@@ -12,6 +12,38 @@ const dir = path.join(__dirname, '..', 'spec');
 fs.writeFileSync(path.join(dir, 'characters.json'), JSON.stringify(M.CHARACTERS, null, 1) + '\n');
 fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'), JSON.stringify(M.CHARACTERS, null, 1) + '\n');   // the Python package carries its own copy
 
+// the same characters as a C table, with what the ported stages read
+(function () {
+  const KIND = { biped: 'CM_BIPED', mech: 'CM_MECH', quad: 'CM_QUAD', hex: 'CM_HEX' };
+  const num = function (x) { const t = String(x); return /[.e]/.test(t) ? t : t + '.0'; };
+  const list = function (a) { return '{ ' + a.map(num).join(', ') + ' }'; };
+  const gait = function (g) { return g ? '{ ' + list(g.phases) + ', ' + list(g.duty) + ' }' : '{ { 0.0 }, { 0.0, 0.0 } }'; };
+  const ids = Object.keys(M.CHARACTERS), out = [];
+  out.push('/* Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE).', '   SPDX-License-Identifier: Apache-2.0', '',
+    '   Written by tools/spec.js from js/core.js. Do not edit: change the reference and run the tool. */', '#include "clio_motion.h"', '#include <string.h>', '',
+    'static const cm_character CHARACTERS[] = {');
+  ids.forEach(function (id) {
+    const c = M.CHARACTERS[id], g = c.gait, gg = g.gallop;
+    out.push('  { "' + id + '", ' + KIND[c.kind] + ', ' + [c.L, c.rootHeight, c.crouchDrop, c.runDrop, c.vmax, c.jumpH || 0, c.bob, c.sway, c.liftWalk, c.liftRun].map(num).join(', ') + ',');
+    out.push('    { ' + [c.L, c.crouchDrop, c.runStride, g.frRun, g.frMax].map(num).join(', ') + ', ' + c.legs.length + ', ' + (g.run ? 1 : 0) + ', ' + (gg ? 1 : 0) + ',');
+    out.push('      ' + gait(g.walk) + ', ' + gait(g.run) + ', ' + gait(gg) + ', ' + num(gg ? gg.fr : 0) + ', ' + num(gg ? gg.frMax : 0) + ' },');
+    out.push('    ' + c.legs.length + ', {');
+    c.legs.forEach(function (l) {
+      const f = l.foot;
+      out.push('      { ' + list(l.attach) + ', ' + list(l.rest) + ', ' + num(l.upper) + ', ' + num(l.lower) + ', ' + list(l.pole) + ', ' + l.side + ', ' + (f ? 1 : 0) + ', '
+        + (f ? list([f.fb, f.hb, f.toe, f.ah, f.heelLift, f.strike]) : '{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }') + ' },');
+    });
+    out.push('    },');
+    const b = c.beast, fs = c.fight && c.fight.stance;
+    out.push('    ' + (b ? 1 : 0) + ', ' + (b && b.mid ? 1 : 0) + ', ' + num(b ? b.flex : 0) + ', ' + num(b ? b.rock : 0) + ', ' + (fs ? 1 : 0) + ', { ' + (fs ? fs.map(list).join(', ') : '{ 0.0, 0.0 }') + ' }, '
+      + num(c.arthro && c.arthro.rock ? c.arthro.rock : 0) + ' },');
+  });
+  out.push('};', '', 'int cm_character_count(void) { return (int)(sizeof CHARACTERS / sizeof CHARACTERS[0]); }',
+    'const cm_character *cm_character_at(int i) { return i >= 0 && i < cm_character_count() ? &CHARACTERS[i] : 0; }',
+    'const cm_character *cm_character_find(const char *id) {', '  int i;', '  for (i = 0; i < cm_character_count(); i++) if (!strcmp(CHARACTERS[i].id, id)) return &CHARACTERS[i];', '  return 0;', '}', '');
+  fs.writeFileSync(path.join(dir, '..', 'c', 'clio_motion_characters.c'), out.join('\n'));
+})();
+
 let seed = 12345;
 function rnd() { seed = (seed + 0x6D2B79F5) >>> 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 function r(a, b) { return a + (b - a) * rnd(); }

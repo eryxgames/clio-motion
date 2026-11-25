@@ -13,9 +13,11 @@ jobs:
           python-version: "3.12"
       - name: JavaScript reference
         run: node js/test/run.js
-      - name: C kernel against the reference
+      - name: C against the reference
         run: make -C c test
-      - name: Python kernel against the reference
-        run: python python/tests/test_kernel.py
+      - name: Python against the reference
+        run: |
+          python python/tests/test_kernel.py
+          python python/tests/test_ground.py
       - name: The bench builds
         run: python bench/build.py

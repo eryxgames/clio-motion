@@ -788,7 +788,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         var grp = (ch.gait.run || ch.gait.walk).phases;
         if (i !== worst && (offs[i] < 0.045 * L || Math.abs(wrapPi(TAU * (grp[i] - grp[worst]))) > 0.1)) continue;
         lg = S.legs[i];
-        lg.swing = { s: 0, psi0: 0, start: lg.ball.slice(), alpha0: lg.alpha, manual: true, rate: 1 / ((0.17 - 0.05 * clamp(mvs / (0.5 * mvMax), 0, 1)) * gp.Tn), ty: lg.ball[1] };
+        lg.swing = { s: 0, psi0: 0, start: lg.ball.slice(), alpha0: lg.alpha, manual: true, rate: 1 / ((0.17 - 0.05 * clamp(mvs / (0.5 * mvMax), 0, 1)) * gp.Tn), tx: lg.ball[0], ty: lg.ball[1], tz: lg.ball[2] };
       }
     }
 
@@ -881,10 +881,10 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         if (!lg.swing && lg.over > 0.03 * L && lg.behind > 0 && down - 1 >= Math.max(1, (S.legs.length >> 1) - 1) && lg.psi < gp.duty - 0.02) {
           if (lg.psi > gp.duty - 0.2) {
             // close to its normal lift-off: simply start the real step a little early
-            lg.swing = { s: 0, psi0: lg.psi, early: true, start: lg.ball.slice(), alpha0: lg.alpha, manual: false, rate: 0, ty: lg.ball[1] };
+            lg.swing = { s: 0, psi0: lg.psi, early: true, start: lg.ball.slice(), alpha0: lg.alpha, manual: false, rate: 0, tx: lg.ball[0], ty: lg.ball[1], tz: lg.ball[2] };
           } else {
             // far out of step (a gait change): one quick corrective step
-            lg.swing = { s: 0, psi0: 0, start: lg.ball.slice(), alpha0: lg.alpha, manual: true, rate: 1 / Math.max(0.7 * (1 - gp.duty) * gp.period, 0.08 * gp.Tn), ty: lg.ball[1] };
+            lg.swing = { s: 0, psi0: 0, start: lg.ball.slice(), alpha0: lg.alpha, manual: true, rate: 1 / Math.max(0.7 * (1 - gp.duty) * gp.period, 0.08 * gp.Tn), tx: lg.ball[0], ty: lg.ball[1], tz: lg.ball[2] };
           }
           down--;
         }

@@ -47,12 +47,15 @@ the bottom, each stage checked against the reference before the next one starts.
 | Stage | JavaScript | C | Python |
 |---|---|---|---|
 | 1. Numeric kernel: springs, two-bone IK, throw solver, chain fitter, gait rules | yes | yes | yes |
-| 2. Ground stepping: foot planning, hips, turning, any direction, jump | yes | | |
+| 2. Ground stepping: speed and turning, any direction, foot planning, jump and pounce, hips, leg IK | yes | yes | yes |
 | 3. Upper bodies: spine, arms, aim, weapons, actions | yes | | |
 | 4. Chains, swimming, flight, ladder, ledge, ragdoll | yes | | |
 | 5. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
 
 Stage 1 agrees with the reference to the last bit or two on 921 recorded cases, in both languages.
+Stage 2 reproduces 24 recorded runs (828 sampled poses of every character) to the ten digits they are
+recorded with. With stage 2 a game has moving legs and hips for any of the characters; the spine,
+arms, head, tail and weapons come with stage 3.
 
 ## Use
 
@@ -71,17 +74,27 @@ Bake files for an engine:
 
 C:
 
-    make -C c            # builds libclio_motion.a and runs its test
+    make -C c            # builds libclio_motion.a and runs its tests
+
+    const cm_character *ch = cm_character_find("soldier");
+    cm_state S; cm_input in = { 0 }; cm_ground_pose pose;
+    cm_state_init(&S, ch, ground_height, NULL);
+    in.speed = 1.4; in.steer = 0.5;
+    cm_step_ground(&S, ch, &in, &CM_STYLE, ground_height, NULL, 1.0 / 60, &pose);
 
 Python:
 
-    python python/tests/test_kernel.py
+    import clio_motion as cm
+    ch = cm.characters()["soldier"]
+    S = cm.create_state(ch, ground_height)
+    pose = cm.step_ground(S, ch, {"speed": 1.4, "steer": 0.5}, cm.STYLE, ground_height, 1 / 60)
 
 ## Tests
 
     node js/test/run.js                 # the reference: every test, then the recorded runs
-    make -C c test                      # the C kernel against the reference's numbers
-    python python/tests/test_kernel.py  # the Python kernel against the same numbers
+    make -C c test                      # C: the kernel's numbers, then the ground replays
+    python python/tests/test_kernel.py  # Python: the kernel's numbers
+    python python/tests/test_ground.py  # Python: the ground replays
 
 After a change to `js/core.js` that is meant to change the motion, `npm run spec` records the
 reference again; the C and Python versions then have to follow.
@@ -89,11 +102,14 @@ reference again; the C and Python versions then have to follow.
 ## How the versions are kept the same
 
 `tools/spec.js` writes the built-in characters as JSON and, for each function of the numeric
-kernel, a few dozen inputs with the outputs the reference gives. `tools/golden.js` plays 26 runs
-described as data in `spec/scenarios.json` (every character through its gaits on rolling ground;
+kernel, a few dozen inputs with the outputs the reference gives, and the characters again as a C
+table. `tools/golden.js` plays 36 runs described as data in `spec/scenarios.json` (every character
+through its gaits on rolling ground; turns, sidesteps, drifting, blows, steps, jumps and pounces;
 the soldier aiming, fighting, carrying, climbing and knocked down; hunts, stings, a swim and two
-flights) and records the whole pose ten times a second. A port passes a stage when it reproduces
-those numbers.
+flights) and records the whole pose ten times a second in `spec/golden/`. The 24 runs that use
+only what the ground step reads are also written to `spec/ground/` as replays that need no JSON
+reader: the inputs step by step, and what the ground step must leave behind. A port passes a
+stage when it reproduces those numbers.
 
 ## Engines
 

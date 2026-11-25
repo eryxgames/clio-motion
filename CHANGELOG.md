@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.0
+
+- C99 and Python, stage 2: the ground step (`cm_step_ground`, `step_ground`). Speed and turning,
+  travel in any direction, the gait, foot planning with feet planted in the world, jumps and
+  pounces, body height and pitch over uneven ground, leg inverse kinematics. Both reproduce the
+  24 ground replays of the reference.
+- `spec/ground/`: self-contained replays for stage 2; ten more recorded runs (36 in all).
+- The built-in characters as a generated C table (`c/clio_motion_characters.c`).
+- Reference: a corrective step now has its target from its first frame (`pose.legs[i].target`
+  held an undefined x for one step).
+
 ## 0.13.0
 
 - Ledge grab: `grabLedge`, hang, pull up, stand on top; `hang` and `climbup` clips; "Wall ahead"

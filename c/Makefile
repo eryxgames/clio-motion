@@ -3,22 +3,27 @@ CC ?= cc
 CFLAGS ?= -std=c99 -O2 -Wall -Wextra -pedantic
 # -ffp-contract=off: no fused multiply-add, so every platform rounds the way the JavaScript reference does
 CFLAGS += -ffp-contract=off
+OBJ = clio_motion.o clio_motion_ground.o clio_motion_characters.o
 
 all: libclio_motion.a test
 
-libclio_motion.a: clio_motion.o
+libclio_motion.a: $(OBJ)
 	$(AR) rcs $@ $^
 
-clio_motion.o: clio_motion.c clio_motion.h
-	$(CC) $(CFLAGS) -c clio_motion.c -o $@
+%.o: %.c clio_motion.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 test_kernel: test_kernel.c libclio_motion.a
 	$(CC) $(CFLAGS) test_kernel.c libclio_motion.a -lm -o $@
 
-test: test_kernel
+test_ground: test_ground.c libclio_motion.a
+	$(CC) $(CFLAGS) test_ground.c libclio_motion.a -lm -o $@
+
+test: test_kernel test_ground
 	./test_kernel ../spec/kernel_vectors.txt
+	./test_ground ../spec/ground/*.txt
 
 clean:
-	rm -f *.o *.a test_kernel
+	rm -f *.o *.a test_kernel test_ground
 
 .PHONY: all test clean
