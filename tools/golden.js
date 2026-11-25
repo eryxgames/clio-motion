@@ -229,5 +229,29 @@ scenarios.forEach(function (sc) {
   if (check) { if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) { bad++; console.log(sc.id + ': differs from the recorded run'); } }
   else fs.writeFileSync(file, text);
 });
+/* Clips: spec/clips.txt has every clip of every character (and of each of the soldier's kits), as the baker records
+   it with eight poses to a cycle. One line a clip:
+     c character kit|- name poses loops seconds speed travel rise  then one number for each pose
+   where a pose's number is the sum of its values, each times (its place in the pose mod 11) + 1, over how many. */
+const clipLines = [];
+let nClips = 0, nClipPoses = 0;
+Object.keys(M.CHARACTERS).forEach(function (id) {
+  const ch = M.CHARACTERS[id];
+  (ch.mount.type === 'held' ? Object.keys(M.KITS) : [null]).forEach(function (kit) {
+    B.recordAll(ch, { frames: 8, kit: kit === ch.mount.kit ? null : kit }).forEach(function (c) {
+      const nums = c.frames.map(function (p) { const v = flat(p, []); let s = 0; v.forEach(function (x, i) { s += x * ((i % 11) + 1); }); return s / v.length; });
+      clipLines.push('c ' + id + ' ' + (kit && kit !== ch.mount.kit ? kit : '-') + ' ' + c.name + ' ' + c.frames.length + ' ' + (c.loop ? 1 : 0) + ' '
+        + [c.duration, c.speed, c.travel, c.rise].concat(nums).map(fmt).join(' '));
+      nClips++; nClipPoses += c.frames.length;
+    });
+  });
+});
+{
+  const ct = clipLines.join('\n') + '\n', cf = path.join(dir, 'clips.txt');
+  if (/ nan/.test(ct)) { bad++; console.log('clips: a value is not a number'); }
+  if (check) { if (!fs.existsSync(cf) || fs.readFileSync(cf, 'utf8') !== ct) { bad++; console.log('clips differ from the recorded ones'); } }
+  else fs.writeFileSync(cf, ct);
+  console.log((check ? 'checked ' : 'recorded ') + nClips + ' clips, ' + nClipPoses + ' poses');
+}
 console.log((check ? 'checked ' : 'recorded ') + scenarios.length + ' runs, ' + samples + ' poses, ' + Math.round(bytes / 1024) + ' KB, ' + grounds + ' ground replays, ' + bodies + ' body replays' + (bad ? ', ' + bad + ' wrong' : ''));
 process.exit(bad ? 1 : 0);

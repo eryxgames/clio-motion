@@ -810,13 +810,15 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     if (!standing) S.lag = 0;
     if (standing && !S.legs.some(function (l) { return l.swing; })) {
       // standing still (or turning on the spot): bring the worst-placed foot back under the body.
-      // A foot counts as badly placed when it is off its spot or still points the old way.
+      // A foot counts as badly placed when it is off its spot or still points the old way. Feet that mirror each other
+      // are equally badly placed, to the last digit or two: of those the first is taken (a later one has to be worse by
+      // more than a billionth of a leg), so that every language and every maths library picks the same.
       var worst = -1, worstD = 0.09 * L, offs = [];
       for (i = 0; i < S.legs.length; i++) {
         var bl = S.legs[i].ball, rs = restOf(i);
         var off = Math.sqrt(Math.pow(bl[0] - (S.x + rs[0]), 2) + Math.pow(bl[2] - rs[1], 2)) + 0.2 * L * Math.abs(wrapPi(S.h - S.legs[i].hd));
         offs.push(off);
-        if (off > worstD) { worstD = off; worst = i; }
+        if (off > worstD + (worst < 0 ? 0 : 1e-9 * L)) { worstD = off; worst = i; }
       }
       S.lag = Math.max.apply(null, offs) / L;
       for (i = 0; worst >= 0 && i < S.legs.length; i++) {

@@ -513,14 +513,15 @@ def step_ground(S, ch, inp, st, terrain_w, dt, upper=None):
     if not standing:
         S.lag = 0.0
     if standing and not any(lg.swing for lg in S.legs):
-        # standing still (or turning on the spot): bring the worst-placed foot back under the body
+        # standing still (or turning on the spot): bring the worst-placed foot back under the body (of feet equally
+        # badly placed, as mirrored ones are, the first: a later one has to be worse by more than a billionth of a leg)
         worst, worst_d, offs = -1, 0.09 * L, []
         for i in range(n):
             bl = S.legs[i].ball
             rs = rest_of(i)
             off = math.sqrt(math.pow(bl[0] - (S.x + rs[0]), 2) + math.pow(bl[2] - rs[1], 2)) + 0.2 * L * abs(wrap_pi(S.h - S.legs[i].hd))
             offs.append(off)
-            if off > worst_d:
+            if off > worst_d + (0 if worst < 0 else 1e-9 * L):
                 worst_d = off
                 worst = i
         S.lag = max(offs) / L

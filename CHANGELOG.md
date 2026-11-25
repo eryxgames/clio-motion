@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.23.0
+
+In CLIo: models that walk, attack and fall by rule. Clips and a model in triangles, in Python.
+
+- CLIo hook. A model in a CLIo game's `models.json` with `"motion": "hyena"` (or an object:
+  character, kit, style, clips, detail, scale) is drawn and moved by this library, which CLIo
+  carries as `engine/motion/clio_motion/`. `tools/clio/carry.py` puts this version into a
+  checkout of CLIo. The change to CLIo itself is in CLIo's repository.
+- Python, `clio_motion.clips`: `record`, `record_all`, `names`, `sample`, `shift_pose`. A port of
+  the baker's recorder; all 214 clips of the twelve characters and the soldier's kits come out
+  pose for pose (`spec/clips.txt`, `python/tests/test_clips.py`).
+- Python, `clio_motion.mesh`: `build`, `place`, `rest`. The stand-in model as triangles, every
+  corner bound to one joint (`python/tests/test_mesh.py`). `python/examples/clip_obj.py` writes
+  a clip as `.obj` files.
+- Fixed, in all three versions: a standing or turning body with mirrored legs (the octopus, the
+  scorpion) chose which foot to bring back under it by the last digit of a sum, so JavaScript,
+  C and Python could step with different legs. Of feet equally badly placed the first is now
+  taken. The 85 runs recorded before are unchanged to the byte; three new ones (many-legged
+  bodies turning on the spot) fail in C and in Python without the rule.
+- `spec/`: 88 runs (3,576 poses), 28 ground replays, 1,192 skeletons, 214 clips.
+
 ## 0.22.0
 
 The skeleton of a pose, live, in C and Python (stage 5a): what an engine needs to show a

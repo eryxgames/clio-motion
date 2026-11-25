@@ -158,7 +158,7 @@ second, stricter way that goes through joints:
 `B.rigData(ch)` is the rig as data: joints (name, parent, the template pose) and parts in their
 joints' frames. `tools/spec.js` writes it for every character and kit to `spec/rigs.json`, and
 the C and Python versions (`cm_skeleton_step`, `clio_motion.rig.skeleton`) are checked against
-this one on 1,154 recorded poses. `node js/test/skeleton_test.js` (part of the usual run) checks
+this one on 1,192 recorded poses. `node js/test/skeleton_test.js` (part of the usual run) checks
 this one against `buildPrims`: the same draw order and shading from three sides in every frame of
 every clip, parts within a few hundredths of a percent of leg length on average, and every
 joint's move bringing the template joint to where it is now. Where the two differ, a body is

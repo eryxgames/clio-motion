@@ -304,7 +304,8 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
       off = sqrt(pow(bl[0] - (S->x + rs[0]), 2) + pow(bl[2] - rs[1], 2)) + 0.2 * L * fabs(cm_wrap_pi(S->h - S->leg[i].hd));
       offs[i] = off;
       if (i == 0 || off > most) most = off;
-      if (off > worst_d) { worst_d = off; worst = i; }
+      /* of feet equally badly placed, as mirrored ones are, the first: a later one has to be worse by more than a billionth of a leg */
+      if (off > worst_d + (worst < 0 ? 0 : 1e-9 * L)) { worst_d = off; worst = i; }
     }
     S->lag = most / L;
     for (i = 0; worst >= 0 && i < n; i++) {

@@ -20,6 +20,8 @@ jobs:
           python python/tests/test_kernel.py
           python python/tests/test_ground.py
           python python/tests/test_body.py
+          python python/tests/test_clips.py
+          python python/tests/test_mesh.py
       - name: The C and Python examples draw the same picture
         run: |
           for n in soldier horse scorpion octopus; do

@@ -4,8 +4,10 @@ Pure Python, standard library only, so CLIo can carry it without a compiler.
 
 Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
 (stage 2), whole bodies on the ground (stage 3) for all twelve characters, and off the ground
-(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; and the skeleton of a
-pose for showing it (stage 5a, below).
+(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; the skeleton of a
+pose for showing it (stage 5a); and, for a game that does not run the core every frame, clips
+recorded from it and a stand-in model in triangles (stage 5b, both below). CLIo uses exactly
+these: see the end.
 
     import clio_motion as cm
 
@@ -91,6 +93,42 @@ the box `dx`, `dy`, `dw`, `dh`.
 writes a strip of a horse walking over rolling ground and knocked down. It writes the same file
 as `c/examples/live2d_svg.c`, byte for byte, for all twelve characters.
 
+## Clips, and a model in triangles
+
+A game that plays clips rather than running the core (a game by turns; a crowd far off) records
+them when it starts, or when one is first needed:
+
+    clip = cm.clips.record(ch, "walk", frames=12)     # None if the character has no such clip
+    clip["frames"], clip["duration"], clip["loop"]    # poses, the body over the origin; seconds; whether it goes round
+    clip["speed"]                                     # metres a second the body would cover
+    i, j, k = cm.clips.sample(clip, t)                # at t seconds: pose i weighing 1 - k, pose j weighing k
+    cm.clips.names(ch)                                # idle, walk, back, left, right, run, sneak, jump, attack, ... die
+
+A looping clip is exactly one cycle. `kit="sword"` gives a soldier's other weapons, `style=` a
+style, `impulse=[x, y, z]` the blow that floors the body in `die`, `fps=` the poses a second of a
+clip played once (12), and `dt=1 / 60` runs the core at a coarser step, for half the work
+(the default, 1/120, is what the reference's baker uses and what is checked). A clip takes about
+a tenth of a second to record. This is a port of the recorder in `js/bake.js`, and gives its 214
+clips pose for pose.
+
+`cm.mesh` makes the stand-in model as triangles for a renderer that draws triangles: each part
+of the rig a small closed shape, every corner bound to one joint, so it follows the skeleton
+with no skinning.
+
+    model = cm.mesh.build(cm.rig.rigs()["hyena"], sides=6)       # once; 300 to 1,200 faces by character and sides
+    points = cm.mesh.place(model, sk)                            # every frame, for rig.skeleton's answer
+    for (a, b, c), part in zip(model["faces"], model["face_part"]):
+        model["parts"][part]["color"], model["parts"][part]["group"]       # "#rrggbb"; leg0, torso, head, ...
+
+`examples/clip_obj.py` writes a clip as `.obj` files, one a pose, that any 3D program opens.
+
+## In CLIo
+
+[CLIo](https://github.com/eryxgames/CLIo) carries this package as `engine/motion/clio_motion/`
+and draws its models with it: `"hound": {"motion": "hyena"}` in a game's `models.json`. See "3D
+models" in CLIo's authoring guide. `python tools/clio/carry.py PATH/TO/CLIo` puts this version
+there; `--check` says whether CLIo's copy is this one.
+
 ## Speed, and the check
 
 Speed on one core, whole steps a second: about 5,000 for the soldier, 7,000 for the hyena and
@@ -103,3 +141,5 @@ Check it against the JavaScript reference:
     python python/tests/test_kernel.py
     python python/tests/test_ground.py
     python python/tests/test_body.py      # also the skeletons, against spec/skeleton/
+    python python/tests/test_clips.py     # every clip, against spec/clips.txt (half a minute)
+    python python/tests/test_mesh.py      # the model in triangles

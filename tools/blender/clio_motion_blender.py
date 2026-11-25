@@ -35,7 +35,7 @@ from bpy_extras.io_utils import ExportHelper, ImportHelper
 bl_info = {
     "name": "CLIo Motion",
     "author": "Daniel Sandner",
-    "version": (0, 22, 0),
+    "version": (0, 23, 0),
     "blender": (4, 2, 0),
     "location": "3D View > Sidebar > CLIo; File > Import, Export",
     "description": "Build a CLIo Motion skeleton, check a model skinned to it, export it as .glb",

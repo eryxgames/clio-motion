@@ -132,8 +132,8 @@ for the soldier, 380,000 for the scorpion, 280,000 for the octopus.
 
 The Makefile turns fused multiply-add off (`-ffp-contract=off`) so that every platform rounds the
 way the JavaScript reference does. The kernel agrees with the reference to the last bit or two
-on 1,142 recorded cases; the ground step and the whole-body step reproduce 25 and 85 recorded runs
-to the ten digits they are recorded with, and the skeleton 1,154 recorded poses (they also do with fused multiply-add on, on the machine
+on 1,142 recorded cases; the ground step and the whole-body step reproduce 28 and 88 recorded runs
+to the ten digits they are recorded with, and the skeleton 1,192 recorded poses (they also do with fused multiply-add on, on the machine
 they were tried on). The whole-body test, with the skeleton, also runs clean under the address and undefined-behaviour
 sanitizers and under valgrind, and gives the same result built with clang.
 
