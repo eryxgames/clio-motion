@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.0
+
+- C99 and Python, stage 3a: upright bodies whole (`cm_step`, `step`). The soldier's spine, head,
+  arms and sideways aim; rifle, two pistols, sword and shield, held and stowed; firing, recoil and
+  reloading; swings and the block; throwing; lifting and carrying a crate; the fighting stance and
+  punches. The mech's hull and guns. Both reproduce 20 whole-body replays of the reference: every
+  number of the pose, the count of each event, and what the events carry.
+- `spec/body/`: whole-body replays; seven more recorded runs (43 in all), one of them for the
+  weapon corner cases (firing dry, a reload refused and cancelled, a throw with pistols).
+- Gait Bench: a copyright line; saving works as an ordinary download on a plain web page.
+
 ## 0.14.0
 
 - C99 and Python, stage 2: the ground step (`cm_step_ground`, `step_ground`). Speed and turning,

@@ -18,6 +18,12 @@
      i step  <19 input numbers>           the inputs from this step on (see inputLine below)
      p n v1 ... vn                        what the ground step left behind (see groundLine below)
 
+   A run of a biped or the mech marked "stage": 2 or 3 (no calls into other modes) is also written to
+   spec/body/<id>.txt, the same way: i lines with every input (see inputLine3 below), and p lines with the
+   whole pose (every number, keys in alphabetical order at every level) followed by how many of each event
+   there have been so far (fire reload loaded throw grab putdown punch strike land jump hit drop), and the sum of
+   every number the events have carried (positions, velocities, which gun or hand).
+
    The ground:  { "waves": [[height, kx, kz, phase], ...], "wall": { "x": 3, "h": 2.3 } }
    height(x, z) = sum of height * sin(kx * x + kz * z + phase), plus h beyond the wall.  No waves: flat.
    A script entry: [time, { input: value, ... }] changes inputs from that time on; an input named with a "!"
@@ -52,6 +58,21 @@ function inputLine(inp) {
   return [inp.speed || 0, inp.crouch || 0, inp.steer || 0, inp.heading != null ? 1 : 0, inp.heading || 0, inp.dir || 0, inp.jump ? 1 : 0,
     h ? 1 : 0, h ? h[0] : 0, h ? h[1] : 0, h ? h[2] || 0 : 0, m ? 1 : 0, m ? m[0] || 0 : 0, m ? m[1] || 0 : 0, pc ? 1 : 0, t ? 1 : 0, t ? t[0] : 0, t ? t[1] : 0, t ? t[2] || 0 : 0].map(fmt17).join(' ');
 }
+/* Everything a whole biped or mech reads: the 19 numbers of inputLine, then
+   aim (0 none, 2 or 3 numbers given) ax ay az, fire, armed, kit (0 unsaid, 1 rifle, 2 pistols, 3 sword), reload,
+   throw (0, 1 no target, 2 target) tx ty tz, pickup, hasAt ax ay az, hasHeading heading, hasSize d h w, putdown, guard, block,
+   punch (0, 1 jab, 2 cross, 3 hook), hasTarget tx ty tz, hasTrack tx ty tz, swing (0, 1 slash, 2 chop, 3 thrust) */
+const KITN = { rifle: 1, pistols: 2, sword: 3 }, PUNCHN = { jab: 1, cross: 2, hook: 3 }, SWINGN = { slash: 1, chop: 2, thrust: 3 };
+const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop'];
+function inputLine3(inp) {
+  const v3 = function (a) { return a ? [a[0], a[1], a[2] || 0] : [0, 0, 0]; };
+  const a = inp.aim, th = inp.throw, pk = inp.pickup, pu = inp.punch, tr = inp.track, sw = inp.swing, sz = pk && pk.size;
+  const v = [a ? a.length : 0].concat(v3(a), [inp.fire ? 1 : 0, inp.armed ? 1 : 0, KITN[inp.kit] || 0, inp.reload ? 1 : 0,
+    th ? (th.target ? 2 : 1) : 0], v3(th && th.target), [pk ? 1 : 0, pk && pk.at ? 1 : 0], v3(pk && pk.at), [pk && pk.heading != null ? 1 : 0, pk && pk.heading || 0,
+    sz ? 1 : 0, sz ? sz.d : 0, sz ? sz.h : 0, sz ? sz.w : 0, inp.putdown ? 1 : 0, inp.guard ? 1 : 0, inp.block ? 1 : 0,
+    pu ? PUNCHN[pu.kind] || 1 : 0, pu && pu.target ? 1 : 0], v3(pu && pu.target), [tr ? 1 : 0], v3(tr), [sw ? SWINGN[sw.kind] || 1 : 0]);
+  return inputLine(inp) + ' ' + v.map(fmt17).join(' ');
+}
 /* What the ground step leaves behind: px pz h x y v a phase om crouch run gal ground pitch-state reach-drop hop bank side,
    root (3) and pitch as drawn, landings and jumps so far, then for each leg: planted, hip, knee, ankle, ball,
    heel and toe if it has a foot, and the place it is stepping to if it is in the air.  Points are in the world. */
@@ -79,6 +100,12 @@ function play(sc) {
     G2.push('g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0'));
   }
   play.ground = G2;
+  // a whole-body replay for the bodies ported so far: bipeds and the mech, with no calls into other modes
+  const whole = (sc.stage === 2 || sc.stage === 3) && (ch.kind === 'biped' || ch.kind === 'mech');
+  const B3 = whole ? ['# ' + sc.id + ' ' + sc.character + ' ' + hz + ' ' + n + ' ' + every, G2 ? G2[1] : 'g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0')] : null;
+  const tally = TALLY.map(function () { return 0; });
+  let lastIn3 = null, evsum = 0;
+  play.body = B3;
   const seen = play.events = [];
   for (let i = 0; i < n; i++) {
     const t = i * dt, once = [];
@@ -87,20 +114,23 @@ function play(sc) {
       if (e[1] === 'call') M[e[2]].apply(null, [S, ch, env].concat(e.slice(3)));
       else Object.keys(e[1]).forEach(function (k) { if (k[0] === '!') { inp[k.slice(1)] = e[1][k]; once.push(k.slice(1)); } else inp[k] = e[1][k]; });
     }
+    if (B3) { const iv3 = inputLine3(inp); if (iv3 !== lastIn3) { B3.push('i ' + i + ' ' + iv3); lastIn3 = iv3; } }
     if (G2) { const iv = inputLine(inp); if (iv !== lastIn) { G2.push('i ' + i + ' ' + iv); lastIn = iv; } }
     M.step(S, ch, inp, STYLE, env, dt);
     S.events.forEach(function (e) { if (e.type === 'land') lands++; else if (e.type === 'jump') jumps++; });
+    S.events.forEach(function (e) { const k = TALLY.indexOf(e.type); if (k >= 0) tally[k]++; flat(e, []).forEach(function (x) { evsum += x; }); });
     S.events.forEach(function (e) { seen.push(e.type); });
     S.events.length = 0;
     once.forEach(function (k) { delete inp[k]; });
     if (G2 && i % every === every - 1) G2.push('p ' + groundLine(S, ch, lands, jumps));
+    if (B3 && i % every === every - 1) { const v3 = flat(S.pose, []).concat(tally, [evsum]); B3.push('p ' + v3.length + ' ' + v3.map(fmt).join(' ')); }
     if (i % every === every - 1) { const v = flat(S.pose, []); lines.push(fmt((i + 1) * dt) + ' ' + S.mode + ' ' + v.length + ' ' + v.map(fmt).join(' ')); }
   }
   return lines.join('\n') + '\n';
 }
 
 const scenarios = JSON.parse(fs.readFileSync(path.join(dir, 'scenarios.json'), 'utf8')).scenarios, check = process.argv.indexOf('--check') >= 0;
-let bad = 0, samples = 0, bytes = 0, grounds = 0;
+let bad = 0, samples = 0, bytes = 0, grounds = 0, bodies = 0;
 if (!check) fs.mkdirSync(out, { recursive: true });
 scenarios.forEach(function (sc) {
   const text = play(sc), file = path.join(out, sc.id + '.txt');
@@ -113,8 +143,14 @@ scenarios.forEach(function (sc) {
     if (check) { if (!fs.existsSync(gf) || fs.readFileSync(gf, 'utf8') !== gt) { bad++; console.log(sc.id + ': ground replay differs from the recorded one'); } }
     else { fs.mkdirSync(path.join(dir, 'ground'), { recursive: true }); fs.writeFileSync(gf, gt); }
   }
+  if (play.body) {
+    const bt = play.body.join('\n') + '\n', bf = path.join(dir, 'body', sc.id + '.txt'); bodies++;
+    if (/ nan/.test(bt)) { bad++; console.log(sc.id + ': a body value is not a number'); }
+    if (check) { if (!fs.existsSync(bf) || fs.readFileSync(bf, 'utf8') !== bt) { bad++; console.log(sc.id + ': body replay differs from the recorded one'); } }
+    else { fs.mkdirSync(path.join(dir, 'body'), { recursive: true }); fs.writeFileSync(bf, bt); }
+  }
   if (check) { if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) { bad++; console.log(sc.id + ': differs from the recorded run'); } }
   else fs.writeFileSync(file, text);
 });
-console.log((check ? 'checked ' : 'recorded ') + scenarios.length + ' runs, ' + samples + ' poses, ' + Math.round(bytes / 1024) + ' KB, ' + grounds + ' ground replays' + (bad ? ', ' + bad + ' wrong' : ''));
+console.log((check ? 'checked ' : 'recorded ') + scenarios.length + ' runs, ' + samples + ' poses, ' + Math.round(bytes / 1024) + ' KB, ' + grounds + ' ground replays, ' + bodies + ' body replays' + (bad ? ', ' + bad + ' wrong' : ''));
 process.exit(bad ? 1 : 0);

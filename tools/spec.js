@@ -15,6 +15,7 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
 // the same characters as a C table, with what the ported stages read
 (function () {
   const KIND = { biped: 'CM_BIPED', mech: 'CM_MECH', quad: 'CM_QUAD', hex: 'CM_HEX' };
+  const MOUNT = { held: 'CM_MOUNT_HELD', fixed: 'CM_MOUNT_FIXED', turret: 'CM_MOUNT_TURRET', jaw: 'CM_MOUNT_JAW' }, KITC = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD' };
   const num = function (x) { const t = String(x); return /[.e]/.test(t) ? t : t + '.0'; };
   const list = function (a) { return '{ ' + a.map(num).join(', ') + ' }'; };
   const gait = function (g) { return g ? '{ ' + list(g.phases) + ', ' + list(g.duty) + ' }' : '{ { 0.0 }, { 0.0, 0.0 } }'; };
@@ -36,7 +37,11 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
     out.push('    },');
     const b = c.beast, fs = c.fight && c.fight.stance;
     out.push('    ' + (b ? 1 : 0) + ', ' + (b && b.mid ? 1 : 0) + ', ' + num(b ? b.flex : 0) + ', ' + num(b ? b.rock : 0) + ', ' + (fs ? 1 : 0) + ', { ' + (fs ? fs.map(list).join(', ') : '{ 0.0, 0.0 }') + ' }, '
-      + num(c.arthro && c.arthro.rock ? c.arthro.rock : 0) + ' },');
+      + num(c.arthro && c.arthro.rock ? c.arthro.rock : 0) + ',');
+    const m = c.mount || {}, T = c.torso || {}, A = c.arms || {}, P = c.pod || {};
+    out.push('    ' + (MOUNT[m.type] || 'CM_MOUNT_TURRET') + ', ' + (KITC[m.kit] || 'CM_KIT_NONE') + ', ' + (m.n || 1) + ', ' + (m.yaw === undefined ? 0 : 1) + ', '
+      + [m.rate || 0, m.kick || 0, m.rise || 0, m.omega || 0, m.aimOmega || 0, m.min || 0, m.max || 0, m.yaw === undefined ? 1 : m.yaw, m.bodyKick || 0].map(num).join(', ') + ',');
+    out.push('    ' + [T.len || 0, T.neck || 0, T.headR || 0, T.shoulderW || 0, A.upper || 0, A.lower || 0, P.h || 0, P.r || 0, P.gunZ || 0, P.gunLen || 0].map(num).join(', ') + ' },');
   });
   out.push('};', '', 'int cm_character_count(void) { return (int)(sizeof CHARACTERS / sizeof CHARACTERS[0]); }',
     'const cm_character *cm_character_at(int i) { return i >= 0 && i < cm_character_count() ? &CHARACTERS[i] : 0; }',

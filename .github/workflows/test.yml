@@ -19,5 +19,6 @@ jobs:
         run: |
           python python/tests/test_kernel.py
           python python/tests/test_ground.py
+          python python/tests/test_body.py
       - name: The bench builds
         run: python bench/build.py

@@ -3,7 +3,7 @@
 
    Stage 2: the ground step. A port of stepGround in js/core.js, kept statement for statement so that it gives
    the same numbers; checked against the replays in spec/ground/. */
-#include "clio_motion.h"
+#include "clio_motion_internal.h"
 #include <math.h>
 #include <string.h>
 
@@ -13,30 +13,15 @@
 
 const cm_style CM_STYLE = { 1.0, 1.0, 1.0, 1.0, 1.0, 0.3 };
 
-/* the body's frame for one step: live place and local x from the state, heading fixed after the turn */
-typedef struct { const cm_state *s; double hc, hs; cm_terrain_fn fn; void *user; } frame;
-
-static void to_w(const frame *f, const double p[3], double o[3]) {
-  double x = p[0] - f->s->x, z = p[2];
-  o[0] = f->s->px + x * f->hc - z * f->hs; o[1] = p[1]; o[2] = f->s->pz + x * f->hs + z * f->hc;
+static double slope_at(const cm_frame *f, double x, double w) {
+  return cm_clamp(atan2(cm_ter(f, x + w, 0) - cm_ter(f, x - w, 0), 2 * w), -0.45, 0.45);
 }
-static void to_l(const frame *f, const double p[3], double o[3]) {
-  double x = p[0] - f->s->px, z = p[2] - f->s->pz;
-  o[0] = f->s->x + x * f->hc + z * f->hs; o[1] = p[1]; o[2] = -x * f->hs + z * f->hc;
-}
-/* ground height under a point given in the body's frame */
-static double ter(const frame *f, double lx, double lz) {
-  const cm_state *s = f->s;
-  return f->fn(s->px + (lx - s->x) * f->hc - lz * f->hs, s->pz + (lx - s->x) * f->hs + lz * f->hc, f->user);
-}
-static double slope_at(const frame *f, double x, double w) {
-  return cm_clamp(atan2(ter(f, x + w, 0) - ter(f, x - w, 0), 2 * w), -0.45, 0.45);
-}
+void cm_event_push(cm_state *s, const cm_event *e) { if (s->n_events < CM_MAX_EVENTS) s->events[s->n_events++] = *e; }
 static void event(cm_state *s, int type, int leg, int side, double x, double y, double z, double hd) {
-  cm_event *e;
-  if (s->n_events >= CM_MAX_EVENTS) return;
-  e = &s->events[s->n_events++];
-  e->type = type; e->leg = leg; e->side = side; e->x = x; e->y = y; e->z = z; e->hd = hd;
+  cm_event e;
+  memset(&e, 0, sizeof e);
+  e.type = type; e.leg = leg; e.side = side; e.x = x; e.y = y; e.z = z; e.hd = hd;
+  cm_event_push(s, &e);
 }
 static void swing_start(cm_leg_state *lg, int manual, double rate, double psi0, int air, int early, int with_target) {
   cm_swing *sw = &lg->swing;
@@ -66,6 +51,9 @@ void cm_state_init(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, v
   s->flinch_dir = -1;
   s->tv[0] = 1;
   s->legs = ch->legs;
+  s->armed.x = 1;
+  s->kit = ch->mount_type == CM_MOUNT_HELD ? ch->mount_kit : CM_KIT_NONE;
+  cm_kit_fill(s);
   for (i = 0; i < ch->legs; i++) {
     cm_leg_state *lg = &s->leg[i];
     lg->ball[0] = ch->leg[i].rest[0]; lg->ball[1] = terrain(ch->leg[i].rest[0], 0.0, user); lg->ball[2] = ch->leg[i].rest[1];
@@ -74,13 +62,20 @@ void cm_state_init(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, v
 }
 
 void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_ground_pose *out) {
+  cm_ground_core(S, ch, inp, st, terrain, user, dt, out, 0);
+  /* The one thing the action layer feeds back into the ground step when nothing is being done:
+     a mantis rocks like a leaf in the wind while it stands. */
+  if (ch->arthro_rock != 0) S->act_back = S->standing ? ch->arthro_rock * sin(TAU * S->t / 1.4) : 0;
+}
+
+void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_ground_pose *out, cm_bctx *B) {
   double L = ch->L, Tn0, he, om_spot, om_max, om_t, hc, hs, vT, a_max, dv, dx = 1, dz = 0, d_in;
   double duty, period, stance_travel, kd, mvx, mvz, mv_max, mvm, kmv, mvl[2], mvs, stK;
   double mean_y = 0, mx = 0, sxx = 0, sxy = 0, pitch_t, pitch, flex = 0, cp, sn, h, phi_mid, c, bob, sway, idle, P, ix, iy, bank_t, sway0, y0, need = 0, vy;
   double hips[CM_MAX_LEGS][3], ankles[CM_MAX_LEGS][3], heels[CM_MAX_LEGS][3], toes[CM_MAX_LEGS][3], balls[CM_MAX_LEGS][3];
   cm_gait_params gp;
   cm_jump *J = &S->jump;
-  frame fr;
+  cm_frame fr;
   int n = S->legs, i, hasJ, air, standing;
 
   S->t += dt;
@@ -135,14 +130,14 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
   duty = gp.duty; period = gp.period;
 
   /* jump: crouch (prep), leave the ground on a ballistic arc (air), absorb the landing with a spring (land) */
-  if (inp->jump && J->stage == CM_JUMP_NONE && ch->jump_h != 0 && !S->carry && !(S->act > 1)) {
+  if (inp->jump && J->stage == CM_JUMP_NONE && ch->jump_h != 0 && !S->carry && !(S->act > CM_ACT_RELOAD)) {
     memset(J, 0, sizeof *J);
     J->stage = CM_JUMP_PREP; J->v0 = sqrt(2 * G * ch->jump_h * L);
   }
   if (inp->has_pounce && J->stage == CM_JUMP_NONE && ch->has_beast && !S->act) {
     /* a leap onto something: a flat arc along the heading, far enough to bring the jaws down on the target */
     double pt0[3], pdist, pv0;
-    if (inp->has_pounce_target) to_l(&fr, inp->pounce_target, pt0); else { pt0[0] = S->x + 3.4 * L; pt0[1] = 0; pt0[2] = 0; }
+    if (inp->has_pounce_target) cm_to_l(&fr, inp->pounce_target, pt0); else { pt0[0] = S->x + 3.4 * L; pt0[1] = 0; pt0[2] = 0; }
     pdist = cm_clamp(pt0[0] - S->x - 1.3 * L - S->v * (0.11 * Tn0 + 0.12), 1.2 * L, 5.5 * L);
     pv0 = sqrt(0.3 * G * pdist);
     memset(J, 0, sizeof *J);
@@ -167,17 +162,17 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
   if (air) {
     double gl = 0;
     J->vy -= G * dt; J->y += J->vy * dt;
-    for (i = 0; i < n; i++) gl += ter(&fr, S->x + ch->leg[i].rest[0], 0);
+    for (i = 0; i < n; i++) gl += cm_ter(&fr, S->x + ch->leg[i].rest[0], 0);
     gl /= n;
     if (J->vy < 0 && J->y <= gl + ch->root_height * (1 - ch->crouch_drop * S->crouch)) {
       J->stage = CM_JUMP_LAND; J->t = 0; J->landed = 1; air = 0;
       S->g_ref.x = gl; S->g_ref.v = 0; S->phase = J->phi;
       for (i = 0; i < n; i++) {
         cm_leg_state *lg = &S->leg[i];
-        double lx = lg->ball[0], ly = ter(&fr, lx, 0), wj[3];
+        double lx = lg->ball[0], ly = cm_ter(&fr, lx, 0), wj[3];
         lg->ball[1] = ly; lg->swing.active = 0; lg->has_w = 0; lg->hd = S->h; lg->strike = 0; lg->alpha = 0; lg->ref_y = ly; lg->drop = 0;
         lg->slope = ch->leg[i].has_foot ? slope_at(&fr, lx, 0.5 * ch->leg[i].foot.fb) : 0;
-        to_w(&fr, lg->ball, wj);
+        cm_to_w(&fr, lg->ball, wj);
         event(S, CM_EV_LAND, i, ch->leg[i].side, wj[0], ly, wj[2], S->h);
       }
     }
@@ -215,9 +210,9 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
     cm_leg_state *lg = &S->leg[i];
     cm_swing *swp = &lg->swing;
     if (swp->active && !swp->air) {
-      if (!swp->has_start_w) { if (lg->has_w) memcpy(swp->start_w, lg->w, sizeof lg->w); else to_w(&fr, swp->start, swp->start_w); swp->has_start_w = 1; }
-      to_l(&fr, swp->start_w, swp->start);
-    } else if (!swp->active && lg->has_w) to_l(&fr, lg->w, lg->ball);
+      if (!swp->has_start_w) { if (lg->has_w) memcpy(swp->start_w, lg->w, sizeof lg->w); else cm_to_w(&fr, swp->start, swp->start_w); swp->has_start_w = 1; }
+      cm_to_l(&fr, swp->start_w, swp->start);
+    } else if (!swp->active && lg->has_w) cm_to_l(&fr, lg->w, lg->ball);
   }
   S->idle_t = standing && !hasJ && fabs(S->om) < 0.2 ? S->idle_t + dt : 0;
 
@@ -237,13 +232,13 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
       double tuck = fmax(0, 0.3 * (1 - pow(J->vy / J->v0, 2))), txa, tya, kA, t_land;
       if (J->pounce) offx += ch->beast_mid && J->vy < 0 ? 0.22 * L : ld->attach[0] > 0 ? (J->vy < 0 ? 0.50 : 0.30) * L : -0.30 * L * fmax(0, J->vy / J->v0);
       txa = S->x + ld->rest[0] + offx * dx;
-      tya = fmax(J->y + ld->attach[1] - h_stand * ext * (1 - tuck), ter(&fr, txa, 0) + 0.01 * L);
+      tya = fmax(J->y + ld->attach[1] - h_stand * ext * (1 - tuck), cm_ter(&fr, txa, 0) + 0.01 * L);
       kA = cm_decay(34 / Tn0, dt);
       lg->ball[0] = cm_lerp(lg->ball[0] + S->v * dt, txa, kA); lg->ball[1] = cm_lerp(lg->ball[1], tya, kA); lg->ball[2] = ld->rest[1];
       lg->alpha = ld->has_foot ? 0.12 + 0.6 * fmax(0, J->vy / J->v0) : 0;
       t_land = (J->vy + sqrt(J->vy * J->vy + 2 * G * fmax(0, J->y - (S->g_ref.x + ch->root_height)))) / G;
-      lg->swing.tx = txa + S->v * t_land; lg->swing.ty = ter(&fr, lg->swing.tx, 0);
-      lg->ref_y = ter(&fr, S->x + ld->rest[0], 0); lg->psi = psi_l; lg->drop = 0;
+      lg->swing.tx = txa + S->v * t_land; lg->swing.ty = cm_ter(&fr, lg->swing.tx, 0);
+      lg->ref_y = cm_ter(&fr, S->x + ld->rest[0], 0); lg->psi = psi_l; lg->drop = 0;
       continue;
     }
     psi = cm_frac(S->phase + gp.phases[i]);
@@ -271,7 +266,7 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
       if (dz != 0) rz = ld->side > 0 ? fmax(rz, 0.02 * L) : fmin(rz, -0.02 * L);     /* going sideways, a foot closes up to the other but does not cross it */
       tx = S->x + fwd * (dx * ch2 - dz * sh2) + rx * ca - rz * sa; tz = fwd * (dx * sh2 + dz * ch2) + rx * sa + rz * ca;
       if (standing && mvs > 1e-4) { double ahead = t_rem + 0.09 * gp.Tn; tx += mvl[0] * ahead; tz += mvl[1] * ahead; }   /* drifting: step to where the body is going */
-      ty = ter(&fr, tx, tz);
+      ty = cm_ter(&fr, tx, tz);
       sw->tx = tx; sw->ty = ty; sw->tz = tz; sw->has_tz = 1;
       e = cm_ease(sw->s, st->snap);
       bx = cm_lerp(sw->start[0], tx, e); bz = cm_lerp(sw->start[2], tz, e);
@@ -281,17 +276,17 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
       ey = up ? 1 - pow(1 - sw->s, 3) : pow(sw->s, 3);       /* rise early onto a ledge, drop late off one */
       eY = cm_lerp(e, ey, cm_clamp(fabs(ty - sw->start[1]) / (0.1 * L), 0, 1));
       by = cm_lerp(sw->start[1], ty, eY) + lift * sin(PI * sw->s);
-      by = fmax(by, ter(&fr, bx, bz) + 0.004 * L);
+      by = fmax(by, cm_ter(&fr, bx, bz) + 0.004 * L);
       if (ld->has_foot) {
         double land_a = -ld->foot.strike * (1 - 0.8 * S->gait.run) * cm_clamp(dist / (0.3 * L), 0, 1) * (sw->manual ? 0.3 : 1);
         lg->alpha = sw->alpha0 * (1 - cm_smooth(0, 0.55, sw->s)) + land_a * cm_smooth(0.5, 0.95, sw->s);
       }
       if (done) {
-        double gy = ter(&fr, bx, bz), wl[3];
+        double gy = cm_ter(&fr, bx, bz), wl[3];
         lg->drop = by - gy; lg->ball[0] = bx; lg->ball[1] = gy; lg->ball[2] = bz; sw->active = 0; lg->has_w = 0; lg->hd = S->h;
         lg->strike = lg->alpha; lg->slope = ld->has_foot ? slope_at(&fr, bx, 0.5 * ld->foot.fb) : 0;
         lg->ref_y = gy;
-        to_w(&fr, lg->ball, wl);
+        cm_to_w(&fr, lg->ball, wl);
         event(S, CM_EV_LAND, i, ld->side, wl[0], gy, wl[2], S->h);
       } else { lg->ball[0] = bx; lg->ball[1] = by; lg->ball[2] = bz; lg->ref_y = ty; }
     } else lg->ref_y = lg->ball[1];
@@ -433,17 +428,17 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
       hip[0] = hips[i][0]; hip[1] = hips[i][1] - S->reach_drop; hip[2] = hips[i][2];
       cm_ik2(hip, ankles[i], ld->upper, ld->lower, ld->pole, knee, end);
       memset(o, 0, sizeof *o);
-      to_w(&fr, hip, o->hip); to_w(&fr, knee, o->knee); to_w(&fr, end, o->ankle); to_w(&fr, balls[i], o->ball);
+      cm_to_w(&fr, hip, o->hip); cm_to_w(&fr, knee, o->knee); cm_to_w(&fr, end, o->ankle); cm_to_w(&fr, balls[i], o->ball);
       o->has_foot = ld->has_foot; o->side = ld->side; o->planted = !lg->swing.active;
-      if (ld->has_foot) { to_w(&fr, heels[i], o->heel); to_w(&fr, toes[i], o->toe); }
+      if (ld->has_foot) { cm_to_w(&fr, heels[i], o->heel); cm_to_w(&fr, toes[i], o->toe); }
       if (lg->swing.active) {
         double tg[3];
         tg[0] = lg->swing.tx; tg[1] = lg->swing.ty; tg[2] = lg->swing.has_tz ? lg->swing.tz : ld->rest[1];
-        to_w(&fr, tg, o->target);
+        cm_to_w(&fr, tg, o->target);
       }
     }
     root[0] = S->x + ix; root[1] = S->y; root[2] = sway;
-    to_w(&fr, root, out->root);
+    cm_to_w(&fr, root, out->root);
     out->pitch = pitch; out->heading = S->h; out->crouch = S->crouch;
     out->gait = air ? CM_GAIT_JUMP : standing || S->v < 0.02 ? CM_GAIT_STANDING : gp.gal > 0.5 ? CM_GAIT_GALLOP
       : gp.run > 0.5 ? (ch->kind == CM_QUAD && n > 2 ? CM_GAIT_TROT : CM_GAIT_RUN) : CM_GAIT_WALK;
@@ -451,9 +446,17 @@ void cm_step_ground(cm_state *S, const cm_character *ch, const cm_input *inp, co
   }
   for (i = 0; i < n; i++) {
     cm_leg_state *lg = &S->leg[i];
-    if (!lg->swing.active && !lg->has_w) { to_w(&fr, lg->ball, lg->w); lg->has_w = 1; }
+    if (!lg->swing.active && !lg->has_w) { cm_to_w(&fr, lg->ball, lg->w); lg->has_w = 1; }
   }
-  /* The one thing the action layer (stage 3) feeds back into the ground step when nothing is being done:
-     a mantis rocks like a leaf in the wind while it stands. */
-  if (ch->arthro_rock != 0) S->act_back = standing ? ch->arthro_rock * sin(TAU * S->t / 1.4) : 0;
+  if (B) {
+    double acc_lean = atan(S->a / G) * 0.55 * st->lean;
+    B->fr = fr;
+    B->root[0] = S->x + ix; B->root[1] = S->y; B->root[2] = sway;
+    B->pitch = pitch; B->gp = gp; B->Tn = Tn0; B->idle = idle; B->P = P; B->bank = bank_t; B->sway0 = sway0; B->flex = flex;
+    B->leg0_side = ch->leg[0].side;
+    B->has_aim = inp->has_aim && !S->carry;
+    if (B->has_aim) { double a3[3]; a3[0] = inp->aim[0]; a3[1] = inp->aim[1]; a3[2] = inp->has_aim > 2 ? inp->aim[2] : S->pz; cm_to_l(&fr, a3, B->aim); }
+    B->prep = hasJ && (J->stage == CM_JUMP_PREP || J->stage == CM_JUMP_PUSH) ? cm_clamp(-S->hop.x / (0.22 * h), 0, 1) : 0;
+    B->lean_base = ((0.03 + 0.05 * fmin(gp.Fr, 2) + 0.09 * gp.run) * st->lean * dx + acc_lean * dx + 0.42 * S->crouch) - 0.8 * S->hop.x / h - 0.06 * S->air_b;
+  }
 }

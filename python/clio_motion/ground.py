@@ -131,6 +131,21 @@ class State:
         self.act = None
         self.act_crouch = 0.0
         self.act_back = 0.0
+        # the upper body: aim, weapons, actions (stage 3)
+        mount = ch.get("mount") or {}
+        self.aim = Spring()
+        self.twist = Spring()
+        self.armed = Spring(1.0)
+        self.kick = [Spring(), Spring()]
+        self.flash = [0.0, 0.0]
+        self.cool = 0.0
+        self.gun = 0
+        self.kit = mount.get("kit")
+        self.ammo = None
+        self.block = Spring()
+        self.ac_tw = 0.0
+        self.ho_rel = [None, None]
+        self.local = None
         self.legs = [Leg([l["rest"][0], terrain(l["rest"][0], 0.0), l["rest"][1]], g0) for l in ch["legs"]]
 
 
@@ -138,11 +153,31 @@ def create_state(ch, terrain):
     return State(ch, terrain)
 
 
+DIR_KEYS = frozenset(("gaze", "u", "f", "dir", "axis", "up", "side", "t1", "t2"))
+
+
+def pose_to_world(o, fr, key=None):
+    """A pose worked out in the body's frame, in the world: points are moved and turned, directions only turned.
+    fr: (the body's local x, its place px, pz, cos and sin of its heading)."""
+    if isinstance(o, list):
+        if len(o) == 3 and isinstance(o[0], (int, float)) and not isinstance(o[0], bool):
+            if key in DIR_KEYS:
+                return [o[0] * fr[3] - o[2] * fr[4], o[1], o[0] * fr[4] + o[2] * fr[3]]
+            x, z = o[0] - fr[0], o[2]
+            return [fr[1] + x * fr[3] - z * fr[4], o[1], fr[2] + x * fr[4] + z * fr[3]]
+        return [pose_to_world(v, fr, key) for v in o]
+    if isinstance(o, dict):
+        return {k: pose_to_world(v, fr, k) for k, v in o.items()}
+    return o
+
+
 def _slope_at(terrain, x, w):
     return clamp(math.atan2(terrain(x + w) - terrain(x - w), 2 * w), -0.45, 0.45)
 
 
-def step_ground(S, ch, inp, st, terrain_w, dt):
+def step_ground(S, ch, inp, st, terrain_w, dt, upper=None):
+    """One step of the legs and hips.  ``upper`` is the upper-body function of stage 3 (see body.py); without it
+    the pose holds the root and the legs only."""
     L = ch["L"]
     cl = ch["legs"]
     S.t += dt
@@ -620,9 +655,9 @@ def step_ground(S, ch, inp, st, terrain_w, dt):
         ankle, heel, toe, ball = ankles[i]
         knee, end = ik2(hips[i], ankle, ld["upper"], ld["lower"], ld["pole"])
         sw = lg.swing
-        target = world([sw.tx, sw.ty, ld["rest"][1] if sw.tz is None else sw.tz]) if sw else None
-        legs.append({"hip": world(hips[i]), "knee": world(knee), "ankle": world(end), "heel": world(heel) if heel else None,
-                     "toe": world(toe) if toe else None, "ball": world(ball), "planted": not sw, "target": target, "side": ld["side"]})
+        target = [sw.tx, sw.ty, ld["rest"][1] if sw.tz is None else sw.tz] if sw else None
+        legs.append({"hip": hips[i], "knee": knee, "ankle": end, "heel": heel, "toe": toe, "ball": ball, "planted": not sw, "target": target,
+                     "side": ld["side"]})
 
     # backpack / tail: a loose spring dragged along by the body's vertical motion
     vy = (S.y - S.last_y) / dt
@@ -644,9 +679,30 @@ def step_ground(S, ch, inp, st, terrain_w, dt):
     S.stats = {"Fr": gp["Fr"], "stride": gp["stride"], "period": period, "duty": duty, "run": gp["run"], "phases": phases, "v": S.v,
                "gait": gait, "idlePeriod": P, "steps": 60 * n / period if S.v > 0.02 else 0, "air": max(0, 1 - 2 * duty) if ch["gait"].get("run") else 0,
                "heading": S.h, "turn": S.om}
+    if upper is not None:
+        aim = inp.get("aim")
+        acc_lean = math.atan(S.a / G) * 0.55 * st["lean"]
+        B = {"root": [S.x + ix, S.y, sway], "pitch": pitch, "gp": gp, "Tn": Tn0, "idle": idle, "P": P, "bank": bank_t, "sway0": sway0,
+             "aim": to_l([aim[0], aim[1], aim[2] if len(aim) > 2 else S.pz]) if aim and not S.carry else None,
+             "to_l": to_l, "to_w": to_w, "terrain": terrain, "flex": flex,
+             "drift": [mvl[0] + S.kv[0] * hc + S.kv[1] * hs, mvl[1] - S.kv[0] * hs + S.kv[1] * hc],
+             "prep": clamp(-S.hop.x / (0.22 * h), 0, 1) if J and J.stage in ("prep", "push") else 0,
+             "leanBase": ((0.03 + 0.05 * min(gp["Fr"], 2) + 0.09 * gp["run"]) * st["lean"] * dx + acc_lean * dx + 0.42 * S.crouch) - 0.8 * S.hop.x / h - 0.06 * S.air_b}
+        S.local = upper(S, ch, inp, st, dt, legs, B)
+        S.local["heading"] = S.h
     for lg in S.legs:
         if not lg.swing and not lg.w:
             lg.w = to_w(lg.ball)
+    if upper is not None:
+        S.stats["ammo"] = list(S.ammo) if S.ammo else None
+        S.stats["kit"] = S.kit
+        S.stats["action"] = S.act["name"] if S.act else None
+        S.pose = pose_to_world(S.local, (S.x, S.px, S.pz, hc, hs))
+        return S.pose
+    for l in legs:
+        for key in ("hip", "knee", "ankle", "heel", "toe", "ball", "target"):
+            if l[key] is not None:
+                l[key] = world(l[key])
     # The one thing the action layer (stage 3) feeds back into the ground step when nothing is being done:
     # a mantis rocks like a leaf in the wind while it stands.
     arthro = ch.get("arthro")

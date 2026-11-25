@@ -79,6 +79,8 @@ button, input { font: inherit; color: inherit; }
 #strip { flex: 0 0 auto; width: 256px; height: 112px; box-sizing: content-box; image-rendering: pixelated; background: var(--stage); border: 1px solid var(--line); }
 #sprite { flex: 0 0 auto; width: 128px; height: 112px; box-sizing: content-box; image-rendering: pixelated; background: var(--stage); border: 1px solid var(--line); }
 .note { margin: 5px 0 0; font-size: 11.5px; color: var(--muted); }
+.credit { margin: 14px 0 6px; padding: 0 16px; font: 11.5px/1.5 var(--mono); color: var(--muted); text-align: center; }
+.credit a { color: inherit; }
 
 .panel { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 4px 18px 20px; }
 .group { padding: 12px 0 13px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 9px; }
@@ -299,6 +301,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     </div>
   </aside>
 </main>
+<footer class="credit">&copy; 2026 Daniel Sandner. CLIo Motion, created for the <a href="https://github.com/eryxgames/CLIo">CLIo game research engine</a>. Apache License 2.0. <a href="https://github.com/eryxgames/clio-motion">Source</a></footer>
 
 <script>
 /*__CORE__*/

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clio-motion"
-version = "0.14.0"
+version = "0.15.0"
 description = "Characters that move by rule, not by keyframe. Pure Python, standard library only."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -50,7 +50,7 @@ static int play(const char *path, int *samples, double *worst) {
   cm_input in;
   cm_ground_pose P;
   long next_step = -1;
-  double pending[32];
+  double pending[32] = { 0 };
   if (!f) return -1;
   if (!fgets(line, MAXLINE, f) || sscanf(line, "# %63s %63s %d %d %d", id, name, &hz, &steps, &every) != 5) { fclose(f); return -1; }
   ch = cm_character_find(name);
