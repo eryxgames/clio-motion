@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.20.0
+
+Templates for artists: your own drawing or model on a character's skeleton, with every clip.
+
+- 2D, Inkscape: `templates/2d/<character>.svg`, a locked guide layer with the figure and its
+  bones, and one empty layer for each image part. Gait Bench reads the drawn file ("Load a
+  drawing"): every layer with something in it becomes the picture of its part, held to its bone at
+  the joint, and the sprite sheet is baked from it. A part may be bigger than the figure's.
+- 3D, Blender: `templates/3d/<name>.rig.json` (the skeleton as data) and `<name>.glb` (the
+  skeleton with a stand-in model), for every character and each of the soldier's kits.
+  `tools/blender/clio_motion_blender.py`, an add-on: Import Rig, Check (bones, parents, places,
+  weights, with reasons), Export.
+- Clips onto a model of your own: `node tools/gaitbake.js <character> --model my.glb`, or
+  "Put the clips on my model" in the bench. The model's bones may point any way (Blender turns
+  them); each joint is given the movement its rig joint makes in the world. Bones of your own
+  follow the rig bone above them.
+- The template pose: standing still, the two halves of the body alike to the micron, a biped's
+  arms straight, out and down.
+- A new style setting in all three versions, `still` (0 to 1): takes the life out of a standing
+  body (no shifting of weight, no breathing, no looking about). 0, the usual, changes nothing:
+  the 82 earlier replays are the same to the byte. Replays can now carry a style (an `s` line);
+  three new runs use it (85 in all, 3,462 poses).
+- The baker's skinned `.glb`: a joint that slides in any clip now has its place written in every
+  clip. Blender leaves unwritten channels as the last clip had them, which showed some clips
+  wrong; engines were not affected. Joints are now exactly where the rig puts them (they were up
+  to 3 mm out); the files are about a sixth larger.
+- Gait Bench: "Load a drawing", "Save the template", "Save the 3D template", "Put the clips on
+  my model".
+- Tests: `js/test/template_test.js` and a check that `templates/` is what the code makes now, in
+  the usual run; `tools/blender/test_addon.py` takes the add-on, the baker and playback in
+  Blender the whole way round (Blender 5.0.1; needs `pip install bpy`, so it is not in CI).
+
 ## 0.19.0
 
 - C99 and Python, stage 4b: the ragdoll and riding. With this both do everything the JavaScript

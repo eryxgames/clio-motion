@@ -20,7 +20,7 @@ import math
 
 from .kernel import G, TAU, Spring, clamp, decay, ease, frac, gait_params, idle_noise, idle_period, ik2, lerp, smooth, wrap_pi
 
-STYLE = {"bounce": 1.0, "stride": 1.0, "arm": 1.0, "lean": 1.0, "step": 1.0, "snap": 0.3}
+STYLE = {"bounce": 1.0, "stride": 1.0, "arm": 1.0, "lean": 1.0, "step": 1.0, "snap": 0.3, "still": 0.0}
 
 
 class Swing:
@@ -568,7 +568,7 @@ def step_ground(S, ch, inp, st, terrain_w, dt, upper=None):
         bob = lerp(bob, st["bounce"] * ch["bob"] * 0.075 * L * math.cos(TAU * (S.phase - 0.95)), gp["gal"])
     sway = 0.02 * L * ch["sway"] * (1 - gp["run"]) * gp["moving"] * math.cos(TAU * (S.phase - phi_mid)) * cl[0]["side"]
     # idle: slow weight shifts; the planted feet stay put, so the knees and hips do the work
-    idle = (1 - gp["moving"]) * (0 if J else 1)
+    idle = (1 - gp["moving"]) * (0 if J else 1) * (1 - (st.get("still") or 0))      # still: no life in a standing body
     P = idle_period(L)
     ix = 0.012 * L * idle * idle_noise(S.t, P, 1.0) - (S.act_back or 0)
     iy = -0.008 * L * idle * (1 + idle_noise(S.t, P, 3.0))

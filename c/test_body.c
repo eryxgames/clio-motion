@@ -154,6 +154,7 @@ static int play(const char *path, int *samples, double *worst) {
   ground g;
   const cm_character *ch, *mch = 0;
   cm_input in, min;
+  cm_style style = CM_STYLE;
   long next_step = -1;
   double pending[NIN] = { 0 }, evsum = 0;
   if (!f) return -1;
@@ -173,6 +174,7 @@ static int play(const char *path, int *samples, double *worst) {
       if (line[0] == 'i') { n = numbers(line + 1, v, MAXV); if (n < NIN + 1) { fclose(f); return -1; } next_step = (long)v[0]; memcpy(pending, v + 1, NIN * sizeof(double)); pend = 'i'; }
       else if (line[0] == 'c') { n = numbers(line + 1, v, MAXV); if (n < 2) { fclose(f); return -1; } next_step = (long)v[0]; memset(pending, 0, sizeof pending); memcpy(pending, v + 1, (size_t)(n - 1) * sizeof(double)); pend = 'c'; }
       else if (line[0] == 'l') { n = numbers(line + 1, v, MAXV); if (n < 6) { fclose(f); return -1; } ladder.x = v[0]; ladder.y0 = v[1]; ladder.spacing = v[2]; ladder.rung = rung; ladder.user = &lr; lr.y0 = v[1]; lr.spacing = v[2]; lr.amp = v[3]; lr.freq = v[4]; lr.phase = v[5]; continue; }
+      else if (line[0] == 's') { n = numbers(line + 1, v, MAXV); if (n < 7) { fclose(f); return -1; } style.bounce = v[0]; style.stride = v[1]; style.arm = v[2]; style.lean = v[3]; style.step = v[4]; style.snap = v[5]; style.still = v[6]; continue; }
       else if (line[0] == 'm') { if (sscanf(line + 1, "%63s", name) != 1 || !(mch = cm_character_find(name))) { fclose(f); return -1; } cm_state_init(&Sm, mch, height, &g); continue; }
       else if (line[0] == 'j') { n = numbers(line + 1, v, MAXV); if (n < NIN + 1) { fclose(f); return -1; } next_step = (long)v[0]; memcpy(pending, v + 1, NIN * sizeof(double)); pend = 'j'; }
       else if (line[0] == 'd') { n = numbers(line + 1, v, MAXV); if (n < 2) { fclose(f); return -1; } next_step = (long)v[0]; memset(pending, 0, sizeof pending); memcpy(pending, v + 1, (size_t)(n - 1) * sizeof(double)); pend = 'd'; }
@@ -191,8 +193,8 @@ static int play(const char *path, int *samples, double *worst) {
     }
     if (next_step == i) { inputs(pending, pend == 'j' ? &min : &in); next_step = -1; continue; }
     /* the mount is stepped first, then its rider */
-    if (mch) { if (cm_step(&Sm, mch, &min, &CM_STYLE, height, &g, 1.0 / hz, &Pm) != 0) { fclose(f); return -1; } Sm.n_events = 0; }
-    if (cm_step(&S, ch, &in, &CM_STYLE, height, &g, 1.0 / hz, &P) != 0) { fclose(f); return -1; }
+    if (mch) { if (cm_step(&Sm, mch, &min, &style, height, &g, 1.0 / hz, &Pm) != 0) { fclose(f); return -1; } Sm.n_events = 0; }
+    if (cm_step(&S, ch, &in, &style, height, &g, 1.0 / hz, &P) != 0) { fclose(f); return -1; }
     for (k = 0; k < S.n_events; k++) { int t = tally_slot(S.events[k].type); if (t >= 0) tally[t]++; evsum += carried(&S.events[k]); }
     S.n_events = 0;
     if (i % every == every - 1) {

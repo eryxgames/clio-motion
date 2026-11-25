@@ -29,18 +29,23 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Hit reactions and a ragdoll the body can be handed to at any moment.
 - Baking: looping clips to a sprite sheet with an atlas, a skinned `.glb`, a `.glb` of rigid
   parts, and CLIo sprite frames.
+- Your own art on the same skeletons: a drawing template for Inkscape and a rig for Blender for
+  every character. A drawn or modelled character gets every clip with no rigging or animating by
+  hand. See [`templates/README.md`](templates/README.md).
 
 ## Layout
 
 | Folder | What it holds |
 |---|---|
 | `js/` | The reference implementation: `core.js` (motion), `rig.js` (looks), `bake.js` (clips and files), `fight.js` (example game code), tests. Guide: [`js/README.md`](js/README.md). |
-| `tools/` | `gaitbake.js`, the command-line baker; `spec.js` and `golden.js`, which write what the other versions are checked against. |
+| `tools/` | `gaitbake.js`, the command-line baker (also puts the clips on a model of your own); `templates.js`, which writes the templates; `blender/`, the Blender add-on; `spec.js` and `golden.js`, which write what the other versions are checked against. |
+| `templates/` | For artists: a drawing template for Inkscape (`2d/`) and a skeleton with a stand-in model for Blender (`3d/`), per character. Guide: [`templates/README.md`](templates/README.md). |
 | `spec/` | The characters as data, test vectors for the numeric kernel, and recorded runs of whole characters. |
 | `c/` | The C99 library. |
 | `python/` | The pure-Python version (standard library only), for CLIo. |
 | `bench/` | Gait Bench's sources; `python bench/build.py` builds `docs/index.html`. |
 | `docs/` | The built bench, for GitHub Pages. |
+| `notes/` | Design notes for work that has not started. |
 
 ## What is ported
 
@@ -59,7 +64,7 @@ the bottom, each stage checked against the reference before the next one starts.
 
 Stage 1 agrees with the reference to the last bit or two on 982 recorded cases, in both languages.
 Stage 2 reproduces 25 recorded runs (870 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4 reproduce 82 whole-body runs (3,360 poses of all
+recorded with. Stages 3 and 4 reproduce 85 whole-body runs (3,462 poses of all
 twelve characters: every number of the pose, the count of each event, what the events carry, and
 the mode the body is in).
 
@@ -106,6 +111,10 @@ Python:
     S = cm.create_state(ch, ground_height)
     pose = cm.step(S, ch, {"speed": 1.4, "steer": 0.5, "armed": True}, cm.STYLE, ground_height, 1 / 60)
 
+A model of your own (built on `templates/3d`, see [`templates/README.md`](templates/README.md)):
+
+    node tools/gaitbake.js soldier --model my_soldier.glb --out out    # writes out/my_soldier_clips.glb
+
 ## Tests
 
     node js/test/run.js                 # the reference: every test, then the recorded runs
@@ -113,6 +122,7 @@ Python:
     python python/tests/test_kernel.py  # Python: the kernel's numbers
     python python/tests/test_ground.py  # Python: the ground replays
     python python/tests/test_body.py    # Python: the whole-body replays
+    python tools/blender/test_addon.py  # the Blender add-on, the whole way round (needs pip install bpy; not in CI)
 
 After a change to `js/core.js` that is meant to change the motion, `npm run spec` records the
 reference again; the C and Python versions then have to follow.
@@ -121,11 +131,12 @@ reference again; the C and Python versions then have to follow.
 
 `tools/spec.js` writes the built-in characters as JSON and, for each function of the numeric
 kernel, a few dozen inputs with the outputs the reference gives, and the characters again as a C
-table. `tools/golden.js` plays 82 runs described as data in `spec/scenarios.json` (every character
+table. `tools/golden.js` plays 85 runs described as data in `spec/scenarios.json` (every character
 through its gaits on rolling ground; turns, sidesteps, drifting, blows, steps, jumps and pounces;
 the soldier aiming, fighting, carrying and climbing; hunts, stings, a swim and two flights; every
 character knocked down, from the ground, the air, the water, a ladder and a ledge; a rider on the
-horse, the spider mech and the dragon, thrown, and refused by a hyena) and records the whole pose
+horse, the spider mech and the dragon, thrown, and refused by a hyena; three with the style
+setting `still`) and records the whole pose
 ten times a second. They are written to `spec/body/` as replays that need no JSON reader: every
 input step by step, the calls that change mode (take off, dive in, take hold of a ladder, mount),
 the whole pose, and the events; a run with a rider carries the mount's inputs too. The 25 of them
@@ -144,14 +155,10 @@ touching.
   then cars and buggies, then tanks, as a new kind of body with crew seats. See
   [notes/groups-and-vehicles.md](notes/groups-and-vehicles.md).
 - A first-person arms view, with the FPS demo.
-- For artists, 3D: a rest-pose skeleton file per character (the `.glb` already carries the joints,
-  names and clips) and a Blender add-on that imports it, checks a mesh skinned to it (bone names,
-  rest lengths, no extra roots) and exports a `.glb` the engines and the baker can use; a
-  description of the rig as data (`spec/rigs/<id>.json`: joints, parents, rest positions, which
-  part hangs on which joint) so other tools can do the same.
-- For artists, 2D: an SVG template per character for Inkscape, one named layer per part at its
-  rest size with its pivots marked; the baker and the bench cut the painted layers into the image
-  parts they already use, so a drawn character moves without any further rigging.
+- For artists, next: the drawn parts with their joints and every clip's part positions as data,
+  for the 2D skeleton tools of Godot and Unity (today a drawing is baked to a sprite sheet);
+  animal heads whose picture turns with the head; separate pictures for fore and hind legs; a
+  skeleton variant laid out for humanoid retargeting.
 - Flight that a game can use as behaviour, not only as a pose: take-off run and landing flare,
   banking turns with a turn radius that follows from speed, soaring and stooping (birds of prey),
   perching; a bat (erratic, flapping, roosting upside down); hovering insects with darting moves;

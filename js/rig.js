@@ -523,6 +523,47 @@
     return res;
   }
   function level(q) { return q.lv === undefined ? q.sh : q.lv; }
+
+  // ---- pictures on bones
+  /* Where a part's picture goes on the screen. a, b: the bone's ends on the screen (b null for a ball), rs: the part's
+     radius there, ppm: pixels to a metre, flip: the body is seen from its other side.
+     A plain picture (im.w, im.h, im.axis) covers the part's capsule, as SLOTS describes. A picture taken from a
+     drawing also has im.box = [x0, y0, x1, y1]: the picture's own box in the bone's frame, in metres, as it was drawn
+     over a bone im.len long and im.r thick. Along the bone it stretches with the bone, so that what was drawn at the
+     joint stays at the joint and what was drawn at the far end stays there; across the bone it keeps its size.
+     Returns where to draw: move to (x, y), turn by rot, scale by (fx, fy), then the picture's box (dx, dy, dw, dh). */
+  function partPlace(im, a, b, rs, ppm, flip) {
+    var o = { x: a[0], y: a[1], rot: 0, fx: 1, fy: 1 }, bx = im.box, t;
+    if (im.axis === 'ball' || !b) {
+      if (flip) o.fx = -1;
+      if (bx) { o.dx = bx[0] * ppm; o.dy = bx[1] * ppm; o.dw = (bx[2] - bx[0]) * ppm; o.dh = (bx[3] - bx[1]) * ppm; }
+      else { o.dh = 2.3 * rs; o.dw = o.dh * im.w / im.h; o.dx = -o.dw / 2; o.dy = -o.dh / 2; }
+      return o;
+    }
+    if (im.axis === 'up') { t = a; a = b; b = t; o.x = a[0]; o.y = a[1]; }
+    var ex = b[0] - a[0], ey = b[1] - a[1], dist = Math.sqrt(ex * ex + ey * ey), len = dist + 2 * rs, ang = Math.atan2(ey, ex);
+    // a bone seen end on has no length on the screen: the picture is then no shorter than the part is thick
+    var k = bx ? Math.max(dist / (im.len * ppm), 2 * rs / ((im.len + 2 * im.r) * ppm)) : 1;
+    if (im.axis === 'right') {
+      o.rot = ang; if (flip) o.fy = -1;
+      if (bx) { o.dx = bx[0] * ppm * k; o.dy = bx[1] * ppm; o.dw = (bx[2] - bx[0]) * ppm * k; o.dh = (bx[3] - bx[1]) * ppm; }
+      else { o.dh = len * im.h / im.w; o.dw = len; o.dx = -rs; o.dy = -o.dh / 2; }
+    } else {
+      o.rot = ang - Math.PI / 2; if (flip) o.fx = -1;
+      if (bx) { o.dx = bx[0] * ppm; o.dy = bx[1] * ppm * k; o.dw = (bx[2] - bx[0]) * ppm; o.dh = (bx[3] - bx[1]) * ppm * k; }
+      else { o.dw = len * im.w / im.h; o.dh = len; o.dx = -o.dw / 2; o.dy = -rs; }
+    }
+    return o;
+  }
+  /* The other way, for reading a drawing: the turn and shift that take a point of the page into the bone's frame
+     (the one im.box is measured in), for a bone drawn from a to b on the page. { rot (radians), x, y }: turn the page
+     by rot about the origin after moving (x, y) to it. */
+  function partFrame(axis, a, b) {
+    if (axis === 'ball' || !b) return { rot: 0, x: a[0], y: a[1] };
+    if (axis === 'up') { var t = a; a = b; b = t; }
+    var ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return { rot: axis === 'right' ? -ang : Math.PI / 2 - ang, x: a[0], y: a[1] };
+  }
   // A rider's parts and its mount's as one list to draw: the rider's far side goes behind the whole mount, the rest in front of it.
   function pair(mount, rider) {
     var out = mount.slice(), i, q;
@@ -545,6 +586,6 @@
     return go(o, null);
   }
 
-  return { PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { partPlace: partPlace, partFrame: partFrame, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });

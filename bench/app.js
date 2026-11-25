@@ -317,18 +317,10 @@
 
   // A picture laid along its bone. See GaitRig.SLOTS for what each axis means.
   function drawPart(c, q, im, ppm, dark, flip) {
-    var img = dark ? im.dark : im.img, a = q.pa, b = q.pe || q.pb, r = q.r * ppm;
-    c.imageSmoothingEnabled = false;
-    if (im.axis === 'ball' || !b) {
-      var hh = 2.3 * r, ww = hh * im.w / im.h;
-      c.save(); c.translate(a[0], a[1]); if (flip) c.scale(-1, 1); c.drawImage(img, -ww / 2, -hh / 2, ww, hh); c.restore(); return;
-    }
-    if (im.axis === 'up') { var t = a; a = b; b = t; }
-    var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) + 2 * r, ang = Math.atan2(dy, dx);
-    c.save(); c.translate(a[0], a[1]);
-    if (im.axis === 'right') { c.rotate(ang); if (flip) c.scale(1, -1); var h2 = len * im.h / im.w; c.drawImage(img, -r, -h2 / 2, len, h2); }
-    else { c.rotate(ang - Math.PI / 2); if (flip) c.scale(-1, 1); var w2 = len * im.w / im.h; c.drawImage(img, -w2 / 2, -r, w2, len); }
-    c.restore();
+    var o = R.partPlace(im, q.pa, q.pe || q.pb, q.r * ppm, ppm, flip);
+    c.imageSmoothingEnabled = !!im.box;          // pictures from a drawing are smoothed; small pixel pictures are not
+    c.save(); c.translate(o.x, o.y); if (o.rot) c.rotate(o.rot); if (o.fx !== 1 || o.fy !== 1) c.scale(o.fx, o.fy);
+    c.drawImage(dark ? im.dark : im.img, o.dx, o.dy, o.dw, o.dh); c.restore();
   }
 
   function drawPrims(c, proj, ppm, prims, dz, outlineW, outlineCol, keepOrder, imgs) {
@@ -557,11 +549,95 @@
   }
 
   // ------------------------------------------------------ image parts
-  function storePart(id, slot, axis, source, w, h, label) {
+  // more (optional): { box, len, r } for a picture taken from a drawing (see GaitRig.partPlace)
+  function storePart(id, slot, axis, source, w, h, label, more) {
     var a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').drawImage(source, 0, 0, w, h);
     var d = document.createElement('canvas'); d.width = w; d.height = h; var dc = d.getContext('2d');
     dc.drawImage(a, 0, 0); dc.globalCompositeOperation = 'source-atop'; dc.fillStyle = 'rgba(0,0,0,0.32)'; dc.fillRect(0, 0, w, h);
     IMG[id][slot] = { img: a, dark: d, w: w, h: h, axis: axis, label: label };
+    if (more) { IMG[id][slot].box = more.box; IMG[id][slot].len = more.len; IMG[id][slot].r = more.r; }
+  }
+  // A whole character drawn on its template (templates/2d, or "Save the template"): every layer that has something
+  // in it becomes the picture of its part, cut out along the bone the guide layer gives for it.
+  function loadDrawing(file) {
+    var note = $('drawingNote'), id = ch.id, rd = new FileReader();
+    function say(t) { note.textContent = t; }
+    rd.onerror = function () { say('That file could not be read.'); };
+    rd.onload = function () {
+      var doc = new DOMParser().parseFromString(String(rd.result), 'image/svg+xml'), root = doc.documentElement;
+      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) { say('That is not an SVG file this browser can read. In Inkscape, save as Inkscape SVG or Plain SVG.'); return; }
+      // nothing in the file may run
+      [].slice.call(doc.querySelectorAll('script, foreignObject, iframe, object, embed')).forEach(function (n) { n.parentNode.removeChild(n); });
+      [].slice.call(doc.querySelectorAll('*')).forEach(function (el) {
+        [].slice.call(el.attributes).forEach(function (at) { if (/^on/i.test(at.name) || (/href$/i.test(at.name) && /^\s*javascript:/i.test(at.value))) el.removeAttribute(at.name); });
+      });
+      var guide = doc.querySelector('[id^="clio-guides-"]');
+      if (!guide) { say('This drawing was not made on a template: its guide layer is missing. Save the template, draw in its layers, and load that file.'); return; }
+      var who = guide.id.slice(12);
+      if (who !== id) { say('This drawing is for the ' + (M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who) + '. Choose that character first, then load it.'); return; }
+      // lay the file out, unseen, so that the browser can measure it
+      var host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none';
+      var live = document.importNode(root, true), NS = 'http://www.w3.org/2000/svg', jobs = [], empty = [], lost = [], linked = [];
+      host.appendChild(live); document.body.appendChild(host);
+      try {
+        var inv = live.getCTM().inverse();
+        var toRoot = function (el) { return inv.multiply(el.getCTM()); };          // from an element's own measure to the page's
+        var at = function (m, x, y) { return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; };
+        var bar = live.querySelector('#clio-scale'), barLen = live.querySelector('#clio-scale-length'), ppmT = 0;
+        if (bar) {
+          var bm = toRoot(bar), p1 = at(bm, bar.x1.baseVal.value, bar.y1.baseVal.value), p2 = at(bm, bar.x2.baseVal.value, bar.y2.baseVal.value);
+          ppmT = Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)) / (parseFloat(barLen ? barLen.textContent : '1') || 1);
+        }
+        if (!(ppmT > 0)) { say('The guide layer of this drawing has lost its scale bar. Start again from a fresh template and paste your layers in.'); return; }
+        var ser = new XMLSerializer(), defs = [].slice.call(live.querySelectorAll('defs, style')).map(function (d) { return ser.serializeToString(d); }).join('');
+        R.SLOTS[id].forEach(function (sl) {
+          var layer = live.querySelector('#clio-part-' + sl[0]), joint = live.querySelector('#clio-joint-' + sl[0]), bone = live.querySelector('#clio-bone-' + sl[0]);
+          if (!layer || !joint) { lost.push(sl[1]); return; }
+          layer.style.display = ''; if (layer.getAttribute('display') === 'none') layer.removeAttribute('display');          // a layer hidden in Inkscape still counts
+          if (!layer.querySelector('path, rect, circle, ellipse, line, polyline, polygon, image, text, use')) { empty.push(sl[1]); return; }
+          // a picture that is only linked from another file cannot come along
+          if ([].slice.call(layer.querySelectorAll('image')).some(function (n) { var h = n.getAttribute('href') || n.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || ''; return !/^data:/i.test(h.trim()); })) linked.push(sl[1]);
+          var jm = toRoot(joint), a = at(jm, joint.cx.baseVal.value, joint.cy.baseVal.value), rT = joint.r.baseVal.value * Math.sqrt(Math.abs(jm.a * jm.d - jm.b * jm.c)), b = null;
+          if (bone && sl[2] !== 'ball') { var bm2 = toRoot(bone); b = at(bm2, bone.x2.baseVal.value, bone.y2.baseVal.value); }
+          var fr = R.partFrame(sl[2], a, b), pm = toRoot(layer.parentNode);
+          var tf = 'rotate(' + (fr.rot * 180 / Math.PI) + ') translate(' + (-fr.x) + ' ' + (-fr.y) + ') matrix(' + [pm.a, pm.b, pm.c, pm.d, pm.e, pm.f].join(' ') + ')';
+          // its box in the bone's frame
+          var outer = document.createElementNS(NS, 'g'), inner = document.createElementNS(NS, 'g');
+          inner.setAttribute('transform', tf); inner.appendChild(layer.cloneNode(true)); outer.appendChild(inner); live.appendChild(outer);
+          var bb = outer.getBBox(); live.removeChild(outer);
+          if (!(bb.width > 0.5) || !(bb.height > 0.5)) { empty.push(sl[1]); return; }
+          var pad = 3 + 0.06 * Math.max(bb.width, bb.height), x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, h = bb.height + 2 * pad;        // room for the width of the strokes
+          var k = Math.min(3, 640 / Math.max(w, h)), W2 = Math.max(2, Math.round(w * k)), H2 = Math.max(2, Math.round(h * k));
+          var xml = '<svg xmlns="' + NS + '" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + W2 + '" height="' + H2 + '" viewBox="' + [x0, y0, w, h].join(' ') + '">' + defs
+            + '<g transform="' + tf + '">' + ser.serializeToString(layer) + '</g></svg>';
+          jobs.push({ sl: sl, xml: xml, w: W2, h: H2, more: { box: [x0 / ppmT, y0 / ppmT, (x0 + w) / ppmT, (y0 + h) / ppmT], r: rT / ppmT,
+            len: b ? Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) / ppmT : 0 } });
+        });
+      } catch (e) { say('This drawing could not be measured (' + (e && e.message ? e.message : e) + ').'); return; }
+      finally { document.body.removeChild(host); }
+      if (!jobs.length) { say('The part layers of this drawing are all empty. Draw each part in the layer that has its name.'); return; }
+      var left = jobs.length, done = [], failed = [];
+      jobs.forEach(function (j) {
+        var im = new Image(), url = null;
+        im.onload = function () { storePart(id, j.sl[0], j.sl[2], im, j.w, j.h, file.name, j.more); if (url) URL.revokeObjectURL(url); done.push(j.sl[1]); fin(); };
+        im.onerror = function () {
+          // where pictures may not be given as data, hand the same thing over as a file in memory
+          if (!url) { try { url = URL.createObjectURL(new Blob([j.xml], { type: 'image/svg+xml' })); im.src = url; return; } catch (e) { url = 'none'; } }
+          else if (url !== 'none') URL.revokeObjectURL(url);
+          failed.push(j.sl[1]); fin();
+        };
+        im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(j.xml);
+      });
+      function fin() {
+        if (--left) return;
+        clearStrip(); if (ch.id === id) syncSlots();
+        say((done.length ? 'Loaded ' + done.length + ' part' + (done.length > 1 ? 's' : '') + ' from ' + file.name + ': ' + done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
+          + (failed.length ? ' Could not be drawn: ' + failed.join(', ') + '.' : '')
+          + (linked.length ? ' Pictures linked from other files were left out of ' + linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
+          + (empty.length ? ' Left as shapes (empty layers): ' + empty.join(', ') + '.' : '') + (lost.length ? ' Missing from the file: ' + lost.join(', ') + '.' : ''));
+      }
+    };
+    rd.readAsText(file);
   }
   function loadPart(slot, axis, file) {
     var id = ch.id, url = URL.createObjectURL(file), im = new Image();
@@ -690,7 +766,7 @@
   }
   function exportReady(d) {
     downloads = d || null;
-    $('export').hidden = !downloads;
+    $('export').hidden = !downloads; $('saveDrawing').hidden = !downloads; $('modelRow').hidden = !downloads; $('modelNote').hidden = !downloads;
     $('exportNote').textContent = downloads ? 'Bakes every clip, from idle to the ragdoll death, with the current style settings.'
       : 'Saving files is not available in this view. The command-line baker writes the same files.';
   }
@@ -857,6 +933,48 @@
   $('overlays').addEventListener('change', function () { set.overlays = this.checked; syncUI(); });
   $('sampleParts').addEventListener('click', sampleParts);
   $('clearParts').addEventListener('click', function () { IMG[ch.id] = {}; clearStrip(); syncSlots(); });
+  $('drawing').addEventListener('change', function () { if (this.files && this.files[0]) loadDrawing(this.files[0]); this.value = ''; });
+  $('saveDrawing').addEventListener('click', function () {
+    if (!downloads) return;
+    var note = $('drawingNote');
+    downloads.save({ filename: ch.id + '_template.svg', data: new Blob([B.svgTemplate(ch)], { type: 'image/svg+xml' }) })
+      .then(function () { note.textContent = 'Saved. Open it in Inkscape, draw each part in the layer that has its name, save, and load the file here.'; }, function () { note.textContent = 'Nothing was saved.'; });
+  });
+  $('saveModel').addEventListener('click', function () {
+    if (!downloads) return;
+    var note = $('modelNote'), kit = ch.mount.type === 'held' && set.kit !== ch.mount.kit ? set.kit : null, rig = B.rig(ch, { kit: kit }), enc = new TextEncoder();
+    var zip = B.zip([{ name: rig.name + '.glb', data: B.glbTemplate(ch, { kit: kit, name: rig.name }) }, { name: rig.name + '.rig.json', data: enc.encode(JSON.stringify(rig, null, 1) + '\n') },
+      { name: 'README.txt', data: enc.encode(['CLIo Motion 3D template: ' + rig.name, '',
+        rig.name + '.rig.json  the skeleton as data: ' + rig.joints.length + ' joints, in the template pose. The Blender add-on (tools/blender/clio_motion_blender.py',
+        '                      in the repository) builds the armature and a stand-in model from it, checks your model and exports it.',
+        rig.name + '.glb       the same skeleton with the stand-in model, skinned, for any other program.', '',
+        'Model round the skeleton and keep the bones\' names. Export a .glb, then in Gait Bench choose "Put the clips on my model",',
+        'or run: node tools/gaitbake.js ' + ch.id + (kit ? ' --kit ' + kit : '') + ' --model your.glb', '',
+        'https://github.com/eryxgames/clio-motion', ''].join('\n')) }]);
+    downloads.save({ filename: rig.name + '_template3d.zip', data: new Blob([zip]) })
+      .then(function () { note.textContent = 'Saved the skeleton and stand-in model of the ' + ch.label.toLowerCase() + (kit ? ' (' + kit + ')' : '') + '.'; }, function () { note.textContent = 'Nothing was saved.'; });
+  });
+  $('fitModel').addEventListener('change', function () {
+    var file = this.files && this.files[0], note = $('modelNote'); this.value = '';
+    if (!file || !downloads) return;
+    var rd = new FileReader(), c0 = ch, kit = ch.mount.type === 'held' && set.kit !== ch.mount.kit ? set.kit : null;
+    note.textContent = 'Baking clips for ' + file.name + '.';
+    rd.onerror = function () { note.textContent = 'That file could not be read.'; };
+    rd.onload = function () {
+      setTimeout(function () {
+        var fit;
+        try { fit = B.glbFit(c0, B.recordAll(c0, { style: set.style, frames: 8, kit: kit }), new Uint8Array(rd.result), { kit: kit }); }
+        catch (e) { note.textContent = 'That model could not be read (' + (e && e.message ? e.message : e) + ').'; return; }
+        var rep = fit.report, warn = rep.warnings.length ? ' ' + rep.warnings.join(' ') : '';
+        if (!fit.glb) { note.textContent = rep.errors.join(' '); return; }
+        // in a zip, like the other exports: not every view that can save files will save a bare .glb
+        var base = file.name.replace(/\.glb$/i, '') + '_clips';
+        downloads.save({ filename: base + '.zip', data: new Blob([B.zip([{ name: base + '.glb', data: fit.glb }])]) })
+          .then(function () { note.textContent = 'Saved ' + base + '.glb (in a zip): ' + rep.clips + ' clips on the ' + rep.joints + ' joints of ' + file.name + '.' + warn; }, function () { note.textContent = 'Nothing was saved.' + warn; });
+      }, 30);
+    };
+    rd.readAsArrayBuffer(file);
+  });
   function typing(e) { var t = e.target && e.target.tagName; return t === 'BUTTON' || t === 'INPUT' || t === 'LABEL' || t === 'SELECT' || t === 'TEXTAREA'; }
   document.addEventListener('keydown', function (e) {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

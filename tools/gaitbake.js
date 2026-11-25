@@ -5,6 +5,10 @@
                     [--clio-size 28] [--clio-view front|side] [--kit rifle|pistols|sword]
    Writes, per character: <id>.glb (skinned skeleton), <id>_parts.glb (separate rigid parts),
    <id>_sheet.png, <id>_sheet.json, <id>_clio.json
+
+   node tools/gaitbake.js <character> --model my.glb [--kit ...] [--clips ...] [--out DIR] [--check]
+   Puts the clips onto a model of your own that was built on the character's template (templates/3d): the file
+   must have the rig's joints by name. Writes <my>_clips.glb. --check only says what it finds.
    (js/fight.js is an example of game code driving two characters; see the README.) */
 'use strict';
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
@@ -21,9 +25,33 @@ for (let i = 0; i < args.length; i++) {
   else if (a === '--clio-size') opt.clioSize = +args[++i];
   else if (a === '--clio-view') opt.clioView = args[++i];
   else if (a === '--kit') opt.kit = args[++i];
+  else if (a === '--model') opt.model = args[++i];
+  else if (a === '--check') opt.check = true;
   else if (a[0] !== '-') who = a;
 }
 const ids = who === 'all' ? Object.keys(M.CHARACTERS) : [who];
+if (opt.model) {
+  // clips onto someone else's model
+  const ch = M.CHARACTERS[who];
+  if (!ch) { console.error('--model needs one character. Known: ' + Object.keys(M.CHARACTERS).join(', ')); process.exit(1); }
+  if (!fs.existsSync(opt.model)) { console.error('No such file: ' + opt.model); process.exit(1); }
+  const kit = ch.mount.type === 'held' && opt.kit && opt.kit !== ch.mount.kit ? opt.kit : null, bytes = fs.readFileSync(opt.model);
+  const say = function (rep) { rep.errors.forEach(function (e) { console.log('ERROR    ' + e); }); rep.warnings.forEach(function (w) { console.log('WARNING  ' + w); }); };
+  if (opt.check) {
+    const rep = B.glbCheck(ch, bytes, { kit: kit }); say(rep);
+    if (rep.ok) console.log('All ' + rep.joints + ' joints of ' + who + (kit ? ' (' + kit + ')' : '') + ' are there; the furthest is ' + (rep.offset * 1000).toFixed(1) + ' mm from the template.');
+    process.exit(rep.ok ? 0 : 1);
+  }
+  const clips = B.recordAll(ch, { frames: opt.frames, clips: opt.clips, kit: kit }), fit = B.glbFit(ch, clips, bytes, { kit: kit });
+  say(fit.report);
+  if (!fit.glb) process.exit(1);
+  fs.mkdirSync(opt.out, { recursive: true });
+  const outFile = path.join(opt.out, path.basename(opt.model).replace(/\.glb$/i, '') + '_clips.glb');
+  fs.writeFileSync(outFile, fit.glb);
+  const fol = B.glbFollows(ch, clips, fit.glb, B.templatePose(ch, { kit: kit }));
+  console.log(outFile + ': ' + fit.report.clips + ' clips on ' + fit.report.joints + ' joints, ' + (fit.glb.length / 1024).toFixed(0) + ' KB. Joints follow the rig to ' + (fol.mean * 100).toFixed(2) + '% of leg length on average.');
+  process.exit(0);
+}
 fs.mkdirSync(opt.out, { recursive: true });
 for (const id of ids) {
   const ch = M.CHARACTERS[id];

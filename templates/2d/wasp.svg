@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="clio-motion-wasp" width="820" height="587" viewBox="0 0 820 587">
+ <title>CLIo Motion drawing template: Giant wasp</title>
+ <sodipodi:namedview pagecolor="#ffffff" bordercolor="#999999" inkscape:document-units="px" showgrid="false"/>
+ <g inkscape:groupmode="layer" id="clio-guides-wasp" inkscape:label="Guide: Giant wasp (locked, leave as it is)" sodipodi:insensitive="true">
+  <line x1="28" y1="403.78" x2="792" y2="403.78" stroke="#b9bec6" stroke-width="1"/>
+  <g id="clio-figure" opacity="0.38">
+   <line x1="501.88" y1="185.96" x2="341.15" y2="150.17" stroke="rgb(137,151,162)" stroke-width="81.31" stroke-linecap="round"/>
+   <line x1="508.79" y1="185.93" x2="334.08" y2="147.03" stroke="rgb(99,118,132)" stroke-width="24.2" stroke-linecap="round"/>
+   <line x1="332.03" y1="147.04" x2="175.02" y2="99.04" stroke="rgb(137,151,162)" stroke-width="58.08" stroke-linecap="round"/>
+   <line x1="334.08" y1="147.03" x2="137.82" y2="87.03" stroke="rgb(99,118,132)" stroke-width="16.94" stroke-linecap="round"/>
+   <line x1="436.44" y1="264.63" x2="352.8" y2="225.63" stroke="rgb(41,33,27)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="352.8" y1="225.63" x2="335.11" y2="350.33" stroke="rgb(41,33,27)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="335.11" y1="350.33" x2="327.54" y2="403.78" stroke="rgb(16,13,11)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="352.8" cy="225.63" r="16.33" fill="rgb(41,33,27)"/>
+   <line x1="496.94" y1="264.63" x2="504.71" y2="223.89" stroke="rgb(41,33,27)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="504.71" y1="223.89" x2="507.74" y2="349.81" stroke="rgb(41,33,27)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="507.74" y1="349.81" x2="509.04" y2="403.78" stroke="rgb(16,13,11)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="504.71" cy="223.89" r="16.33" fill="rgb(41,33,27)"/>
+   <line x1="557.44" y1="264.63" x2="649.38" y2="225.49" stroke="rgb(41,33,27)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="649.38" y1="225.49" x2="669.72" y2="350.29" stroke="rgb(41,33,27)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="669.72" y1="350.29" x2="678.44" y2="403.78" stroke="rgb(16,13,11)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="649.38" cy="225.49" r="16.33" fill="rgb(41,33,27)"/>
+   <line x1="388.04" y1="246.92" x2="304.68" y2="273.26" stroke="rgb(179,134,22)" stroke-width="121" stroke-linecap="round"/>
+   <line x1="289.97" y1="277.91" x2="215.88" y2="324.31" stroke="rgb(34,29,26)" stroke-width="127.05" stroke-linecap="round"/>
+   <line x1="202.8" y1="332.5" x2="127.94" y2="377.66" stroke="rgb(179,134,22)" stroke-width="84.7" stroke-linecap="round"/>
+   <line x1="127.94" y1="377.66" x2="78.47" y2="407.5" stroke="rgb(18,14,12)" stroke-width="16.94" stroke-linecap="round"/>
+   <circle cx="678.31" cy="215.49" r="27.23" fill="rgb(106,32,20)"/>
+   <line x1="400.14" y1="246.87" x2="593.73" y2="246.08" stroke="rgb(34,29,26)" stroke-width="127.05" stroke-linecap="round"/>
+   <circle cx="496.94" cy="246.48" r="69.58" fill="rgb(179,134,22)"/>
+   <circle cx="660.21" cy="227.67" r="51.43" fill="rgb(179,134,22)"/>
+   <line x1="660.06" y1="191.37" x2="744.62" y2="154.72" stroke="rgb(18,14,12)" stroke-width="9.68" stroke-linecap="round"/>
+   <circle cx="678.31" cy="215.49" r="27.23" fill="rgb(106,32,20)"/>
+   <line x1="660.06" y1="191.37" x2="744.62" y2="154.72" stroke="rgb(18,14,12)" stroke-width="9.68" stroke-linecap="round"/>
+   <line x1="557.44" y1="264.63" x2="649.38" y2="225.49" stroke="rgb(53,42,34)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="649.38" y1="225.49" x2="669.72" y2="350.29" stroke="rgb(53,42,34)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="669.72" y1="350.29" x2="678.44" y2="403.78" stroke="rgb(21,16,14)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="649.38" cy="225.49" r="16.33" fill="rgb(53,42,34)"/>
+   <line x1="496.94" y1="264.63" x2="504.71" y2="223.89" stroke="rgb(53,42,34)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="504.71" y1="223.89" x2="507.74" y2="349.81" stroke="rgb(53,42,34)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="507.74" y1="349.81" x2="509.04" y2="403.78" stroke="rgb(21,16,14)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="504.71" cy="223.89" r="16.33" fill="rgb(53,42,34)"/>
+   <line x1="436.44" y1="264.63" x2="352.8" y2="225.63" stroke="rgb(53,42,34)" stroke-width="30.86" stroke-linecap="round"/>
+   <line x1="352.8" y1="225.63" x2="335.11" y2="350.33" stroke="rgb(53,42,34)" stroke-width="25.41" stroke-linecap="round"/>
+   <line x1="335.11" y1="350.33" x2="327.54" y2="403.78" stroke="rgb(21,16,14)" stroke-width="12.71" stroke-linecap="round"/>
+   <circle cx="352.8" cy="225.63" r="16.33" fill="rgb(53,42,34)"/>
+   <line x1="501.88" y1="185.96" x2="341.15" y2="150.17" stroke="rgb(176,194,209)" stroke-width="81.31" stroke-linecap="round"/>
+   <line x1="508.79" y1="185.93" x2="334.08" y2="147.03" stroke="rgb(128,151,169)" stroke-width="24.2" stroke-linecap="round"/>
+   <line x1="332.03" y1="147.04" x2="175.02" y2="99.04" stroke="rgb(176,194,209)" stroke-width="58.08" stroke-linecap="round"/>
+   <line x1="334.08" y1="147.03" x2="137.82" y2="87.03" stroke="rgb(128,151,169)" stroke-width="16.94" stroke-linecap="round"/>
+  </g>
+  <g id="clio-bones" fill="none" stroke="#d6217f" stroke-width="1.4">
+   <line id="clio-bone-body" x1="400.14" y1="246.87" x2="593.73" y2="246.08"/>
+   <circle id="clio-joint-body" cx="400.14" cy="246.87" r="63.53"/>
+   <circle id="clio-joint-head" cx="660.21" cy="227.67" r="51.43"/>
+   <line id="clio-bone-upperLeg" x1="436.44" y1="264.63" x2="352.8" y2="225.63"/>
+   <circle id="clio-joint-upperLeg" cx="436.44" cy="264.63" r="15.43"/>
+   <line id="clio-bone-lowerLeg" x1="352.8" y1="225.63" x2="335.11" y2="350.33"/>
+   <circle id="clio-joint-lowerLeg" cx="352.8" cy="225.63" r="12.71"/>
+   <line id="clio-bone-wing" x1="508.79" y1="185.93" x2="334.08" y2="147.03"/>
+   <circle id="clio-joint-wing" cx="508.79" cy="185.93" r="12.1"/>
+  </g>
+  <g id="clio-labels" font-family="sans-serif" font-size="11" fill="#a3175f">
+   <text x="565.46" y="249.48">Thorax</text>
+   <text x="716.64" y="230.67">Head</text>
+   <text x="415.04" y="248.13">Upper leg</text>
+   <text x="361.66" y="290.98">Lower leg</text>
+   <text x="438.54" y="169.48">Wing</text>
+  </g>
+  <line id="clio-scale" x1="70" y1="503" x2="675" y2="503" stroke="#444a54" stroke-width="2"/>
+  <g font-family="sans-serif" font-size="11" fill="#444a54">
+   <text id="clio-scale-length" x="683" y="507">1 m</text>
+   <text x="70" y="525">Draw each part in the layer that has its name, over the figure.</text>
+   <text x="70" y="539">The figure faces right. A line is a bone; the circle is its joint.</text>
+   <text x="70" y="553">One drawing serves both sides. An empty layer keeps its plain shape.</text>
+   <text x="70" y="567">Leave this guide layer in the file: it says where the bones are.</text>
+  </g>
+ </g>
+ <g inkscape:groupmode="layer" id="clio-part-body" inkscape:label="Thorax"/>
+ <g inkscape:groupmode="layer" id="clio-part-head" inkscape:label="Head"/>
+ <g inkscape:groupmode="layer" id="clio-part-upperLeg" inkscape:label="Upper leg"/>
+ <g inkscape:groupmode="layer" id="clio-part-lowerLeg" inkscape:label="Lower leg"/>
+ <g inkscape:groupmode="layer" id="clio-part-wing" inkscape:label="Wing"/>
+</svg>

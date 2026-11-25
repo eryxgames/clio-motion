@@ -38,6 +38,11 @@ octopus; `in.depth`, `in.ink`), `cm_enter_ladder` / `cm_leave_ladder` (a `cm_lad
 function; `in.speed` climbs), `cm_grab_ledge` (then `in.climb` or `in.drop`), `cm_place`.
 `cm_step_ground` gives the legs and hips alone.
 
+The style (`cm_style`, `CM_STYLE` for the plain one): `bounce`, `stride`, `arm`, `lean`, `step` scale
+those parts of the motion, `snap` is how sharply a foot is put down, and `still` (0 to 1, 0 in
+`CM_STYLE`) takes the life out of a standing body: no shifting of weight, no breathing, no looking
+about.
+
 Knocked down: set `in.die` for one step (1: a blow from straight ahead; 2: with the push in
 `in.die_impulse`, in the world). The body is handed to its ragdoll from wherever it is (walking,
 in the air, in the water, on a ladder), a `CM_EV_DIE` event is given, and `cm_step` goes on
@@ -69,7 +74,7 @@ and 180,000 for the horse; a galloping horse and its rider together about 140,00
 
 The Makefile turns fused multiply-add off (`-ffp-contract=off`) so that every platform rounds the
 way the JavaScript reference does. The kernel agrees with the reference to the last bit or two
-on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 82 recorded runs
+on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 85 recorded runs
 to the ten digits they are recorded with (they also do with fused multiply-add on, on the machine
 they were tried on). The whole-body test also runs clean under the address and undefined-behaviour
 sanitizers and under valgrind, and gives the same result built with clang.

@@ -95,6 +95,7 @@ def play(path):
     nw = int(g[0])
     terrain = ground([g[1 + 4 * k: 5 + 4 * k] for k in range(nw)], (g[2 + 4 * nw], g[3 + 4 * nw]) if g[1 + 4 * nw] else None)
     changes, calls, wants, ladder = {}, {}, [], None
+    style = cm.STYLE
     mch, mchanges, mcalls = None, {}, {}                     # a run with a rider: the mount, its inputs and the calls on it
     for ln in lines[2:]:
         w = ln.split()
@@ -104,6 +105,8 @@ def play(path):
             changes[int(w[1])] = inputs([float(x) for x in w[2:]])
         elif w[0] == "c":
             calls.setdefault(int(w[1]), []).append([float(x) for x in w[2:]])
+        elif w[0] == "s":
+            style = dict(zip(("bounce", "stride", "arm", "lean", "step", "snap", "still"), (float(x) for x in w[1:8])))
         elif w[0] == "m":
             mch = cm.characters()[w[1]]
         elif w[0] == "j":
@@ -153,10 +156,10 @@ def play(path):
             call(S, ch, c)
         if mch:                                              # the mount is stepped first, then its rider
             minp = mchanges.get(i, minp)
-            cm.step(Sm, mch, minp, cm.STYLE, terrain, dt)
+            cm.step(Sm, mch, minp, style, terrain, dt)
             Sm.events.clear()
         inp = changes.get(i, inp)
-        pose = cm.step(S, ch, inp, cm.STYLE, terrain, dt, mount)
+        pose = cm.step(S, ch, inp, style, terrain, dt, mount)
         for e in S.events:
             if e["type"] in TALLY:
                 tally[TALLY.index(e["type"])] += 1

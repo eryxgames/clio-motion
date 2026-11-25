@@ -108,9 +108,9 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 .slots { display: grid; gap: 4px; }
 .slot { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 12.5px; }
 .slot .state { font: 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot .pick { position: relative; overflow: hidden; }
-.slot .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
-.slot .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pick { position: relative; overflow: hidden; display: inline-block; text-align: center; }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .slot .btn { padding: 3px 8px; font-size: 12px; }
 [hidden] { display: none !important; }
 
@@ -289,14 +289,24 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         <button class="btn" id="sampleParts">Use sample parts</button>
         <button class="btn" id="clearParts">Back to shapes</button>
       </div>
+      <div class="pair">
+        <label class="btn pick">Load a drawing (.svg)<input type="file" id="drawing" accept=".svg,image/svg+xml" aria-label="Load a drawing made on this character's template"></label>
+        <button class="btn" id="saveDrawing" hidden>Save the template</button>
+      </div>
+      <p class="note" id="drawingNote" role="status">Draw the whole character in Inkscape on its template, one layer for each part, and load the file here.</p>
       <div id="slots" class="slots"></div>
-      <p class="note">One picture per part, drawn in a side view facing right. Limbs hang straight down with the joint at the top. Feet, weapons and long bodies point right.</p>
+      <p class="note">Or one picture per part, drawn in a side view facing right. Limbs hang straight down with the joint at the top. Feet, weapons and long bodies point right.</p>
     </div>
 
     <div class="group">
       <h2>Export</h2>
       <button class="btn" id="export" hidden>Save sprite sheet, glTF and CLIo frames (.zip)</button>
       <p class="note" id="exportNote">Checking whether this view can save files.</p>
+      <div class="pair" id="modelRow" hidden>
+        <button class="btn" id="saveModel">Save the 3D template</button>
+        <label class="btn pick">Put the clips on my model<input type="file" id="fitModel" accept=".glb,model/gltf-binary" aria-label="Choose a .glb model built on this character's template"></label>
+      </div>
+      <p class="note" id="modelNote" role="status" hidden>The 3D template is this character's skeleton with a stand-in model, for Blender. A model built on it (.glb) gets every clip here.</p>
     </div>
 
     <div class="group">

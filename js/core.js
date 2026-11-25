@@ -536,7 +536,8 @@
     if (gp.gal > 1e-3) bob = lerp(bob, st.bounce * ch.bob * 0.075 * L * Math.cos(TAU * (S.phase - 0.95)), gp.gal);   // one rise and fall a stride, highest in flight
     var sway = 0.02 * L * ch.sway * (1 - gp.run) * gp.moving * Math.cos(TAU * (S.phase - phiMid)) * ch.legs[0].side;
     // idle: slow weight shifts; the planted feet stay put, so the knees and hips do the work
-    var idle = (1 - gp.moving) * (J ? 0 : 1), P = idlePeriod(ch);
+    // style.still (0..1) takes the life out of a standing body: no shifting of weight, no breathing, no looking about
+    var idle = (1 - gp.moving) * (J ? 0 : 1) * (1 - (st.still || 0)), P = idlePeriod(ch);
     var ix = 0.012 * L * idle * idleNoise(S.t, P, 1.0) - (S.actBack || 0), iy = -0.008 * L * idle * (1 + idleNoise(S.t, P, 3.0));
     sway += 0.03 * L * idle * idleNoise(S.t, P, 2.0);
     // lean into a turn, from the feet up, by the angle that balances the sideways pull

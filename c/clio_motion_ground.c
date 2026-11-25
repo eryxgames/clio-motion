@@ -11,7 +11,7 @@
 #define PI 3.141592653589793
 #define G CM_G
 
-const cm_style CM_STYLE = { 1.0, 1.0, 1.0, 1.0, 1.0, 0.3 };
+const cm_style CM_STYLE = { 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 0.0 };
 
 static double slope_at(const cm_frame *f, double x, double w) {
   return cm_clamp(atan2(cm_ter(f, x + w, 0) - cm_ter(f, x - w, 0), 2 * w), -0.45, 0.45);
@@ -338,7 +338,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
   if (gp.gal > 1e-3) bob = cm_lerp(bob, st->bounce * ch->bob * 0.075 * L * cos(TAU * (S->phase - 0.95)), gp.gal);   /* one rise and fall a stride */
   sway = 0.02 * L * ch->sway * (1 - gp.run) * gp.moving * cos(TAU * (S->phase - phi_mid)) * ch->leg[0].side;
   /* idle: slow weight shifts; the planted feet stay put, so the knees and hips do the work */
-  idle = (1 - gp.moving) * (hasJ ? 0 : 1); P = 2.1 * TAU * sqrt(L / G);
+  idle = (1 - gp.moving) * (hasJ ? 0 : 1) * (1 - st->still); P = 2.1 * TAU * sqrt(L / G);      /* still: no life in a standing body */
   ix = 0.012 * L * idle * cm_idle_noise(S->t, P, 1.0) - S->act_back; iy = -0.008 * L * idle * (1 + cm_idle_noise(S->t, P, 3.0));
   sway += 0.03 * L * idle * cm_idle_noise(S->t, P, 2.0);
   /* lean into a turn, from the feet up, by the angle that balances the sideways pull */

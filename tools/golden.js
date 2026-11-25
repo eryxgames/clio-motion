@@ -30,6 +30,9 @@
 
    The ground:  { "waves": [[height, kx, kz, phase], ...], "wall": { "x": 3, "h": 2.3 } }
    height(x, z) = sum of height * sin(kx * x + kz * z + phase), plus h beyond the wall.  No waves: flat.
+   A run with "style": { ... } is played with those style settings over the usual ones; its replay has an s line:
+   bounce stride arm lean step snap still.
+
    A run with a rider has "mount": the character ridden, and "mountScript": its own script.  The replay then has
    an m line (the mount's character), j lines (the mount's inputs, like i lines) and d lines (calls on the mount,
    like c lines); calls 10 mountUp and 11 dismount are the rider's.  Each step the mount is stepped first, then
@@ -41,7 +44,7 @@
 const fs = require('fs'), path = require('path');
 const M = require('../js/core.js');
 const dir = path.join(__dirname, '..', 'spec'), out = path.join(dir, 'golden');
-const STYLE = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3 };
+const STYLE0 = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3, still: 0 };
 
 function ground(g) {
   g = g || {};
@@ -108,6 +111,7 @@ function groundLine(S, ch, lands, jumps) {
 function fmt(x) { return Number.isFinite(x) ? Number(x.toPrecision(10)).toString() : 'nan'; }
 
 function play(sc) {
+  const STYLE = Object.assign({}, STYLE0, sc.style || {});
   const ch = M.CHARACTERS[sc.character], env = { terrain: ground(sc.ground) };
   if (sc.ladder) env.ladder = ladderOf(sc.ladder);
   const cmt = sc.mount ? M.CHARACTERS[sc.mount] : null, envM = { terrain: env.terrain }, Sm = cmt ? M.createState(cmt, envM) : null, inpM = { speed: 0 }, scriptM = (sc.mountScript || []).slice();
@@ -127,6 +131,7 @@ function play(sc) {
   const B3 = whole ? ['# ' + sc.id + ' ' + sc.character + ' ' + hz + ' ' + n + ' ' + every, G2 ? G2[1] : 'g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0')] : null;
   if (B3 && sc.ladder) B3.push('l ' + [sc.ladder.x, sc.ladder.y0, sc.ladder.spacing, sc.ladder.amp || 0, sc.ladder.freq || 0, sc.ladder.phase || 0].map(fmt17).join(' '));
   if (B3 && cmt) B3.push('m ' + sc.mount);
+  if (B3 && sc.style) B3.push('s ' + [STYLE.bounce, STYLE.stride, STYLE.arm, STYLE.lean, STYLE.step, STYLE.snap, STYLE.still].map(fmt17).join(' '));
   const tally = TALLY.map(function () { return 0; });
   let lastIn3 = null, evsum = 0;
   play.body = B3;

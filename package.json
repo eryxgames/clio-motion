@@ -1,6 +1,6 @@
 {
   "name": "clio-motion",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Characters that move by rule, not by keyframe: procedural walking, running, climbing, fighting, swimming and flying for bipeds and other creatures.",
   "main": "js/core.js",
   "files": ["js/core.js", "js/rig.js", "js/bake.js", "js/fight.js", "js/README.md", "tools/gaitbake.js", "LICENSE", "NOTICE"],
@@ -8,6 +8,7 @@
   "scripts": {
     "test": "node js/test/run.js",
     "spec": "node tools/spec.js && node tools/golden.js",
+    "templates": "node tools/templates.js",
     "bench": "python3 bench/build.py",
     "bake": "node tools/gaitbake.js all --out out"
   },

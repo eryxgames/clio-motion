@@ -108,9 +108,9 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 .slots { display: grid; gap: 4px; }
 .slot { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 12.5px; }
 .slot .state { font: 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot .pick { position: relative; overflow: hidden; }
-.slot .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
-.slot .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pick { position: relative; overflow: hidden; display: inline-block; text-align: center; }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .slot .btn { padding: 3px 8px; font-size: 12px; }
 [hidden] { display: none !important; }
 
@@ -289,14 +289,24 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         <button class="btn" id="sampleParts">Use sample parts</button>
         <button class="btn" id="clearParts">Back to shapes</button>
       </div>
+      <div class="pair">
+        <label class="btn pick">Load a drawing (.svg)<input type="file" id="drawing" accept=".svg,image/svg+xml" aria-label="Load a drawing made on this character's template"></label>
+        <button class="btn" id="saveDrawing" hidden>Save the template</button>
+      </div>
+      <p class="note" id="drawingNote" role="status">Draw the whole character in Inkscape on its template, one layer for each part, and load the file here.</p>
       <div id="slots" class="slots"></div>
-      <p class="note">One picture per part, drawn in a side view facing right. Limbs hang straight down with the joint at the top. Feet, weapons and long bodies point right.</p>
+      <p class="note">Or one picture per part, drawn in a side view facing right. Limbs hang straight down with the joint at the top. Feet, weapons and long bodies point right.</p>
     </div>
 
     <div class="group">
       <h2>Export</h2>
       <button class="btn" id="export" hidden>Save sprite sheet, glTF and CLIo frames (.zip)</button>
       <p class="note" id="exportNote">Checking whether this view can save files.</p>
+      <div class="pair" id="modelRow" hidden>
+        <button class="btn" id="saveModel">Save the 3D template</button>
+        <label class="btn pick">Put the clips on my model<input type="file" id="fitModel" accept=".glb,model/gltf-binary" aria-label="Choose a .glb model built on this character's template"></label>
+      </div>
+      <p class="note" id="modelNote" role="status" hidden>The 3D template is this character's skeleton with a stand-in model, for Blender. A model built on it (.glb) gets every clip here.</p>
     </div>
 
     <div class="group">
@@ -846,7 +856,8 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     if (gp.gal > 1e-3) bob = lerp(bob, st.bounce * ch.bob * 0.075 * L * Math.cos(TAU * (S.phase - 0.95)), gp.gal);   // one rise and fall a stride, highest in flight
     var sway = 0.02 * L * ch.sway * (1 - gp.run) * gp.moving * Math.cos(TAU * (S.phase - phiMid)) * ch.legs[0].side;
     // idle: slow weight shifts; the planted feet stay put, so the knees and hips do the work
-    var idle = (1 - gp.moving) * (J ? 0 : 1), P = idlePeriod(ch);
+    // style.still (0..1) takes the life out of a standing body: no shifting of weight, no breathing, no looking about
+    var idle = (1 - gp.moving) * (J ? 0 : 1) * (1 - (st.still || 0)), P = idlePeriod(ch);
     var ix = 0.012 * L * idle * idleNoise(S.t, P, 1.0) - (S.actBack || 0), iy = -0.008 * L * idle * (1 + idleNoise(S.t, P, 3.0));
     sway += 0.03 * L * idle * idleNoise(S.t, P, 2.0);
     // lean into a turn, from the feet up, by the angle that balances the sideways pull
@@ -3002,6 +3013,47 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     return res;
   }
   function level(q) { return q.lv === undefined ? q.sh : q.lv; }
+
+  // ---- pictures on bones
+  /* Where a part's picture goes on the screen. a, b: the bone's ends on the screen (b null for a ball), rs: the part's
+     radius there, ppm: pixels to a metre, flip: the body is seen from its other side.
+     A plain picture (im.w, im.h, im.axis) covers the part's capsule, as SLOTS describes. A picture taken from a
+     drawing also has im.box = [x0, y0, x1, y1]: the picture's own box in the bone's frame, in metres, as it was drawn
+     over a bone im.len long and im.r thick. Along the bone it stretches with the bone, so that what was drawn at the
+     joint stays at the joint and what was drawn at the far end stays there; across the bone it keeps its size.
+     Returns where to draw: move to (x, y), turn by rot, scale by (fx, fy), then the picture's box (dx, dy, dw, dh). */
+  function partPlace(im, a, b, rs, ppm, flip) {
+    var o = { x: a[0], y: a[1], rot: 0, fx: 1, fy: 1 }, bx = im.box, t;
+    if (im.axis === 'ball' || !b) {
+      if (flip) o.fx = -1;
+      if (bx) { o.dx = bx[0] * ppm; o.dy = bx[1] * ppm; o.dw = (bx[2] - bx[0]) * ppm; o.dh = (bx[3] - bx[1]) * ppm; }
+      else { o.dh = 2.3 * rs; o.dw = o.dh * im.w / im.h; o.dx = -o.dw / 2; o.dy = -o.dh / 2; }
+      return o;
+    }
+    if (im.axis === 'up') { t = a; a = b; b = t; o.x = a[0]; o.y = a[1]; }
+    var ex = b[0] - a[0], ey = b[1] - a[1], dist = Math.sqrt(ex * ex + ey * ey), len = dist + 2 * rs, ang = Math.atan2(ey, ex);
+    // a bone seen end on has no length on the screen: the picture is then no shorter than the part is thick
+    var k = bx ? Math.max(dist / (im.len * ppm), 2 * rs / ((im.len + 2 * im.r) * ppm)) : 1;
+    if (im.axis === 'right') {
+      o.rot = ang; if (flip) o.fy = -1;
+      if (bx) { o.dx = bx[0] * ppm * k; o.dy = bx[1] * ppm; o.dw = (bx[2] - bx[0]) * ppm * k; o.dh = (bx[3] - bx[1]) * ppm; }
+      else { o.dh = len * im.h / im.w; o.dw = len; o.dx = -rs; o.dy = -o.dh / 2; }
+    } else {
+      o.rot = ang - Math.PI / 2; if (flip) o.fx = -1;
+      if (bx) { o.dx = bx[0] * ppm; o.dy = bx[1] * ppm * k; o.dw = (bx[2] - bx[0]) * ppm; o.dh = (bx[3] - bx[1]) * ppm * k; }
+      else { o.dw = len * im.w / im.h; o.dh = len; o.dx = -o.dw / 2; o.dy = -rs; }
+    }
+    return o;
+  }
+  /* The other way, for reading a drawing: the turn and shift that take a point of the page into the bone's frame
+     (the one im.box is measured in), for a bone drawn from a to b on the page. { rot (radians), x, y }: turn the page
+     by rot about the origin after moving (x, y) to it. */
+  function partFrame(axis, a, b) {
+    if (axis === 'ball' || !b) return { rot: 0, x: a[0], y: a[1] };
+    if (axis === 'up') { var t = a; a = b; b = t; }
+    var ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return { rot: axis === 'right' ? -ang : Math.PI / 2 - ang, x: a[0], y: a[1] };
+  }
   // A rider's parts and its mount's as one list to draw: the rider's far side goes behind the whole mount, the rest in front of it.
   function pair(mount, rider) {
     var out = mount.slice(), i, q;
@@ -3024,7 +3076,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     return go(o, null);
   }
 
-  return { PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { partPlace: partPlace, partFrame: partFrame, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });
 
@@ -3463,9 +3515,10 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     function toLocal(B, v) { return [dot3(B[0], v), dot3(B[1], v), dot3(B[2], v)]; }
     var IDENT = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 
-    function glbSkinned(ch, clips, o) {
-      o = o || {};
-      var bind = R.buildPrims(clips[0].frames[0], ch, { flash: false, model: true }), J = bind.joints, nj = J.length, jIdx = {}, i, k;
+    // The skeleton a list of parts declares: joints, parents, and the world frame of every joint for any pose.
+    // Which way a joint's side axis is taken from (refs) is settled once, from the pose the parts are given in.
+    function skeleton(bind) {
+      var J = bind.joints, jIdx = {};
       J.forEach(function (j, n) { jIdx[j.name] = n; });
       var parent = J.map(function (j) { return j.parent === null ? -1 : jIdx[j.parent]; });
       function dirOf(j) { var a = conv(j.o), b = conv(j.aim), d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.sqrt(dot3(d, d)); return l > 1e-6 ? [d[0] / l, d[1] / l, d[2] / l] : [0, 1, 0]; }
@@ -3482,6 +3535,14 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
           return { t: toLocal(P.B, d), B: [toLocal(P.B, w.B[0]), toLocal(P.B, w.B[1]), toLocal(P.B, w.B[2])] };
         });
       }
+      return { J: J, jIdx: jIdx, parent: parent, frames: frames, locals: locals };
+    }
+    // o.bind: build the mesh and the skeleton in this pose instead of the first frame of the first clip.
+    // o.clips === false: no animations (a rest-pose file).
+    function glbSkinned(ch, clips, o) {
+      o = o || {};
+      var bind = R.buildPrims(o.bind || clips[0].frames[0], ch, { flash: false, model: true }), sk = skeleton(bind), J = sk.J, nj = J.length, jIdx = sk.jIdx, i, k;
+      var parent = sk.parent, frames = sk.frames, locals = sk.locals;
       var chunks = [], byteLen = 0, views = [], accs = [];
       function pushData(typed, target) {
         var pad = (4 - byteLen % 4) % 4; if (pad) { chunks.push(new Uint8Array(pad)); byteLen += pad; }
@@ -3539,8 +3600,10 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       var jointList = []; for (k = 0; k < nj; k++) jointList.push(k);
       var skin = { name: ch.id + '_skin', joints: jointList, inverseBindMatrices: acc(ibm, 'MAT4', 5126), skeleton: roots[0] };
       // --- clips
-      var anims = [];
-      clips.forEach(function (c) {
+      // every clip is worked out first: a joint that slides in any of them has its place written in all of them,
+      // so that a tool which leaves unwritten channels as the last clip had them (Blender does) shows each clip right
+      var anims = [], work = [], slides = parent.map(function (p) { return p < 0; });
+      (o.clips === false ? [] : clips).forEach(function (c) {
         var fr = c.frames.slice(); if (c.loop) fr.push(c.frames[0]);
         var nF = fr.length, f, prev = F0, Ls = [], ok = true;
         for (f = 0; f < nF; f++) {
@@ -3549,26 +3612,357 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
           prev = frames(pr, prev); Ls.push(locals(prev));
         }
         if (!ok) return;
-        var times = new Float32Array(nF);
+        var times = new Float32Array(nF), Qs = [], Ts = [];
         for (f = 0; f < nF; f++) times[f] = c.loop ? c.duration * f / (nF - 1) : c.duration * f / nF;
-        var tAcc = acc(times, 'SCALAR', 5126, null, true), samplers = [], channels = [];
         for (k = 0; k < nj; k++) {
-          var Q = new Float32Array(nF * 4), T = new Float32Array(nF * 3), pq = null, slides = parent[k] < 0;
+          var Q = new Float32Array(nF * 4), T = new Float32Array(nF * 3), pq = null;
           for (f = 0; f < nF; f++) {
             var l = Ls[f][k], qq = quatOfBasis(l.B);
             if (pq && qq[0] * pq[0] + qq[1] * pq[1] + qq[2] * pq[2] + qq[3] * pq[3] < 0) qq = [-qq[0], -qq[1], -qq[2], -qq[3]];
             pq = qq; Q.set(qq, f * 4); T.set(l.t, f * 3);
-            if (Math.abs(l.t[0] - L0[k].t[0]) + Math.abs(l.t[1] - L0[k].t[1]) + Math.abs(l.t[2] - L0[k].t[2]) > 0.003 * ch.L) slides = true;
+            if (Math.abs(l.t[0] - L0[k].t[0]) + Math.abs(l.t[1] - L0[k].t[1]) + Math.abs(l.t[2] - L0[k].t[2]) > 0.003 * ch.L) slides[k] = true;
           }
-          samplers.push({ input: tAcc, output: acc(Q, 'VEC4', 5126), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: k, path: 'rotation' } });
-          if (slides) { samplers.push({ input: tAcc, output: acc(T, 'VEC3', 5126), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: k, path: 'translation' } }); }
+          Qs.push(Q); Ts.push(T);
         }
-        anims.push({ name: c.name, samplers: samplers, channels: channels });
+        work.push({ name: c.name, times: times, Q: Qs, T: Ts });
+      });
+      work.forEach(function (wk) {
+        var tAcc = acc(wk.times, 'SCALAR', 5126, null, true), samplers = [], channels = [];
+        for (k = 0; k < nj; k++) {
+          samplers.push({ input: tAcc, output: acc(wk.Q[k], 'VEC4', 5126), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: k, path: 'rotation' } });
+          if (slides[k]) { samplers.push({ input: tAcc, output: acc(wk.T[k], 'VEC3', 5126), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: k, path: 'translation' } }); }
+        }
+        anims.push({ name: wk.name, samplers: samplers, channels: channels });
       });
       var doc = { asset: { version: '2.0', generator: 'Gait Bench 0.3' }, scene: 0, scenes: [{ name: ch.id, nodes: [nj, nj + 1] }], nodes: nodes,
         meshes: [{ name: ch.id, primitives: prims }], skins: [skin], materials: mats, animations: anims, accessors: accs, bufferViews: views, buffers: [{ byteLength: 0 }] };
+      if (!anims.length) delete doc.animations;
       return packGlb(doc, chunks, byteLen);
     }
+    // --------------------------------------------------- templates for artists
+    // The pose a model is built in: standing still, weapons put away, and a biped's arms held straight, out and down.
+    function templatePose(ch, o) {
+      o = o || {};
+      var env = { terrain: flat, ladder: null }, S = M.createState(ch, env), inp = { speed: 0, armed: false, kit: null }, n, i;
+      // held still, so that nothing sways, breathes or looks to one side: the two halves of the body match
+      var st = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3, still: 1 };
+      function run(sec) { for (n = Math.round(sec / DT), i = 0; i < n; i++) { M.step(S, ch, inp, st, env, DT); S.events.length = 0; } }
+      if (o.kit && M.KITS[o.kit] && S.kit && o.kit !== S.kit) { inp.kit = o.kit; run(1.5); }
+      run(8);
+      var p = JSON.parse(JSON.stringify(R.shiftPose(S.pose, -S.px, 0, -S.pz)));
+      if (p.kind === 'biped' && p.arms && ch.arms) {
+        var a = o.arms === undefined ? 0.78 : o.arms, u = p.u, sd = p.side || [0, 0, 1], ca = Math.cos(a), sa = Math.sin(a);
+        p.arms.forEach(function (s) {
+          var d = [-u[0] * ca + sd[0] * s.side * sa, -u[1] * ca + sd[1] * s.side * sa, -u[2] * ca + sd[2] * s.side * sa];
+          s.elbow = [s.shoulder[0] + d[0] * ch.arms.upper, s.shoulder[1] + d[1] * ch.arms.upper, s.shoulder[2] + d[2] * ch.arms.upper];
+          s.hand = [s.elbow[0] + d[0] * ch.arms.lower, s.elbow[1] + d[1] * ch.arms.lower, s.elbow[2] + d[2] * ch.arms.lower];
+        });
+      }
+      return p;
+    }
+    function r6(v) { return v.map(function (x) { return Math.round(x * 1e6) / 1e6 + 0; }); }
+    // The rig as data, for other tools: joints with their parents and where they are in the template pose, and
+    // every part of the stand-in model with the joint it hangs on. glTF axes and metres.
+    function rig(ch, o) {
+      o = o || {};
+      var kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null;
+      var prims = R.buildPrims(templatePose(ch, { kit: kit }), ch, { flash: false, model: true }), top = 0;
+      prims.forEach(function (q) { top = Math.max(top, q.a[1] + q.r, q.b ? q.b[1] + q.r : 0); });
+      // a bone ends where a child begins, if it aims there; otherwise where the parts it carries end
+      function tailOf(j) {
+        var h = conv(j.o), a = conv(j.aim), d = [a[0] - h[0], a[1] - h[1], a[2] - h[2]], len = Math.sqrt(dot3(d, d)), dir = len > 1e-6 ? [d[0] / len, d[1] / len, d[2] / len] : [0, 1, 0], ext = 0;
+        var child = len > 1e-6 && prims.joints.some(function (c) { var q = conv(c.o); return c.parent === j.name && Math.abs(q[0] - a[0]) + Math.abs(q[1] - a[1]) + Math.abs(q[2] - a[2]) < 1e-4; });
+        if (!child) prims.forEach(function (q) { if (q.j === j.name) [q.a, q.b].forEach(function (pt) { if (pt) { var c = conv(pt); ext = Math.max(ext, (c[0] - h[0]) * dir[0] + (c[1] - h[1]) * dir[1] + (c[2] - h[2]) * dir[2] + q.r); } }); });
+        var bl = child ? len : Math.max(ext, 0.03 * top);
+        return [h[0] + dir[0] * bl, h[1] + dir[1] * bl, h[2] + dir[2] * bl];
+      }
+      return {
+        format: 'clio-motion-rig', version: 1, id: ch.id, name: kit ? ch.id + '_' + kit : ch.id, kit: kit || (ch.mount.type === 'held' ? ch.mount.kit : null), kind: ch.kind,
+        units: 'metres', axes: { up: '+Y', forward: '+Z', right: '-X' }, height: Math.round(top * 1e4) / 1e4, leg: ch.L, pose: 'template',
+        joints: prims.joints.map(function (j) { return { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; }),
+        parts: prims.map(function (q) { return { joint: q.j, group: q.g, slot: q.part || q.of || null, a: r6(conv(q.a)), b: q.b ? r6(conv(q.b)) : null, r: q.r, color: q.col }; }),
+        slots: (R.SLOTS[ch.id] || []).map(function (sl) { return { id: sl[0], label: sl[1], axis: sl[2] }; }),
+        clips: clipNames(ch)
+      };
+    }
+    // The stand-in model in the template pose, skinned, with no clips: what a modeller starts from.
+    function glbTemplate(ch, o) {
+      o = o || {};
+      var kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null;
+      return glbSkinned(ch, [], { bind: templatePose(ch, { kit: kit }), clips: false, name: o.name });
+    }
+
+    // A drawing template for Inkscape: the figure seen from its right side in the template pose (a biped's arms
+    // hanging), as a locked guide layer, and above it one empty layer for each image part (rig.js, SLOTS).
+    // The guide carries, for each part, the bone its picture lies along: a line clio-bone-<part> from the joint to
+    // the bone's end (none for a part whose picture stays upright), and a circle clio-joint-<part> at the joint, as
+    // wide as the part. A reader needs only those, and the scale bar clio-scale (one metre), to take the drawing apart.
+    // A part listed in APART (a weapon) has its bone laid level under the figure, where it is easier to draw.
+    var APART = { weapon: 1 };
+    function svgTemplate(ch) {
+      var prims = R.buildPrims(templatePose(ch, { arms: 0 }), ch, { flash: false, model: true }), slots = R.SLOTS[ch.id] || [];
+      var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, i;
+      prims.forEach(function (q) { [q.a, q.b, q.end].forEach(function (p) { if (p) { x0 = Math.min(x0, p[0] - q.r); x1 = Math.max(x1, p[0] + q.r); y0 = Math.min(y0, p[1] - q.r); y1 = Math.max(y1, p[1] + q.r); } }); });
+      y0 = Math.min(y0, 0);
+      var ppm = Math.round(680 / Math.max(x1 - x0, y1 - y0)), pad = 70, figW = (x1 - x0) * ppm, figH = (y1 - y0) * ppm;
+      var sorted = R.order(prims, R.projector({ cx: x0, cy: y1, cz: 0, yaw: 0, pit: 0, ppm: ppm, ox: pad, oy: pad }));
+      function n2(v) { return String(Math.round(v * 100) / 100); }
+      function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+      function shape(q, a, b, extra) {
+        var col = R.shade(q.col, R.level(q)).css, r = Math.max(q.r * ppm, 0.6);
+        if (!b) return '<circle cx="' + n2(a[0]) + '" cy="' + n2(a[1]) + '" r="' + n2(r) + '" fill="' + col + '"' + (extra || '') + '/>';
+        return '<line x1="' + n2(a[0]) + '" y1="' + n2(a[1]) + '" x2="' + n2(b[0]) + '" y2="' + n2(b[1]) + '" stroke="' + col + '" stroke-width="' + n2(2 * r) + '" stroke-linecap="' + (q.sq ? 'butt' : 'round') + '"' + (extra || '') + '/>';
+      }
+      // the bone of each part: the copy of it nearest the eye
+      var ref = {}, apartY = pad + figH + 46, bottom = pad + figH, fig = [], aside = [], bones = [], labels = [], layers = [];
+      slots.forEach(function (sl) {
+        var best = null;
+        sorted.forEach(function (q) { if (q.part === sl[0] && (!best || q.k > best.k)) best = q; });
+        if (best) ref[sl[0]] = best;
+      });
+      sorted.forEach(function (q) { if (!q.fx) fig.push('   ' + shape(q, q.pa, q.pb)); });
+      slots.forEach(function (sl) {
+        var q = ref[sl[0]]; if (!q) return;
+        var a = q.pa, b = sl[2] === 'ball' ? null : (q.pe || q.pb), r = q.r * ppm, move = null;
+        if (APART[sl[0]] && b) {
+          // turn the part level and set it down under the figure, with everything that belongs to it
+          var ang = Math.atan2(b[1] - a[1], b[0] - a[0]), ca = Math.cos(-ang), sa = Math.sin(-ang), ox = pad + 40, oy = apartY + 40;
+          move = function (p) { var dx = p[0] - a[0], dy = p[1] - a[1]; return [ox + dx * ca - dy * sa, oy + dx * sa + dy * ca]; };
+          sorted.forEach(function (w) { if ((w.part === sl[0] || w.of === sl[0]) && w.j && w.g === q.g && !w.fx) aside.push('   ' + shape(w, move(w.pa), w.pb ? move(w.pb) : null)); });
+          var a2 = move(a); b = move(b); a = a2; bottom = Math.max(bottom, oy + 60); apartY = oy + 80;
+        }
+        if (b) bones.push('   <line id="clio-bone-' + sl[0] + '" x1="' + n2(a[0]) + '" y1="' + n2(a[1]) + '" x2="' + n2(b[0]) + '" y2="' + n2(b[1]) + '"/>');
+        bones.push('   <circle id="clio-joint-' + sl[0] + '" cx="' + n2(a[0]) + '" cy="' + n2(a[1]) + '" r="' + n2(r) + '"/>');
+        var lx = b ? (a[0] + b[0]) / 2 : a[0], ly = b ? (a[1] + b[1]) / 2 : a[1];
+        labels.push('   <text x="' + n2(lx + r + 5) + '" y="' + n2(ly + 3) + '">' + esc(sl[1]) + '</text>');
+        layers.push({ k: move ? 1e6 : q.k, text: ' <g inkscape:groupmode="layer" id="clio-part-' + sl[0] + '" inkscape:label="' + esc(sl[1]) + '"/>' });
+      });
+      layers.sort(function (m, n) { return m.k - n.k; });
+      var W = Math.ceil(Math.max(figW + 2 * pad, 560)), H = Math.ceil(bottom + pad + 96), gy = pad + (y1 - 0) * ppm, out = [];
+      out.push('<?xml version="1.0" encoding="UTF-8"?>');
+      out.push('<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="clio-motion-' + ch.id + '" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">');
+      out.push(' <title>CLIo Motion drawing template: ' + esc(ch.label || ch.id) + '</title>');
+      out.push(' <sodipodi:namedview pagecolor="#ffffff" bordercolor="#999999" inkscape:document-units="px" showgrid="false"/>');
+      out.push(' <g inkscape:groupmode="layer" id="clio-guides-' + ch.id + '" inkscape:label="Guide: ' + esc(ch.label || ch.id) + ' (locked, leave as it is)" sodipodi:insensitive="true">');
+      out.push('  <line x1="' + n2(pad * 0.4) + '" y1="' + n2(gy) + '" x2="' + n2(W - pad * 0.4) + '" y2="' + n2(gy) + '" stroke="#b9bec6" stroke-width="1"/>');
+      out.push('  <g id="clio-figure" opacity="0.38">'); out.push(fig.join('\n')); out.push('  </g>');
+      if (aside.length) { out.push('  <g id="clio-apart" opacity="0.38">'); out.push(aside.join('\n')); out.push('  </g>'); }
+      out.push('  <g id="clio-bones" fill="none" stroke="#d6217f" stroke-width="1.4">'); out.push(bones.join('\n')); out.push('  </g>');
+      out.push('  <g id="clio-labels" font-family="sans-serif" font-size="11" fill="#a3175f">'); out.push(labels.join('\n')); out.push('  </g>');
+      var sb = Math.min(ppm, W - 2 * pad), sy = H - 84;        // the scale bar: one metre, or half of one if the page is narrow
+      if (sb < ppm) sb = ppm / 2;
+      out.push('  <line id="clio-scale" x1="' + pad + '" y1="' + sy + '" x2="' + n2(pad + sb) + '" y2="' + sy + '" stroke="#444a54" stroke-width="2"/>');
+      out.push('  <g font-family="sans-serif" font-size="11" fill="#444a54">');
+      out.push('   <text id="clio-scale-length" x="' + n2(pad + sb + 8) + '" y="' + (sy + 4) + '">' + (sb < ppm ? '0.5 m' : '1 m') + '</text>');
+      ['Draw each part in the layer that has its name, over the figure.', 'The figure faces right. A line is a bone; the circle is its joint.',
+        'One drawing serves both sides. An empty layer keeps its plain shape.', 'Leave this guide layer in the file: it says where the bones are.'].forEach(function (t, k) {
+        out.push('   <text x="' + pad + '" y="' + (sy + 22 + 14 * k) + '">' + t + '</text>');
+      });
+      out.push('  </g>');
+      out.push(' </g>');
+      layers.forEach(function (l) { out.push(l.text); });
+      out.push('</svg>'); out.push('');
+      return out.join('\n');
+    }
+
+    // 4 x 4 matrices as glTF writes them (column after column)
+    function m4mul(a, b) {
+      var o = new Array(16), c, r;
+      for (c = 0; c < 4; c++) for (r = 0; r < 4; r++) o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+      return o;
+    }
+    function m4trs(t, q, sc) {
+      var x = q[0], y = q[1], z = q[2], w = q[3], sx = sc[0], sy = sc[1], sz = sc[2];
+      return [(1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0, 2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
+        2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0, t[0], t[1], t[2], 1];
+    }
+    function m4inv(m) {            // of a matrix whose last row is 0 0 0 1
+      var a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
+      var A = e * i - f * h, B2 = f * g - d * i, C = d * h - e * g, det = a * A + b * B2 + c * C, k = 1 / det;
+      var r = [A * k, B2 * k, C * k, 0, (c * h - b * i) * k, (a * i - c * g) * k, (b * g - a * h) * k, 0, (b * f - c * e) * k, (c * d - a * f) * k, (a * e - b * d) * k, 0, 0, 0, 0, 1];
+      r[12] = -(r[0] * m[12] + r[4] * m[13] + r[8] * m[14]); r[13] = -(r[1] * m[12] + r[5] * m[13] + r[9] * m[14]); r[14] = -(r[2] * m[12] + r[6] * m[13] + r[10] * m[14]);
+      return r;
+    }
+    function m4pt(m, p) { return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]]; }
+    function parseGlb(bytes) {
+      var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      if (u8.length < 20 || dv.getUint32(0, true) !== 0x46546C67) throw new Error('not a .glb file (a binary glTF is needed, not .gltf, .blend or .fbx)');
+      var jl = dv.getUint32(12, true), doc = JSON.parse(new TextDecoder().decode(u8.subarray(20, 20 + jl))), at = 20 + jl, bin = new Uint8Array(0);
+      if (at + 8 <= u8.length && dv.getUint32(at + 4, true) === 0x004E4942) bin = u8.subarray(at + 8, at + 8 + dv.getUint32(at, true));
+      return { doc: doc, bin: bin };
+    }
+    function glbWorlds(doc) {      // parent and world matrix of every node, as the file has them at rest
+      var n = doc.nodes.length, par = new Array(n).fill(-1), W = new Array(n), i;
+      doc.nodes.forEach(function (nd, k) { (nd.children || []).forEach(function (c) { par[c] = k; }); });
+      function local(nd) { return nd.matrix ? nd.matrix.slice() : m4trs(nd.translation || [0, 0, 0], nd.rotation || [0, 0, 0, 1], nd.scale || [1, 1, 1]); }
+      function world(k) { if (!W[k]) W[k] = par[k] < 0 ? local(doc.nodes[k]) : m4mul(world(par[k]), local(doc.nodes[k])); return W[k]; }
+      for (i = 0; i < n; i++) world(i);
+      return { parent: par, world: W };
+    }
+    // Compare a model made by someone else with the rig: are all the joints there, under the right parents, and
+    // where the template has them?  Returns { ok, errors: [text], warnings: [text], joints, offset (largest, metres) }.
+    function glbCheck(ch, bytes, o) {
+      o = o || {};
+      var rep = { ok: false, errors: [], warnings: [], joints: 0, offset: 0 }, g, kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null;
+      try { g = parseGlb(bytes); } catch (e) { rep.errors.push(e.message); return rep; }
+      var doc = g.doc, tp = R.buildPrims(templatePose(ch, { kit: kit }), ch, { flash: false, model: true }), sk = skeleton(tp), J = sk.J, byName = {}, inSkin = {}, i;
+      if (!doc.nodes || !doc.nodes.length) { rep.errors.push('The file has no nodes.'); return rep; }
+      (doc.skins || []).forEach(function (s) { s.joints.forEach(function (n) { inSkin[n] = true; }); });
+      doc.nodes.forEach(function (nd, k) { if (nd.name !== undefined && (byName[nd.name] === undefined || (inSkin[k] && !inSkin[byName[nd.name]]))) byName[nd.name] = k; });
+      var node = J.map(function (j) { return byName[j.name] === undefined ? -1 : byName[j.name]; }), missing = J.filter(function (j, k) { return node[k] < 0; }).map(function (j) { return j.name; });
+      if (missing.length) {
+        rep.errors.push('Missing joint' + (missing.length > 1 ? 's' : '') + ': ' + missing.join(', ') + '. Bone names must be exactly those of the template'
+          + (missing.length === J.length ? ' (none was found: is this the right character?)' : missing.length > J.length / 2 ? ' (most are missing: is this a model of the ' + (ch.label || ch.id).toLowerCase() + '?)' : ch.mount.type === 'held' && missing.every(function (m) { return /^(Weapon|Magazine|Shield)/.test(m); }) ? ' (the model looks built for another kit: name it with --kit, or choose it in the bench)' : '') + '.');
+        return rep;
+      }
+      var gw = glbWorlds(doc), jointOf = {}, L = ch.L;
+      node.forEach(function (n, k) { jointOf[n] = k; });
+      rep.joints = J.length;
+      if (!(doc.skins || []).length) rep.warnings.push('No skin: the mesh is not bound to the bones (in Blender: parent the mesh to the armature with an Armature modifier and vertex groups named after the bones).');
+      else {
+        var unbound = J.filter(function (j, k) { return !inSkin[node[k]]; }).map(function (j) { return j.name; });
+        if (unbound.length === J.length) rep.warnings.push('The skin uses none of the rig\'s joints.');
+        var extra = Object.keys(inSkin).filter(function (n) { return jointOf[n] === undefined; }).map(function (n) { return doc.nodes[n].name || '#' + n; });
+        if (extra.length) rep.warnings.push(extra.length + ' extra bone' + (extra.length > 1 ? 's' : '') + ' in the skin (' + extra.slice(0, 6).join(', ') + (extra.length > 6 ? ', ...' : '') + '): they will follow the nearest rig joint above them, rigidly.');
+      }
+      for (i = 0; i < J.length; i++) {
+        var m = gw.world[node[i]], sx = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]), sy = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]), sz = Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+        if (Math.abs(sx - sy) > 1e-3 * sx || Math.abs(sx - sz) > 1e-3 * sx) { rep.errors.push('Joint ' + J[i].name + ' is scaled unevenly (' + [sx, sy, sz].map(function (v) { return v.toFixed(3); }).join(', ') + '). Apply the scale of the armature and of its bones.'); return rep; }
+        // the nearest rig joint above this one in the file should be its parent in the rig
+        var up = gw.parent[node[i]]; while (up >= 0 && jointOf[up] === undefined) up = gw.parent[up];
+        var found = up < 0 ? null : J[jointOf[up]].name;
+        if (found !== J[i].parent) rep.warnings.push('Joint ' + J[i].name + ' hangs under ' + (found || 'nothing') + ', the template has it under ' + (J[i].parent || 'nothing') + '.');
+        var c0 = conv(J[i].o), dd = Math.sqrt(Math.pow(m[12] - c0[0], 2) + Math.pow(m[13] - c0[1], 2) + Math.pow(m[14] - c0[2], 2));
+        if (dd > rep.offset) { rep.offset = dd; rep.offsetJoint = J[i].name; }
+      }
+      if (rep.offset > 0.5 * L) { rep.errors.push('Joint ' + rep.offsetJoint + ' is ' + rep.offset.toFixed(2) + ' m from where the template has it. The model must stand in the template pose, at the template\'s size, facing +Z with +Y up (in Blender: export with "+Y Up" on).'); return rep; }
+      if (rep.offset > 0.03 * L) rep.warnings.push('Joint ' + rep.offsetJoint + ' is ' + (rep.offset * 100).toFixed(1) + ' cm from where the template has it. The clips will still follow the rig exactly; parts around that joint may look bent or stretched.');
+      rep.ok = true; rep._ = { doc: doc, bin: g.bin, gw: gw, node: node, jointOf: jointOf, tp: tp, kit: kit };
+      return rep;
+    }
+    // Put the clips onto someone else's model. The model must have the rig's joints by name (glbCheck); its bones may
+    // point any way and have any roll, as they do after a trip through Blender: every joint is given the same
+    // movement in the world that the rig's joint makes, measured from the template pose.
+    // Returns { glb: bytes or null, report }.
+    function glbFit(ch, clips, bytes, o) {
+      o = o || {};
+      var rep = glbCheck(ch, bytes, o);
+      if (!rep.ok) return { glb: null, report: rep };
+      var X = rep._, doc = X.doc, gw = X.gw, node = X.node, jointOf = X.jointOf, nj = node.length, k, f; delete rep._;
+      var std = R.buildPrims(record(ch, 'idle', { frames: 8, kit: X.kit }).frames[0], ch, { flash: false, model: true }), sk = skeleton(std);
+      if (std.joints.length !== nj) { rep.ok = false; rep.errors.push('The rig has changed its joints between poses.'); return { glb: null, report: rep }; }
+      var F0 = sk.frames(std, null), Fr = sk.frames(X.tp, F0);
+      // which rig joint carries each node: itself, or the nearest one above it
+      var owner = doc.nodes.map(function (nd, n) { var up = n; while (up >= 0 && jointOf[up] === undefined) up = gw.parent[up]; return up < 0 ? -1 : jointOf[up]; });
+      function delta(Fn, j) {        // the movement of rig joint j from the template pose to this pose, in the world
+        var A = Fn[j].B, Bq = Fr[j].B, R3 = [], c, r, o0 = Fr[j].o, o1 = Fn[j].o;
+        for (c = 0; c < 3; c++) for (r = 0; r < 3; r++) R3[c * 3 + r] = A[0][r] * Bq[0][c] + A[1][r] * Bq[1][c] + A[2][r] * Bq[2][c];
+        return [R3[0], R3[1], R3[2], 0, R3[3], R3[4], R3[5], 0, R3[6], R3[7], R3[8], 0,
+          o1[0] - (R3[0] * o0[0] + R3[3] * o0[1] + R3[6] * o0[2]), o1[1] - (R3[1] * o0[0] + R3[4] * o0[1] + R3[7] * o0[2]), o1[2] - (R3[2] * o0[0] + R3[5] * o0[1] + R3[8] * o0[2]), 1];
+      }
+      var chunks = [X.bin], byteLen = X.bin.length, views = doc.bufferViews = doc.bufferViews || [], accs = doc.accessors = doc.accessors || [];
+      if (!doc.buffers || !doc.buffers.length) doc.buffers = [{ byteLength: 0 }];
+      if (doc.buffers[0].uri) { rep.ok = false; rep.errors.push('The file keeps its data outside itself. Export a single .glb.'); return { glb: null, report: rep }; }
+      function push(typed) {
+        var pad = (4 - byteLen % 4) % 4; if (pad) { chunks.push(new Uint8Array(pad)); byteLen += pad; }
+        var u8 = new Uint8Array(typed.buffer, typed.byteOffset, typed.byteLength);
+        views.push({ buffer: 0, byteOffset: byteLen, byteLength: u8.length }); chunks.push(u8); byteLen += u8.length; return views.length - 1;
+      }
+      function acc(typed, type, minmax) {
+        var size = { SCALAR: 1, VEC3: 3, VEC4: 4 }[type], a = { bufferView: push(typed), componentType: 5126, count: typed.length / size, type: type };
+        if (minmax) { a.min = [Math.min.apply(null, typed)]; a.max = [Math.max.apply(null, typed)]; }
+        accs.push(a); return accs.length - 1;
+      }
+      var rest = node.map(function (n) { var p = gw.parent[n], Lm = p < 0 ? gw.world[n] : m4mul(m4inv(gw.world[p]), gw.world[n]); return [Lm[12], Lm[13], Lm[14]]; });
+      // every clip is worked out first: a joint that slides in any of them gets its place written in all of them,
+      // so that a tool which leaves unwritten channels as the last clip had them (Blender does) shows each clip right
+      var anims = [], work = [], slides = node.map(function (n) { var pn = gw.parent[n]; return pn < 0 || owner[pn] < 0; });
+      clips.forEach(function (c) {
+        var fr = c.frames.slice(); if (c.loop) fr.push(c.frames[0]);
+        var nF = fr.length, prev = F0, Ds = [], ok = true;
+        for (f = 0; f < nF; f++) {
+          var pr = R.buildPrims(fr[f], ch, { flash: false, model: true });
+          if (pr.joints.length !== nj) { ok = false; break; }
+          prev = sk.frames(pr, prev);
+          var Fn = prev; Ds.push(Fn.map(function (w, j) { return delta(Fn, j); }));
+        }
+        if (!ok) { rep.warnings.push('Clip ' + c.name + ' was left out: it uses other joints (another kit?).'); return; }
+        var times = new Float32Array(nF), Qs = [], Ts = [];
+        for (f = 0; f < nF; f++) times[f] = c.loop ? c.duration * f / (nF - 1) : c.duration * f / nF;
+        for (k = 0; k < nj; k++) {
+          var n = node[k], pn = gw.parent[n], po = pn < 0 ? -1 : owner[pn], Q = new Float32Array(nF * 4), T = new Float32Array(nF * 3), pq = null;
+          for (f = 0; f < nF; f++) {
+            var Wn = m4mul(Ds[f][k], gw.world[n]), Wp = pn < 0 ? null : po < 0 ? gw.world[pn] : m4mul(Ds[f][po], gw.world[pn]), Lm = Wp ? m4mul(m4inv(Wp), Wn) : Wn;
+            var sx = Math.sqrt(Lm[0] * Lm[0] + Lm[1] * Lm[1] + Lm[2] * Lm[2]) || 1, sy = Math.sqrt(Lm[4] * Lm[4] + Lm[5] * Lm[5] + Lm[6] * Lm[6]) || 1, sz = Math.sqrt(Lm[8] * Lm[8] + Lm[9] * Lm[9] + Lm[10] * Lm[10]) || 1;
+            var qq = quatOfBasis([[Lm[0] / sx, Lm[1] / sx, Lm[2] / sx], [Lm[4] / sy, Lm[5] / sy, Lm[6] / sy], [Lm[8] / sz, Lm[9] / sz, Lm[10] / sz]]);
+            if (pq && qq[0] * pq[0] + qq[1] * pq[1] + qq[2] * pq[2] + qq[3] * pq[3] < 0) qq = [-qq[0], -qq[1], -qq[2], -qq[3]];
+            pq = qq; Q.set(qq, f * 4); T[f * 3] = Lm[12]; T[f * 3 + 1] = Lm[13]; T[f * 3 + 2] = Lm[14];
+            // (the straight distance, so that the answer does not depend on which way the model's bones happen to point)
+            if (Math.sqrt(Math.pow(Lm[12] - rest[k][0], 2) + Math.pow(Lm[13] - rest[k][1], 2) + Math.pow(Lm[14] - rest[k][2], 2)) > 0.002 * ch.L) slides[k] = true;
+          }
+          Qs.push(Q); Ts.push(T);
+        }
+        work.push({ name: c.name, times: times, Q: Qs, T: Ts });
+      });
+      work.forEach(function (wk) {
+        var tAcc = acc(wk.times, 'SCALAR', true), samplers = [], channels = [];
+        for (k = 0; k < nj; k++) {
+          samplers.push({ input: tAcc, output: acc(wk.Q[k], 'VEC4'), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: node[k], path: 'rotation' } });
+          if (slides[k]) { samplers.push({ input: tAcc, output: acc(wk.T[k], 'VEC3'), interpolation: 'LINEAR' }); channels.push({ sampler: samplers.length - 1, target: { node: node[k], path: 'translation' } }); }
+        }
+        anims.push({ name: wk.name, samplers: samplers, channels: channels });
+      });
+      if ((doc.animations || []).length) rep.warnings.push('The ' + doc.animations.length + ' animation' + (doc.animations.length > 1 ? 's' : '') + ' the file had were replaced.');
+      doc.animations = anims; rep.clips = anims.length;
+      // a joint that was written as a matrix cannot be animated: give it the same thing as translation, rotation, scale
+      node.forEach(function (n) {
+        var nd = doc.nodes[n]; if (!nd.matrix) return;
+        var m = nd.matrix, sx = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]), sy = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]), sz = Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+        nd.translation = [m[12], m[13], m[14]]; nd.scale = [sx, sy, sz];
+        nd.rotation = quatOfBasis([[m[0] / sx, m[1] / sx, m[2] / sx], [m[4] / sy, m[5] / sy, m[6] / sy], [m[8] / sz, m[9] / sz, m[10] / sz]]); delete nd.matrix;
+      });
+      // a skinned mesh takes its place from its joints alone; Blender hangs it under the armature, which the format
+      // advises against. Lift it to the top of its scene: nothing moves.
+      doc.nodes.forEach(function (nd, n) {
+        if (nd.skin === undefined || nd.mesh === undefined || gw.parent[n] < 0 || (nd.children || []).length) return;
+        var top = n; while (gw.parent[top] >= 0) top = gw.parent[top];
+        var pc = doc.nodes[gw.parent[n]].children; pc.splice(pc.indexOf(n), 1); if (!pc.length) delete doc.nodes[gw.parent[n]].children;
+        (doc.scenes || []).forEach(function (sc) { if ((sc.nodes || []).indexOf(top) >= 0) sc.nodes.push(n); });
+        delete nd.translation; delete nd.rotation; delete nd.scale; delete nd.matrix;
+      });
+      return { glb: packGlb(doc, chunks, byteLen), report: rep };
+    }
+    // How well a skinned file follows the rig: every part of the stand-in model is carried by its joint through
+    // every clip in the file, and its ends are compared with where the rig puts them. Distances as a share of leg length.
+    // bindPose: the pose the file's mesh was built in (the template pose for a fitted file).
+    function glbFollows(ch, clips, bytes, bindPose) {
+      var g = parseGlb(bytes), doc = g.doc, bin = g.bin, dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength), gw = glbWorlds(doc), skin = doc.skins[0], byName = {}, worst = 0, sum = 0, cnt = 0, what = '';
+      function read(i) { var a = doc.accessors[i], v = doc.bufferViews[a.bufferView], n = { SCALAR: 1, VEC3: 3, VEC4: 4, MAT4: 16 }[a.type], o = [], at = (v.byteOffset || 0) + (a.byteOffset || 0), st = v.byteStride || n * 4; for (var e = 0; e < a.count; e++) for (var c = 0; c < n; c++) o.push(dv.getFloat32(at + e * st + c * 4, true)); return o; }
+      var ibm = read(skin.inverseBindMatrices), slot = {};
+      skin.joints.forEach(function (n, k) { slot[doc.nodes[n].name] = k; });
+      var bind = R.buildPrims(bindPose || clips[0].frames[0], ch, { flash: false, model: true });
+      (doc.animations || []).forEach(function (an) {
+        var clip = clips.filter(function (c) { return c.name === an.name; })[0]; if (!clip) return;
+        var chs = an.channels.map(function (c) { return { node: c.target.node, path: c.target.path, out: read(an.samplers[c.sampler].output) }; });
+        for (var f = 0; f < clip.frames.length; f++) {
+          var loc = doc.nodes.map(function (nd) { return nd.matrix ? null : { t: (nd.translation || [0, 0, 0]).slice(), q: (nd.rotation || [0, 0, 0, 1]).slice(), s: nd.scale || [1, 1, 1] }; });
+          chs.forEach(function (c) { if (c.path === 'rotation') loc[c.node].q = c.out.slice(f * 4, f * 4 + 4); else if (c.path === 'translation') loc[c.node].t = c.out.slice(f * 3, f * 3 + 3); });
+          var W = [], world = function (n) { if (!W[n]) { var m = loc[n] ? m4trs(loc[n].t, loc[n].q, loc[n].s) : doc.nodes[n].matrix; W[n] = gw.parent[n] < 0 ? m : m4mul(world(gw.parent[n]), m); } return W[n]; };
+          var now = R.buildPrims(clip.frames[f], ch, { flash: false, model: true });
+          bind.forEach(function (q, k) {
+            var js = slot[q.j]; if (js === undefined) return;
+            var m = m4mul(world(skin.joints[js]), ibm.slice(js * 16, js * 16 + 16));
+            [[q.a, now[k].a], [q.b, now[k].b]].forEach(function (pp) {
+              if (!pp[0]) return;
+              var sp = m4pt(m, conv(pp[0])), e = conv(pp[1]), err = Math.sqrt(Math.pow(sp[0] - e[0], 2) + Math.pow(sp[1] - e[1], 2) + Math.pow(sp[2] - e[2], 2)) / ch.L;
+              sum += err; cnt++; if (err > worst) { worst = err; what = an.name + ' frame ' + f + ' ' + q.g + '/' + (q.part || q.of || '') + ' on ' + q.j; }
+            });
+          });
+        }
+      });
+      return { mean: cnt ? sum / cnt : 0, worst: worst, where: what, clips: (doc.animations || []).length, points: cnt };
+    }
+
     function packGlb(doc, chunks, byteLen) {
       var pad = (4 - byteLen % 4) % 4, i; if (pad) { chunks.push(new Uint8Array(pad)); byteLen += pad; }
       doc.buffers[0].byteLength = byteLen;
@@ -3628,7 +4022,8 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     }
 
     return { record: record, recordAll: recordAll, clipNames: clipNames, walkSpeed: walkSpeed, runSpeed: runSpeed, newPalette: newPalette, rasterize: rasterize,
-      framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
+      framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned,
+      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
   };
 });
 
@@ -4095,18 +4490,10 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 
   // A picture laid along its bone. See GaitRig.SLOTS for what each axis means.
   function drawPart(c, q, im, ppm, dark, flip) {
-    var img = dark ? im.dark : im.img, a = q.pa, b = q.pe || q.pb, r = q.r * ppm;
-    c.imageSmoothingEnabled = false;
-    if (im.axis === 'ball' || !b) {
-      var hh = 2.3 * r, ww = hh * im.w / im.h;
-      c.save(); c.translate(a[0], a[1]); if (flip) c.scale(-1, 1); c.drawImage(img, -ww / 2, -hh / 2, ww, hh); c.restore(); return;
-    }
-    if (im.axis === 'up') { var t = a; a = b; b = t; }
-    var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) + 2 * r, ang = Math.atan2(dy, dx);
-    c.save(); c.translate(a[0], a[1]);
-    if (im.axis === 'right') { c.rotate(ang); if (flip) c.scale(1, -1); var h2 = len * im.h / im.w; c.drawImage(img, -r, -h2 / 2, len, h2); }
-    else { c.rotate(ang - Math.PI / 2); if (flip) c.scale(-1, 1); var w2 = len * im.w / im.h; c.drawImage(img, -w2 / 2, -r, w2, len); }
-    c.restore();
+    var o = R.partPlace(im, q.pa, q.pe || q.pb, q.r * ppm, ppm, flip);
+    c.imageSmoothingEnabled = !!im.box;          // pictures from a drawing are smoothed; small pixel pictures are not
+    c.save(); c.translate(o.x, o.y); if (o.rot) c.rotate(o.rot); if (o.fx !== 1 || o.fy !== 1) c.scale(o.fx, o.fy);
+    c.drawImage(dark ? im.dark : im.img, o.dx, o.dy, o.dw, o.dh); c.restore();
   }
 
   function drawPrims(c, proj, ppm, prims, dz, outlineW, outlineCol, keepOrder, imgs) {
@@ -4335,11 +4722,95 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
   }
 
   // ------------------------------------------------------ image parts
-  function storePart(id, slot, axis, source, w, h, label) {
+  // more (optional): { box, len, r } for a picture taken from a drawing (see GaitRig.partPlace)
+  function storePart(id, slot, axis, source, w, h, label, more) {
     var a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').drawImage(source, 0, 0, w, h);
     var d = document.createElement('canvas'); d.width = w; d.height = h; var dc = d.getContext('2d');
     dc.drawImage(a, 0, 0); dc.globalCompositeOperation = 'source-atop'; dc.fillStyle = 'rgba(0,0,0,0.32)'; dc.fillRect(0, 0, w, h);
     IMG[id][slot] = { img: a, dark: d, w: w, h: h, axis: axis, label: label };
+    if (more) { IMG[id][slot].box = more.box; IMG[id][slot].len = more.len; IMG[id][slot].r = more.r; }
+  }
+  // A whole character drawn on its template (templates/2d, or "Save the template"): every layer that has something
+  // in it becomes the picture of its part, cut out along the bone the guide layer gives for it.
+  function loadDrawing(file) {
+    var note = $('drawingNote'), id = ch.id, rd = new FileReader();
+    function say(t) { note.textContent = t; }
+    rd.onerror = function () { say('That file could not be read.'); };
+    rd.onload = function () {
+      var doc = new DOMParser().parseFromString(String(rd.result), 'image/svg+xml'), root = doc.documentElement;
+      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) { say('That is not an SVG file this browser can read. In Inkscape, save as Inkscape SVG or Plain SVG.'); return; }
+      // nothing in the file may run
+      [].slice.call(doc.querySelectorAll('script, foreignObject, iframe, object, embed')).forEach(function (n) { n.parentNode.removeChild(n); });
+      [].slice.call(doc.querySelectorAll('*')).forEach(function (el) {
+        [].slice.call(el.attributes).forEach(function (at) { if (/^on/i.test(at.name) || (/href$/i.test(at.name) && /^\s*javascript:/i.test(at.value))) el.removeAttribute(at.name); });
+      });
+      var guide = doc.querySelector('[id^="clio-guides-"]');
+      if (!guide) { say('This drawing was not made on a template: its guide layer is missing. Save the template, draw in its layers, and load that file.'); return; }
+      var who = guide.id.slice(12);
+      if (who !== id) { say('This drawing is for the ' + (M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who) + '. Choose that character first, then load it.'); return; }
+      // lay the file out, unseen, so that the browser can measure it
+      var host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none';
+      var live = document.importNode(root, true), NS = 'http://www.w3.org/2000/svg', jobs = [], empty = [], lost = [], linked = [];
+      host.appendChild(live); document.body.appendChild(host);
+      try {
+        var inv = live.getCTM().inverse();
+        var toRoot = function (el) { return inv.multiply(el.getCTM()); };          // from an element's own measure to the page's
+        var at = function (m, x, y) { return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; };
+        var bar = live.querySelector('#clio-scale'), barLen = live.querySelector('#clio-scale-length'), ppmT = 0;
+        if (bar) {
+          var bm = toRoot(bar), p1 = at(bm, bar.x1.baseVal.value, bar.y1.baseVal.value), p2 = at(bm, bar.x2.baseVal.value, bar.y2.baseVal.value);
+          ppmT = Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)) / (parseFloat(barLen ? barLen.textContent : '1') || 1);
+        }
+        if (!(ppmT > 0)) { say('The guide layer of this drawing has lost its scale bar. Start again from a fresh template and paste your layers in.'); return; }
+        var ser = new XMLSerializer(), defs = [].slice.call(live.querySelectorAll('defs, style')).map(function (d) { return ser.serializeToString(d); }).join('');
+        R.SLOTS[id].forEach(function (sl) {
+          var layer = live.querySelector('#clio-part-' + sl[0]), joint = live.querySelector('#clio-joint-' + sl[0]), bone = live.querySelector('#clio-bone-' + sl[0]);
+          if (!layer || !joint) { lost.push(sl[1]); return; }
+          layer.style.display = ''; if (layer.getAttribute('display') === 'none') layer.removeAttribute('display');          // a layer hidden in Inkscape still counts
+          if (!layer.querySelector('path, rect, circle, ellipse, line, polyline, polygon, image, text, use')) { empty.push(sl[1]); return; }
+          // a picture that is only linked from another file cannot come along
+          if ([].slice.call(layer.querySelectorAll('image')).some(function (n) { var h = n.getAttribute('href') || n.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || ''; return !/^data:/i.test(h.trim()); })) linked.push(sl[1]);
+          var jm = toRoot(joint), a = at(jm, joint.cx.baseVal.value, joint.cy.baseVal.value), rT = joint.r.baseVal.value * Math.sqrt(Math.abs(jm.a * jm.d - jm.b * jm.c)), b = null;
+          if (bone && sl[2] !== 'ball') { var bm2 = toRoot(bone); b = at(bm2, bone.x2.baseVal.value, bone.y2.baseVal.value); }
+          var fr = R.partFrame(sl[2], a, b), pm = toRoot(layer.parentNode);
+          var tf = 'rotate(' + (fr.rot * 180 / Math.PI) + ') translate(' + (-fr.x) + ' ' + (-fr.y) + ') matrix(' + [pm.a, pm.b, pm.c, pm.d, pm.e, pm.f].join(' ') + ')';
+          // its box in the bone's frame
+          var outer = document.createElementNS(NS, 'g'), inner = document.createElementNS(NS, 'g');
+          inner.setAttribute('transform', tf); inner.appendChild(layer.cloneNode(true)); outer.appendChild(inner); live.appendChild(outer);
+          var bb = outer.getBBox(); live.removeChild(outer);
+          if (!(bb.width > 0.5) || !(bb.height > 0.5)) { empty.push(sl[1]); return; }
+          var pad = 3 + 0.06 * Math.max(bb.width, bb.height), x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, h = bb.height + 2 * pad;        // room for the width of the strokes
+          var k = Math.min(3, 640 / Math.max(w, h)), W2 = Math.max(2, Math.round(w * k)), H2 = Math.max(2, Math.round(h * k));
+          var xml = '<svg xmlns="' + NS + '" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + W2 + '" height="' + H2 + '" viewBox="' + [x0, y0, w, h].join(' ') + '">' + defs
+            + '<g transform="' + tf + '">' + ser.serializeToString(layer) + '</g></svg>';
+          jobs.push({ sl: sl, xml: xml, w: W2, h: H2, more: { box: [x0 / ppmT, y0 / ppmT, (x0 + w) / ppmT, (y0 + h) / ppmT], r: rT / ppmT,
+            len: b ? Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) / ppmT : 0 } });
+        });
+      } catch (e) { say('This drawing could not be measured (' + (e && e.message ? e.message : e) + ').'); return; }
+      finally { document.body.removeChild(host); }
+      if (!jobs.length) { say('The part layers of this drawing are all empty. Draw each part in the layer that has its name.'); return; }
+      var left = jobs.length, done = [], failed = [];
+      jobs.forEach(function (j) {
+        var im = new Image(), url = null;
+        im.onload = function () { storePart(id, j.sl[0], j.sl[2], im, j.w, j.h, file.name, j.more); if (url) URL.revokeObjectURL(url); done.push(j.sl[1]); fin(); };
+        im.onerror = function () {
+          // where pictures may not be given as data, hand the same thing over as a file in memory
+          if (!url) { try { url = URL.createObjectURL(new Blob([j.xml], { type: 'image/svg+xml' })); im.src = url; return; } catch (e) { url = 'none'; } }
+          else if (url !== 'none') URL.revokeObjectURL(url);
+          failed.push(j.sl[1]); fin();
+        };
+        im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(j.xml);
+      });
+      function fin() {
+        if (--left) return;
+        clearStrip(); if (ch.id === id) syncSlots();
+        say((done.length ? 'Loaded ' + done.length + ' part' + (done.length > 1 ? 's' : '') + ' from ' + file.name + ': ' + done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
+          + (failed.length ? ' Could not be drawn: ' + failed.join(', ') + '.' : '')
+          + (linked.length ? ' Pictures linked from other files were left out of ' + linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
+          + (empty.length ? ' Left as shapes (empty layers): ' + empty.join(', ') + '.' : '') + (lost.length ? ' Missing from the file: ' + lost.join(', ') + '.' : ''));
+      }
+    };
+    rd.readAsText(file);
   }
   function loadPart(slot, axis, file) {
     var id = ch.id, url = URL.createObjectURL(file), im = new Image();
@@ -4468,7 +4939,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
   }
   function exportReady(d) {
     downloads = d || null;
-    $('export').hidden = !downloads;
+    $('export').hidden = !downloads; $('saveDrawing').hidden = !downloads; $('modelRow').hidden = !downloads; $('modelNote').hidden = !downloads;
     $('exportNote').textContent = downloads ? 'Bakes every clip, from idle to the ragdoll death, with the current style settings.'
       : 'Saving files is not available in this view. The command-line baker writes the same files.';
   }
@@ -4635,6 +5106,48 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
   $('overlays').addEventListener('change', function () { set.overlays = this.checked; syncUI(); });
   $('sampleParts').addEventListener('click', sampleParts);
   $('clearParts').addEventListener('click', function () { IMG[ch.id] = {}; clearStrip(); syncSlots(); });
+  $('drawing').addEventListener('change', function () { if (this.files && this.files[0]) loadDrawing(this.files[0]); this.value = ''; });
+  $('saveDrawing').addEventListener('click', function () {
+    if (!downloads) return;
+    var note = $('drawingNote');
+    downloads.save({ filename: ch.id + '_template.svg', data: new Blob([B.svgTemplate(ch)], { type: 'image/svg+xml' }) })
+      .then(function () { note.textContent = 'Saved. Open it in Inkscape, draw each part in the layer that has its name, save, and load the file here.'; }, function () { note.textContent = 'Nothing was saved.'; });
+  });
+  $('saveModel').addEventListener('click', function () {
+    if (!downloads) return;
+    var note = $('modelNote'), kit = ch.mount.type === 'held' && set.kit !== ch.mount.kit ? set.kit : null, rig = B.rig(ch, { kit: kit }), enc = new TextEncoder();
+    var zip = B.zip([{ name: rig.name + '.glb', data: B.glbTemplate(ch, { kit: kit, name: rig.name }) }, { name: rig.name + '.rig.json', data: enc.encode(JSON.stringify(rig, null, 1) + '\n') },
+      { name: 'README.txt', data: enc.encode(['CLIo Motion 3D template: ' + rig.name, '',
+        rig.name + '.rig.json  the skeleton as data: ' + rig.joints.length + ' joints, in the template pose. The Blender add-on (tools/blender/clio_motion_blender.py',
+        '                      in the repository) builds the armature and a stand-in model from it, checks your model and exports it.',
+        rig.name + '.glb       the same skeleton with the stand-in model, skinned, for any other program.', '',
+        'Model round the skeleton and keep the bones\' names. Export a .glb, then in Gait Bench choose "Put the clips on my model",',
+        'or run: node tools/gaitbake.js ' + ch.id + (kit ? ' --kit ' + kit : '') + ' --model your.glb', '',
+        'https://github.com/eryxgames/clio-motion', ''].join('\n')) }]);
+    downloads.save({ filename: rig.name + '_template3d.zip', data: new Blob([zip]) })
+      .then(function () { note.textContent = 'Saved the skeleton and stand-in model of the ' + ch.label.toLowerCase() + (kit ? ' (' + kit + ')' : '') + '.'; }, function () { note.textContent = 'Nothing was saved.'; });
+  });
+  $('fitModel').addEventListener('change', function () {
+    var file = this.files && this.files[0], note = $('modelNote'); this.value = '';
+    if (!file || !downloads) return;
+    var rd = new FileReader(), c0 = ch, kit = ch.mount.type === 'held' && set.kit !== ch.mount.kit ? set.kit : null;
+    note.textContent = 'Baking clips for ' + file.name + '.';
+    rd.onerror = function () { note.textContent = 'That file could not be read.'; };
+    rd.onload = function () {
+      setTimeout(function () {
+        var fit;
+        try { fit = B.glbFit(c0, B.recordAll(c0, { style: set.style, frames: 8, kit: kit }), new Uint8Array(rd.result), { kit: kit }); }
+        catch (e) { note.textContent = 'That model could not be read (' + (e && e.message ? e.message : e) + ').'; return; }
+        var rep = fit.report, warn = rep.warnings.length ? ' ' + rep.warnings.join(' ') : '';
+        if (!fit.glb) { note.textContent = rep.errors.join(' '); return; }
+        // in a zip, like the other exports: not every view that can save files will save a bare .glb
+        var base = file.name.replace(/\.glb$/i, '') + '_clips';
+        downloads.save({ filename: base + '.zip', data: new Blob([B.zip([{ name: base + '.glb', data: fit.glb }])]) })
+          .then(function () { note.textContent = 'Saved ' + base + '.glb (in a zip): ' + rep.clips + ' clips on the ' + rep.joints + ' joints of ' + file.name + '.' + warn; }, function () { note.textContent = 'Nothing was saved.' + warn; });
+      }, 30);
+    };
+    rd.readAsArrayBuffer(file);
+  });
   function typing(e) { var t = e.target && e.target.tagName; return t === 'BUTTON' || t === 'INPUT' || t === 'LABEL' || t === 'SELECT' || t === 'TEXTAREA'; }
   document.addEventListener('keydown', function (e) {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;

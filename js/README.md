@@ -32,7 +32,9 @@ The clip list must include `idle`: it is the rest pose.
 - `<id>.glb`: glTF 2.0 with a skinned skeleton. One mesh, a joint hierarchy (`Hips`, `Spine`,
   `Head`, `UpperLeg_R`, `LowerLeg_R`, `Foot_R`, `Toe_R`, `UpperArm_R`, `LowerArm_R`, `Hand_R`, ...),
   every vertex bound to exactly one joint. Clips animate joint rotations, plus translation on the
-  root and on the few joints that slide (weapon recoil, backpack).
+  root and on the few joints that slide (weapon recoil, backpack). A joint that slides in any clip
+  has its place written in every clip, so a program that leaves unwritten channels as the last
+  clip had them (Blender does) shows each clip right.
 - `<id>_parts.glb`: the same clips with every part as its own rigid node and no skin.
 - `<id>_sheet.png` and `<id>_sheet.json`: sprite sheet and atlas in the JSON-hash form
   (`frames`, `animations`, `meta.frameTags`). `meta.clips` gives each clip's length in seconds
@@ -68,6 +70,28 @@ facing forwards), `run` (trot for the quadruped), `sneak`, `jump`, `attack`, `hi
 - `guard` is the fighting stance (a loop). `jab`, `cross` and `hook` start and end in it and are
   recorded at 24 frames a second, since they are over in half a second.
 
+## Your own art
+
+`templates/` has a drawing template for Inkscape and a skeleton for Blender for every character;
+[`templates/README.md`](../templates/README.md) is the guide. In code:
+
+- `B.templatePose(ch, { kit })`: the pose a model is built in. Standing with `still: 1`, weapons
+  put away, a biped's arms straight, out and down (`arms: 0` leaves them hanging, as the drawing
+  template has them).
+- `B.rig(ch, { kit })`: the rig as data (what `templates/3d/<name>.rig.json` holds).
+- `B.glbTemplate(ch, { kit })`: the stand-in model in the template pose, skinned, no clips.
+- `B.glbCheck(ch, bytes, { kit })`: compares someone else's `.glb` with the rig. Returns
+  `{ ok, errors, warnings, joints, offset }`.
+- `B.glbFit(ch, clips, bytes, { kit })`: puts the clips on that model. Returns `{ glb, report }`.
+  Each joint is given the movement its rig joint makes in the world, measured from the template
+  pose, so the model's bones may point any way; nodes that are not rig joints follow the nearest
+  rig joint above them. `node tools/gaitbake.js <character> --model my.glb` does this from the
+  command line and writes `my_clips.glb`; `--check` only reports.
+- `B.glbFollows(ch, clips, bytes, bindPose)`: how closely a skinned file follows the rig (the
+  stand-in model's parts, carried by the file's joints, against where the rig puts them).
+- `B.svgTemplate(ch)`: the drawing template. `R.partPlace` and `R.partFrame` say where a part's
+  picture goes on its bone, and take a drawing apart.
+
 ## Engines
 
 - Unity: import the `.glb` with glTFast; slice the sheet by frame size or read the atlas.
@@ -78,12 +102,14 @@ facing forwards), `run` (trot for the quadruped), `sneak`, `jump`, `attack`, `hi
 
 ## Checked
 
-- All twenty-six `.glb` files that `tools/gaitbake.js` writes for the built-in characters pass the Khronos glTF validator with no errors or warnings.
+- All twenty-eight `.glb` files that `tools/gaitbake.js` writes for the built-in characters (twelve characters and the soldier's two other kits, skinned and in parts) pass the Khronos glTF validator with no errors or warnings. So do the fourteen template files, and the files made by putting the clips on models that Blender exported.
 - CLIo's own `engine/gltf.py` reads every clip of all twelve characters from them.
 - The skinned files were played back through their joint hierarchy and compared with the rig:
-  parts land within 0.13% of leg length on average, also when aiming well off to the side. The worst
-  cases are the quadruped's body in the death clip (about 7% of leg length) and the soldier's
-  shoulder line while carrying (about 3%).
+  joints are where the rig puts them (to 2 mm in the ragdoll clips), and parts land within 0.1% of
+  leg length on average, also when aiming well off to the side. The worst cases are parts that
+  change length, which one joint cannot follow: the octopus's mantle as it jets (about 18% of leg
+  length), the quadruped's body in the death clip (about 7%) and the soldier's shoulder line
+  while carrying (about 3%).
 - Throws: the grenade comes down within 2 cm of the target at 2 to 14 m. Crate: hands stay on the
   handles to within 1 cm from grab to release, on the ground and on a table. Punches: the fist
   reaches a target inside arm's length to within 2 mm (jab, cross); the hook is a short-range punch.
@@ -142,6 +168,11 @@ coordinates:
     const S = M.createState(ch, env);
     const style = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3 };
     const pose = M.step(S, ch, { speed: 1.4, crouch: 0, armed: true, steer: 0.5 }, style, env, 1 / 120);
+
+The style: `bounce`, `stride`, `arm`, `lean` and `step` scale those parts of the motion (1 is
+plain), `snap` is how sharply a foot is put down. `still` (0 to 1, usually left out) takes the
+life out of a standing body: no shifting of weight, no breathing, no looking about. At 1 a body
+that stands is as still as a statue, and its two halves match exactly; the templates are made so.
 
 Inputs: `speed` (m/s), `crouch` (0..1), `steer` (-1..1) or `heading` (radians, 0 = +x),
 `aim` (world point `[x, y, z]`), `fire`, `armed` (false stows the weapons), `kit`, `reload`,
@@ -324,8 +355,8 @@ when its health runs out, and gets up again after a few seconds.
 
 - Riding: there is no climbing on or getting down (both are switches); the rider does not grip
   with his knees or lose his seat by himself; nothing but the seat joins him to the mount, so a
-  mount that rears or rolls takes him with it however steep. Riding is not baked into clips and is
-  not in the C and Python versions yet. Only the soldier rides.
+  mount that rears or rolls takes him with it however steep. Riding is not baked into clips. Only
+  the soldier rides.
 - The horse's legs have two bones each, like the hyena's. Its pounce is a jump with the head down.
 - Flight has no take-off run and no landing flare: entering and leaving the air are switches, and
   the bench cross-fades over them. Wings do not collide with the ground or the body.

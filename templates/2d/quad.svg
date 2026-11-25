@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="clio-motion-quad" width="821" height="586" viewBox="0 0 821 586">
+ <title>CLIo Motion drawing template: Quadruped</title>
+ <sodipodi:namedview pagecolor="#ffffff" bordercolor="#999999" inkscape:document-units="px" showgrid="false"/>
+ <g inkscape:groupmode="layer" id="clio-guides-quad" inkscape:label="Guide: Quadruped (locked, leave as it is)" sodipodi:insensitive="true">
+  <line x1="28" y1="413.5" x2="793" y2="413.5" stroke="#b9bec6" stroke-width="1"/>
+  <g id="clio-figure" opacity="0.38">
+   <line x1="509.81" y1="191.74" x2="437.66" y2="300.49" stroke="rgb(64,67,73)" stroke-width="45.94" stroke-linecap="round"/>
+   <circle cx="509.81" cy="191.74" r="33.66" fill="rgb(118,47,33)"/>
+   <line x1="437.66" y1="300.49" x2="508.58" y2="400.59" stroke="rgb(64,67,73)" stroke-width="35.64" stroke-linecap="round"/>
+   <circle cx="508.58" cy="400.59" r="19.01" fill="rgb(30,31,34)"/>
+   <line x1="224.69" y1="191.74" x2="141.63" y2="292.43" stroke="rgb(64,67,73)" stroke-width="45.94" stroke-linecap="round"/>
+   <circle cx="224.69" cy="191.74" r="33.66" fill="rgb(118,47,33)"/>
+   <line x1="141.63" y1="292.43" x2="201.17" y2="399.66" stroke="rgb(64,67,73)" stroke-width="35.64" stroke-linecap="round"/>
+   <circle cx="201.17" cy="399.66" r="19.01" fill="rgb(30,31,34)"/>
+   <line x1="224.66" y1="184.4" x2="81.88" y2="129.54" stroke="rgb(34,36,39)" stroke-width="23.76" stroke-linecap="round"/>
+   <line x1="224.66" y1="184.4" x2="509.78" y2="183.24" stroke="rgb(73,77,83)" stroke-width="118.8" stroke-linecap="round"/>
+   <line x1="295.85" y1="160.35" x2="438.41" y2="159.77" stroke="rgb(134,54,38)" stroke-width="99" stroke-linecap="round"/>
+   <line x1="509.73" y1="171.36" x2="604.5" y2="103.66" stroke="rgb(73,77,83)" stroke-width="59.4" stroke-linecap="round"/>
+   <line x1="604.5" y1="131.38" x2="739.14" y2="131.38" stroke="rgb(34,36,39)" stroke-width="22.18" stroke-linecap="round"/>
+   <line x1="604.5" y1="103.66" x2="683.7" y2="103.66" stroke="rgb(134,54,38)" stroke-width="67.32" stroke-linecap="round"/>
+   <circle cx="687.66" cy="91.78" r="11.88" fill="rgb(255,106,60)"/>
+   <line x1="224.69" y1="191.74" x2="141.63" y2="292.43" stroke="rgb(82,86,94)" stroke-width="45.94" stroke-linecap="round"/>
+   <circle cx="224.69" cy="191.74" r="33.66" fill="rgb(151,60,42)"/>
+   <line x1="141.63" y1="292.43" x2="201.17" y2="399.66" stroke="rgb(82,86,94)" stroke-width="35.64" stroke-linecap="round"/>
+   <circle cx="201.17" cy="399.66" r="19.01" fill="rgb(39,41,44)"/>
+   <line x1="509.81" y1="191.74" x2="437.66" y2="300.49" stroke="rgb(82,86,94)" stroke-width="45.94" stroke-linecap="round"/>
+   <circle cx="509.81" cy="191.74" r="33.66" fill="rgb(151,60,42)"/>
+   <line x1="437.66" y1="300.49" x2="508.58" y2="400.59" stroke="rgb(82,86,94)" stroke-width="35.64" stroke-linecap="round"/>
+   <circle cx="508.58" cy="400.59" r="19.01" fill="rgb(39,41,44)"/>
+  </g>
+  <g id="clio-bones" fill="none" stroke="#d6217f" stroke-width="1.4">
+   <line id="clio-bone-body" x1="224.66" y1="184.4" x2="509.78" y2="183.24"/>
+   <circle id="clio-joint-body" cx="224.66" cy="184.4" r="59.4"/>
+   <line id="clio-bone-head" x1="604.5" y1="103.66" x2="683.7" y2="103.66"/>
+   <circle id="clio-joint-head" cx="604.5" cy="103.66" r="33.66"/>
+   <line id="clio-bone-upperLeg" x1="509.81" y1="191.74" x2="437.66" y2="300.49"/>
+   <circle id="clio-joint-upperLeg" cx="509.81" cy="191.74" r="22.97"/>
+   <line id="clio-bone-lowerLeg" x1="437.66" y1="300.49" x2="508.58" y2="400.59"/>
+   <circle id="clio-joint-lowerLeg" cx="437.66" cy="300.49" r="17.82"/>
+  </g>
+  <g id="clio-labels" font-family="sans-serif" font-size="11" fill="#a3175f">
+   <text x="431.62" y="186.82">Body</text>
+   <text x="682.76" y="106.66">Head</text>
+   <text x="501.71" y="249.12">Upper leg</text>
+   <text x="495.94" y="353.54">Lower leg</text>
+  </g>
+  <line id="clio-scale" x1="70" y1="502" x2="466" y2="502" stroke="#444a54" stroke-width="2"/>
+  <g font-family="sans-serif" font-size="11" fill="#444a54">
+   <text id="clio-scale-length" x="474" y="506">1 m</text>
+   <text x="70" y="524">Draw each part in the layer that has its name, over the figure.</text>
+   <text x="70" y="538">The figure faces right. A line is a bone; the circle is its joint.</text>
+   <text x="70" y="552">One drawing serves both sides. An empty layer keeps its plain shape.</text>
+   <text x="70" y="566">Leave this guide layer in the file: it says where the bones are.</text>
+  </g>
+ </g>
+ <g inkscape:groupmode="layer" id="clio-part-body" inkscape:label="Body"/>
+ <g inkscape:groupmode="layer" id="clio-part-head" inkscape:label="Head"/>
+ <g inkscape:groupmode="layer" id="clio-part-upperLeg" inkscape:label="Upper leg"/>
+ <g inkscape:groupmode="layer" id="clio-part-lowerLeg" inkscape:label="Lower leg"/>
+</svg>

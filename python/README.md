@@ -42,6 +42,11 @@ Off the ground, a call changes the mode and `step` carries on:
 
 `step_ground` gives the legs and hips alone.
 
+The style (`cm.STYLE` is the plain one): `bounce`, `stride`, `arm`, `lean`, `step` scale those
+parts of the motion, `snap` is how sharply a foot is put down, and `still` (0 to 1, 0 in
+`cm.STYLE`) takes the life out of a standing body: no shifting of weight, no breathing, no
+looking about. Pass a copy: `dict(cm.STYLE, still=1)`.
+
 Knocked down: give `"die": {}` (a blow from straight ahead) or `"die": {"impulse": [x, y, z]}` for
 one step. The body is handed to its ragdoll from wherever it is, a `die` event is given, and `step`
 goes on returning the falling, then lying, pose. `cm.stand(S, ch, ground)` puts it back on its feet.

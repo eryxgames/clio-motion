@@ -156,8 +156,10 @@ typedef struct {
   int climb, drop;                             /* hanging from a ledge: pull up; let go */
   int die; double die_impulse[3];              /* knocked down: 1 from straight ahead, 2 with this push (world) */
 } cm_input;
-typedef struct { double bounce, stride, arm, lean, step, snap; } cm_style;
-extern const cm_style CM_STYLE;                /* 1, 1, 1, 1, 1, 0.3 */
+/* How the motion is styled: 1 is the plain setting for the first five. still (0..1) takes the life out of a standing
+   body: no shifting of weight, no breathing, no looking about (0: alive, the usual). */
+typedef struct { double bounce, stride, arm, lean, step, snap, still; } cm_style;
+extern const cm_style CM_STYLE;                /* 1, 1, 1, 1, 1, 0.3, 0 */
 
 /* Ground height at a point of the world. */
 typedef double (*cm_terrain_fn)(double x, double z, void *user);
