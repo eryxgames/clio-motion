@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clio-motion"
+version = "0.13.0"
+description = "Characters that move by rule, not by keyframe. Pure Python, standard library only."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Daniel Sandner" }]
+
+[project.urls]
+Source = "https://github.com/eryxgames/clio-motion"
+
+[tool.setuptools]
+packages = ["clio_motion"]
+
+[tool.setuptools.package-data]
+clio_motion = ["characters.json"]

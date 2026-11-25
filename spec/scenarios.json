@@ -1,0 +1,1479 @@
+{
+ "about": "Recorded runs for checking the ports. Format: see tools/golden.js.",
+ "scenarios": [
+  {
+   "id": "soldier_gaits",
+   "character": "soldier",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.4
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 5.5,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "mech_gaits",
+   "character": "mech",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.2
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 4.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "quad_gaits",
+   "character": "quad",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.2
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 4.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "hyena_gaits",
+   "character": "hyena",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.5
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 9.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "raptor_gaits",
+   "character": "raptor",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.8
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 9.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "spider_gaits",
+   "character": "spider",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.0
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 3.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "scorpion_gaits",
+   "character": "scorpion",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.8
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 2.5,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "mantis_gaits",
+   "character": "mantis",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.5
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 1.6,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "wasp_gaits",
+   "character": "wasp",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.4
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 1.2,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "dragon_gaits",
+   "character": "dragon",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.4
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 5.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "octopus_gaits",
+   "character": "octopus",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.4
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 1.0,
+      "steer": 0
+     }
+    ],
+    [
+     4.2,
+     {
+      "steer": -0.4
+     }
+    ],
+    [
+     5.0,
+     {
+      "speed": 0,
+      "steer": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "soldier_flat_30hz",
+   "character": "soldier",
+   "seconds": 4,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.4
+     }
+    ],
+    [
+     2,
+     {
+      "speed": 4.5
+     }
+    ],
+    [
+     3.3,
+     {
+      "speed": 0
+     }
+    ]
+   ],
+   "hz": 30,
+   "every": 5
+  },
+  {
+   "id": "soldier_crouch_jump",
+   "character": "soldier",
+   "seconds": 5,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.2,
+      "crouch": 1
+     }
+    ],
+    [
+     1.5,
+     {
+      "crouch": 0,
+      "speed": 3.5
+     }
+    ],
+    [
+     2.4,
+     {
+      "!jump": true
+     }
+    ],
+    [
+     3.6,
+     {
+      "speed": 1.4
+     }
+    ],
+    [
+     4.0,
+     {
+      "!jump": true
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "soldier_any_direction",
+   "character": "soldier",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.4,
+      "dir": 3.14159
+     }
+    ],
+    [
+     1.5,
+     {
+      "dir": 1.5708
+     }
+    ],
+    [
+     3,
+     {
+      "dir": -0.8,
+      "steer": 0.4
+     }
+    ],
+    [
+     4.5,
+     {
+      "dir": 0,
+      "steer": 0
+     }
+    ],
+    [
+     5.2,
+     {
+      "speed": 0
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "soldier_rifle",
+   "character": "soldier",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "armed": true,
+      "aim": [
+       8,
+       1.4,
+       1.5
+      ],
+      "speed": 1.4
+     }
+    ],
+    [
+     1.2,
+     {
+      "fire": true
+     }
+    ],
+    [
+     2.4,
+     {
+      "fire": false,
+      "!reload": true
+     }
+    ],
+    [
+     4.2,
+     {
+      "aim": [
+       6,
+       2.5,
+       -3
+      ],
+      "fire": true
+     }
+    ],
+    [
+     5,
+     {
+      "fire": false,
+      "armed": false,
+      "speed": 0
+     }
+    ]
+   ]
+  },
+  {
+   "id": "soldier_sword",
+   "character": "soldier",
+   "seconds": 5,
+   "script": [
+    [
+     0,
+     {
+      "kit": "sword",
+      "armed": true
+     }
+    ],
+    [
+     1.2,
+     {
+      "!swing": {
+       "kind": "chop"
+      }
+     }
+    ],
+    [
+     2.2,
+     {
+      "!swing": {
+       "kind": "thrust"
+      }
+     }
+    ],
+    [
+     3.2,
+     {
+      "block": true
+     }
+    ],
+    [
+     4,
+     {
+      "block": false,
+      "speed": 1.4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "soldier_hands",
+   "character": "soldier",
+   "seconds": 11,
+   "script": [
+    [
+     0.3,
+     {
+      "!throw": {
+       "target": [
+        9,
+        0,
+        1
+       ]
+      }
+     }
+    ],
+    [
+     2,
+     {
+      "guard": true
+     }
+    ],
+    [
+     2.6,
+     {
+      "!punch": {
+       "kind": "jab"
+      }
+     }
+    ],
+    [
+     3.2,
+     {
+      "!punch": {
+       "kind": "cross"
+      }
+     }
+    ],
+    [
+     3.9,
+     {
+      "!punch": {
+       "kind": "hook"
+      }
+     }
+    ],
+    [
+     4.8,
+     {
+      "guard": false
+     }
+    ],
+    [
+     5.2,
+     {
+      "!pickup": {
+       "at": [
+        0.75,
+        0,
+        0
+       ],
+       "heading": 0,
+       "size": {
+        "w": 0.5,
+        "h": 0.4,
+        "d": 0.4
+       }
+      }
+     }
+    ],
+    [
+     7,
+     {
+      "speed": 1.2
+     }
+    ],
+    [
+     8,
+     {
+      "speed": 0
+     }
+    ],
+    [
+     9,
+     {
+      "!putdown": true
+     }
+    ]
+   ]
+  },
+  {
+   "id": "soldier_ledge",
+   "character": "soldier",
+   "seconds": 5,
+   "script": [
+    [
+     0.2,
+     "call",
+     "place",
+     2.6,
+     0,
+     0
+    ],
+    [
+     0.3,
+     "call",
+     "grabLedge",
+     [
+      3,
+      2.3,
+      0
+     ]
+    ],
+    [
+     1.5,
+     {
+      "!climb": true
+     }
+    ],
+    [
+     3.6,
+     {
+      "speed": 1.4
+     }
+    ]
+   ],
+   "ground": {
+    "wall": {
+     "x": 3,
+     "h": 2.3
+    }
+   }
+  },
+  {
+   "id": "soldier_knocked_down",
+   "character": "soldier",
+   "seconds": 5,
+   "script": [
+    [
+     0,
+     {
+      "speed": 3
+     }
+    ],
+    [
+     1.2,
+     {
+      "!hit": {
+       "impulse": [
+        -140,
+        30,
+        40
+       ]
+      }
+     }
+    ],
+    [
+     2.2,
+     {
+      "!die": {
+       "impulse": [
+        -220,
+        60,
+        -50
+       ],
+       "at": [
+        0,
+        1.3,
+        0
+       ]
+      }
+     }
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "hyena_hunt",
+   "character": "hyena",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 3
+     }
+    ],
+    [
+     1.5,
+     {
+      "!bite": {
+       "target": [
+        6,
+        0.6,
+        0.2
+       ]
+      }
+     }
+    ],
+    [
+     2.5,
+     {
+      "speed": 7
+     }
+    ],
+    [
+     4,
+     {
+      "!pounce": {
+       "target": [
+        30,
+        0,
+        0
+       ]
+      }
+     }
+    ],
+    [
+     5.2,
+     {
+      "speed": 0
+     }
+    ]
+   ]
+  },
+  {
+   "id": "raptor_hunt",
+   "character": "raptor",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 4
+     }
+    ],
+    [
+     1.5,
+     {
+      "!bite": {
+       "target": [
+        8,
+        1.2,
+        0.3
+       ]
+      }
+     }
+    ],
+    [
+     2.6,
+     {
+      "steer": 0.7
+     }
+    ],
+    [
+     3.6,
+     {
+      "steer": 0,
+      "!pounce": {
+       "target": [
+        16,
+        0,
+        6
+       ]
+      }
+     }
+    ],
+    [
+     5,
+     {
+      "speed": 0
+     }
+    ]
+   ]
+  },
+  {
+   "id": "scorpion_strike",
+   "character": "scorpion",
+   "seconds": 5,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.8
+     }
+    ],
+    [
+     1.2,
+     {
+      "speed": 0,
+      "!pinch": {
+       "target": [
+        1.9,
+        0.2,
+        0.2
+       ]
+      }
+     }
+    ],
+    [
+     2.4,
+     {
+      "!sting": {
+       "target": [
+        2.0,
+        0.4,
+        0
+       ]
+      }
+     }
+    ],
+    [
+     3.8,
+     {
+      "speed": 1.5,
+      "steer": 0.5
+     }
+    ]
+   ]
+  },
+  {
+   "id": "mantis_strike",
+   "character": "mantis",
+   "seconds": 4,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.4
+     }
+    ],
+    [
+     1.5,
+     {
+      "speed": 0,
+      "!pinch": {
+       "target": [
+        1.2,
+        0.5,
+        0.1
+       ]
+      }
+     }
+    ],
+    [
+     3,
+     {
+      "speed": 0.8
+     }
+    ]
+   ]
+  },
+  {
+   "id": "octopus_swim",
+   "character": "octopus",
+   "seconds": 7,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.4
+     }
+    ],
+    [
+     1.2,
+     {
+      "speed": 0,
+      "!grab": {
+       "target": [
+        0.9,
+        0.3,
+        0.3
+       ]
+      }
+     }
+    ],
+    [
+     2.4,
+     "call",
+     "enterSwim"
+    ],
+    [
+     2.5,
+     {
+      "speed": 2,
+      "depth": 1.5
+     }
+    ],
+    [
+     4,
+     {
+      "steer": 0.5,
+      "!ink": true
+     }
+    ],
+    [
+     5.5,
+     {
+      "steer": 0,
+      "speed": 0.5
+     }
+    ],
+    [
+     6.2,
+     "call",
+     "leaveSwim"
+    ]
+   ],
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "wasp_flight",
+   "character": "wasp",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 0.4
+     }
+    ],
+    [
+     1,
+     "call",
+     "enterFly"
+    ],
+    [
+     1.1,
+     {
+      "speed": 0,
+      "height": 1.2
+     }
+    ],
+    [
+     2.2,
+     {
+      "speed": 1.2,
+      "steer": 0.6
+     }
+    ],
+    [
+     3.4,
+     {
+      "steer": 0,
+      "!sting": {
+       "target": [
+        4,
+        0.8,
+        0.5
+       ]
+      }
+     }
+    ],
+    [
+     5,
+     "call",
+     "leaveFly"
+    ]
+   ]
+  },
+  {
+   "id": "dragon_flight",
+   "character": "dragon",
+   "seconds": 8,
+   "script": [
+    [
+     0,
+     {
+      "speed": 3
+     }
+    ],
+    [
+     1.2,
+     "call",
+     "enterFly"
+    ],
+    [
+     1.3,
+     {
+      "speed": 9,
+      "height": 6
+     }
+    ],
+    [
+     3.5,
+     {
+      "steer": 0.5
+     }
+    ],
+    [
+     5,
+     {
+      "steer": 0,
+      "!bite": {
+       "target": [
+        60,
+        6,
+        20
+       ]
+      }
+     }
+    ],
+    [
+     6.5,
+     {
+      "speed": 5,
+      "height": 1
+     }
+    ],
+    [
+     7.4,
+     "call",
+     "leaveFly"
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "clio-motion",
+  "version": "0.13.0",
+  "description": "Characters that move by rule, not by keyframe: procedural walking, running, climbing, fighting, swimming and flying for bipeds and other creatures.",
+  "main": "js/core.js",
+  "files": ["js/core.js", "js/rig.js", "js/bake.js", "js/fight.js", "js/README.md", "tools/gaitbake.js", "LICENSE", "NOTICE"],
+  "bin": { "gaitbake": "tools/gaitbake.js" },
+  "scripts": {
+    "test": "node js/test/run.js",
+    "spec": "node tools/spec.js && node tools/golden.js",
+    "bench": "python3 bench/build.py",
+    "bake": "node tools/gaitbake.js all --out out"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/eryxgames/clio-motion.git" },
+  "author": "Daniel Sandner (https://eryxian.com)",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=18" }
+}

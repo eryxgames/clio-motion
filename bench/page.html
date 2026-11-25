@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!-- Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE). SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gait Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a test bench. The stage is the one loud thing; instruments sit under it, controls beside it. */
+:root {
+  --bg: #dde2de; --panel: #eceeea; --stage: #f6f6f2; --chip: #ffffff;
+  --ink: #18201e; --muted: #56625e; --line: #c2c9c4;
+  --accent: #cf4f08; --trace: #0d7c8a;
+  --ground-top: #cbd1ca; --ground-cut: #b5bdb6; --outline: #161b1a;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111615; --panel: #182020; --stage: #0d1211; --chip: #212a29;
+    --ink: #e4e9e5; --muted: #8e9b96; --line: #2d3735;
+    --accent: #ff7b2e; --trace: #4cc6d3;
+    --ground-top: #2a3432; --ground-cut: #1e2625; --outline: #040606;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111615; --panel: #182020; --stage: #0d1211; --chip: #212a29;
+  --ink: #e4e9e5; --muted: #8e9b96; --line: #2d3735;
+  --accent: #ff7b2e; --trace: #4cc6d3;
+  --ground-top: #2a3432; --ground-cut: #1e2625; --outline: #040606;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--body); display: flex; flex-direction: column; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding: 12px 20px 10px; border-bottom: 1px solid var(--line); }
+.mark { font: 900 30px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; margin: 0; }
+.mark span { color: var(--accent); }
+.thesis { margin: 0; color: var(--muted); flex: 1 1 280px; max-width: 62ch; }
+.transport { display: flex; gap: 6px; }
+
+.bench { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 328px; }
+.work { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 12px 20px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { border: 1px solid var(--line); background: var(--panel); padding: 6px 14px 5px; cursor: pointer; font: 700 17px/1.1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; border-radius: 2px; }
+.tab small { display: block; font: 400 10.5px/1.3 var(--mono); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab[aria-pressed="true"] small { color: inherit; opacity: 0.7; }
+
+.stage { position: relative; flex: 1 1 auto; min-height: 260px; background: var(--stage); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: crosshair; }
+.stage .hint { position: absolute; left: 12px; bottom: 9px; margin: 0; font: 11px/1.3 var(--mono); color: var(--muted); pointer-events: none; }
+.stage .view { position: absolute; right: 10px; top: 10px; }
+.stage .legend { position: absolute; left: 12px; top: 10px; margin: 0; padding: 0; list-style: none; font: 11px/1.5 var(--mono); color: var(--muted); pointer-events: none; }
+.legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--trace); vertical-align: middle; margin-right: 6px; }
+.legend i.ring { width: 9px; height: 9px; border: 1.5px solid var(--accent); border-radius: 50%; margin-right: 11px; }
+.legend i.print { border-top: 4px solid var(--ink); width: 9px; margin-right: 11px; }
+
+.instruments { flex: 0 0 auto; display: grid; grid-template-columns: minmax(230px, 1fr) minmax(170px, 0.75fr) auto; gap: 10px; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 8px 10px 9px; min-width: 0; }
+.box h2, .group h2 { margin: 0 0 6px; font: 700 13px/1.2 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.readouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin: 0; }
+.readouts div { min-width: 0; }
+.readouts dt { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readouts dd { margin: 0; font: 600 16px/1.25 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readouts dd small { font: 400 10.5px var(--mono); color: var(--muted); }
+#footfall { width: 100%; height: 112px; display: block; }
+.bake-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+#strip { flex: 0 0 auto; width: 256px; height: 112px; box-sizing: content-box; image-rendering: pixelated; background: var(--stage); border: 1px solid var(--line); }
+#sprite { flex: 0 0 auto; width: 128px; height: 112px; box-sizing: content-box; image-rendering: pixelated; background: var(--stage); border: 1px solid var(--line); }
+.note { margin: 5px 0 0; font-size: 11.5px; color: var(--muted); }
+
+.panel { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 4px 18px 20px; }
+.group { padding: 12px 0 13px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 9px; }
+.group:last-child { border-bottom: 0; }
+.group h2 { margin: 0; color: var(--ink); font-size: 15px; }
+.row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 62px; align-items: center; gap: 8px; }
+.row label { font-size: 13px; }
+.row output { font: 12px var(--mono); text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--chip); }
+.seg button { flex: 1 1 auto; border: 0; border-right: 1px solid var(--line); background: transparent; padding: 5px 9px; cursor: pointer; font-size: 12.5px; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { border: 1px solid var(--line); background: var(--chip); border-radius: 2px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.fire { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; user-select: none; touch-action: none; }
+.btn:disabled, .seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+.pair { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; margin: 0; }
+input[type="range"]::-webkit-slider-runnable-track { height: 3px; background: var(--line); }
+input[type="range"]::-moz-range-track { height: 3px; background: var(--line); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 18px; margin-top: -7.5px; background: var(--ink); border: 0; border-radius: 1px; cursor: ew-resize; }
+input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: var(--ink); border: 0; border-radius: 1px; cursor: ew-resize; }
+.slots { display: grid; gap: 4px; }
+.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; font-size: 12.5px; }
+.slot .state { font: 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot .pick { position: relative; overflow: hidden; }
+.slot .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.slot .pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.slot .btn { padding: 3px 8px; font-size: 12px; }
+[hidden] { display: none !important; }
+
+@media (max-width: 980px) {
+  html, body { height: auto; }
+  .bench { grid-template-columns: minmax(0, 1fr); }
+  .work { padding: 12px 16px; }
+  .stage { flex: 0 0 auto; height: min(68vw, 460px); }
+  .instruments { grid-template-columns: minmax(0, 1fr); }
+  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding: 4px 16px 24px; }
+  .stage .legend, .stage .hint { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 class="mark">Gait <span>Bench</span></h1>
+  <p class="thesis">One motion core drives all four characters. Nothing on this page is keyframed: feet are planted by a gait rule, joints by inverse kinematics, the rest by springs and gravity.</p>
+  <div class="transport">
+    <button class="btn" id="pause" aria-pressed="false">Pause</button>
+    <button class="btn" id="slow" aria-pressed="false">Quarter speed</button>
+  </div>
+</header>
+
+<main class="bench">
+  <section class="work">
+    <div class="tabs" id="chars" role="group" aria-label="Character">
+      <button class="tab" data-ch="soldier" aria-pressed="true">Soldier<small>biped, 0.92 m leg</small></button>
+      <button class="tab" data-ch="mech" aria-pressed="false">Heavy mech<small>reverse knee, 2.6 m leg</small></button>
+      <button class="tab" data-ch="quad" aria-pressed="false">Quadruped<small>walk and trot</small></button>
+      <button class="tab" data-ch="hyena" aria-pressed="false">Hyena<small>gallops, bites, has a tail</small></button>
+      <button class="tab" data-ch="raptor" aria-pressed="false">Raptor<small>two legs, balanced by its tail</small></button>
+      <button class="tab" data-ch="scorpion" aria-pressed="false">Scorpion<small>eight legs, claws, a sting</small></button>
+      <button class="tab" data-ch="octopus" aria-pressed="false">Octopus<small>crawls on eight arms, swims by jets</small></button>
+      <button class="tab" data-ch="mantis" aria-pressed="false">Mantis<small>four legs, two striking forelegs</small></button>
+      <button class="tab" data-ch="wasp" aria-pressed="false">Giant wasp<small>walks, hovers, stings</small></button>
+      <button class="tab" data-ch="dragon" aria-pressed="false">Dragon<small>walks, flies, glides</small></button>
+      <button class="tab" data-ch="spider" aria-pressed="false">Spider mech<small>six legs, tripod gait</small></button>
+    </div>
+
+    <div class="stage" id="stageBox">
+      <canvas id="stage" aria-label="Animated character on a test track"></canvas>
+      <ul class="legend" id="legend">
+        <li><i></i>hip path</li>
+        <li><i class="ring"></i>where a lifted foot will land</li>
+        <li><i class="print"></i>footprints, with stride length</li>
+      </ul>
+      <div class="seg view" role="group" aria-label="View">
+        <button id="viewSide" aria-pressed="true">Side, 2D</button>
+        <button id="view34" aria-pressed="false">Three-quarter, 3D</button>
+      </div>
+      <p class="hint" id="hint">Move the pointer over the stage to aim. Press to fire. Space to jump, arrow keys to steer.</p>
+    </div>
+
+    <div class="instruments">
+      <div class="box">
+        <h2>Readings</h2>
+        <dl class="readouts">
+          <div><dt>Gait</dt><dd id="rGait">Walk</dd></div>
+          <div><dt>Speed</dt><dd><span id="rSpeed">0.00</span> <small>m/s</small></dd></div>
+          <div><dt>Froude number</dt><dd id="rFr">0.00</dd></div>
+          <div><dt>Stride length</dt><dd><span id="rStride">0.00</span> <small>m</small></dd></div>
+          <div><dt>Step rate</dt><dd><span id="rSteps">0</span> <small>/min</small></dd></div>
+          <div><dt>Foot on ground</dt><dd><span id="rDuty">0</span> <small>% of stride</small></dd></div>
+        </dl>
+      </div>
+      <div class="box">
+        <h2>Footfall pattern</h2>
+        <canvas id="footfall" aria-label="Which feet are on the ground through one stride"></canvas>
+      </div>
+      <div class="box">
+        <h2>Sprite bake, 8 frames per stride</h2>
+        <div class="bake-row">
+          <canvas id="sprite" width="64" height="56" aria-label="Latest baked frame"></canvas>
+          <canvas id="strip" width="256" height="112" aria-label="Eight baked frames of the current stride"></canvas>
+        </div>
+        <p class="note">The same poses at 64 × 56 pixels. Flat ground gives a clean loop.</p>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel" aria-label="Controls">
+    <div class="group">
+      <h2>Move</h2>
+      <div class="seg" role="group" aria-label="Speed presets">
+        <button id="gStand">Stand</button><button id="gWalk">Walk</button><button id="gRun">Run</button><button id="gGallop" hidden>Gallop</button>
+      </div>
+      <div class="seg" id="dirSeg" role="group" aria-label="Direction of travel">
+        <button data-dir="0" aria-pressed="true">Forwards</button><button data-dir="180" aria-pressed="false">Backwards</button><button data-dir="-90" aria-pressed="false">Step left</button><button data-dir="90" aria-pressed="false">Step right</button>
+      </div>
+      <div class="row"><label for="speed">Speed</label><input type="range" id="speed" min="0" max="6.5" step="0.05" value="1.4"><output id="speedOut" for="speed">1.40 m/s</output></div>
+      <div class="row"><label for="crouch">Crouch</label><input type="range" id="crouch" min="0" max="1" step="0.01" value="0"><output id="crouchOut" for="crouch">0%</output></div>
+      <div class="seg" id="terrain" role="group" aria-label="Ground">
+        <button data-t="flat" aria-pressed="false">Flat</button><button data-t="rough" aria-pressed="true">Rough</button><button data-t="steps" aria-pressed="false">Steps</button>
+      </div>
+      <div class="pair">
+        <button class="btn" id="turnRound">Turn round</button>
+        <button class="btn" id="steerL">Hold: steer left</button>
+        <button class="btn" id="steerR">Hold: steer right</button>
+      </div>
+      <p class="note">Turn round works in both views. Steering is easiest to follow in the three-quarter view.</p>
+      <div class="pair">
+        <button class="btn" id="jump">Jump</button>
+        <button class="btn" id="pounce" hidden>Pounce</button>
+        <button class="btn" id="sting" hidden>Sting</button>
+        <button class="btn" id="swim" aria-pressed="false" hidden>Swim</button>
+        <button class="btn" id="ink" hidden>Ink</button>
+        <button class="btn" id="hit">Hit</button>
+        <button class="btn" id="knock" aria-pressed="false">Knock down</button>
+        <button class="btn" id="ladder" aria-pressed="false">Climb a ladder</button>
+        <button class="btn" id="ledge" aria-pressed="false">Wall ahead</button>
+      </div>
+      <p class="note">Hit staggers the body and it recovers. Knock down lets it fall as a ragdoll. Both push away from the pointer.</p>
+      <p class="note" id="ladderNote">Rungs are unevenly spaced on purpose. Each hand and foot finds a real one.</p>
+    </div>
+
+    <div class="group">
+      <h2>Weapon</h2>
+      <div class="seg" id="kitSeg" role="group" aria-label="Kit">
+        <button data-kit="rifle" aria-pressed="true">Rifle</button><button data-kit="pistols" aria-pressed="false">Two pistols</button><button data-kit="sword" aria-pressed="false">Sword and shield</button>
+      </div>
+      <div class="pair">
+        <button class="btn fire" id="fire">Hold to fire</button>
+        <button class="btn" id="reload">Reload</button>
+        <div class="seg" id="holdSeg" role="group" aria-label="Hands">
+          <button id="armedOn" aria-pressed="true">Ready</button><button id="armedOff" aria-pressed="false">Stowed</button>
+        </div>
+      </div>
+      <p class="note" id="ammoNote">Rounds 30 of 30</p>
+      <p class="note" id="weaponNote">Weapons are separate objects with grip points.</p>
+    </div>
+
+    <div class="group" id="actGroup">
+      <h2>Hands and fists</h2>
+      <div class="pair">
+        <button class="btn" id="throw">Throw a grenade</button>
+        <button class="btn" id="crate" aria-pressed="false">Pick up a crate</button>
+      </div>
+      <p class="note">The grenade is lobbed to the ground under the place last pointed at (or press G while pointing). The crate is lifted from a squat and can be walked about with.</p>
+      <div class="pair">
+        <button class="btn" id="guard" aria-pressed="false">Fists up</button>
+        <button class="btn" id="pJab">Jab</button>
+        <button class="btn" id="pCross">Cross</button>
+        <button class="btn" id="pHook">Hook</button>
+      </div>
+      <div class="pair">
+        <button class="btn" id="fight" aria-pressed="false">Start a fistfight</button>
+      </div>
+      <p class="note" id="fightNote">Two soldiers, each run by the same motion core. A short script on top decides when to step in, punch, cover up or back off.</p>
+    </div>
+
+    <div class="group">
+      <h2>Style</h2>
+      <div class="seg" id="presets" role="group" aria-label="Style presets">
+        <button data-p="neutral" aria-pressed="true">Neutral</button><button data-p="heavy" aria-pressed="false">Heavy</button><button data-p="sneak" aria-pressed="false">Sneak</button><button data-p="cartoon" aria-pressed="false">Cartoon</button>
+      </div>
+      <div class="row"><label for="sBounce">Bounce</label><input type="range" id="sBounce" min="0" max="2.5" step="0.05" value="1"><output id="sBounceOut" for="sBounce">1.00</output></div>
+      <div class="row"><label for="sStride">Stride</label><input type="range" id="sStride" min="0.6" max="1.4" step="0.02" value="1"><output id="sStrideOut" for="sStride">1.00</output></div>
+      <div class="row"><label for="sArm">Arm swing</label><input type="range" id="sArm" min="0" max="2.2" step="0.05" value="1"><output id="sArmOut" for="sArm">1.00</output></div>
+      <div class="row"><label for="sLean">Lean</label><input type="range" id="sLean" min="0" max="2.5" step="0.05" value="1"><output id="sLeanOut" for="sLean">1.00</output></div>
+      <div class="row"><label for="sStep">Step height</label><input type="range" id="sStep" min="0.4" max="2.5" step="0.05" value="1"><output id="sStepOut" for="sStep">1.00</output></div>
+      <div class="row"><label for="sSnap">Snap</label><input type="range" id="sSnap" min="0" max="1" step="0.02" value="0.3"><output id="sSnapOut" for="sSnap">0.30</output></div>
+      <div class="seg" id="fps" role="group" aria-label="Pose rate">
+        <button data-f="0" aria-pressed="true">Smooth</button><button data-f="12" aria-pressed="false">12 poses/s</button><button data-f="8" aria-pressed="false">8 poses/s</button>
+      </div>
+      <p class="note">Lower pose rates hold each pose the way a hand-drawn sprite sheet does.</p>
+    </div>
+
+    <div class="group">
+      <h2>Body parts as images</h2>
+      <div class="pair">
+        <button class="btn" id="sampleParts">Use sample parts</button>
+        <button class="btn" id="clearParts">Back to shapes</button>
+      </div>
+      <div id="slots" class="slots"></div>
+      <p class="note">One picture per part, drawn in a side view facing right. Limbs hang straight down with the joint at the top. Feet, weapons and long bodies point right.</p>
+    </div>
+
+    <div class="group">
+      <h2>Export</h2>
+      <button class="btn" id="export" hidden>Save sprite sheet, glTF and CLIo frames (.zip)</button>
+      <p class="note" id="exportNote">Checking whether this view can save files.</p>
+    </div>
+
+    <div class="group">
+      <h2>Show</h2>
+      <label class="check"><input type="checkbox" id="overlays" checked> Hip path, landing targets and footprints</label>
+    </div>
+  </aside>
+</main>
+
+<script>
+/*__CORE__*/
+</script>
+<script>
+/*__RIG__*/
+</script>
+<script>
+/*__BAKE__*/
+</script>
+<script>
+/*__FIGHT__*/
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>
