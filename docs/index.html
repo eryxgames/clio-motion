@@ -300,7 +300,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 
     <div class="group">
       <h2>Export</h2>
-      <button class="btn" id="export" hidden>Save sprite sheet, glTF and CLIo frames (.zip)</button>
+      <button class="btn" id="export" hidden>Save sprite sheet, cutout, glTF and CLIo frames (.zip)</button>
       <p class="note" id="exportNote">Checking whether this view can save files.</p>
       <div class="pair" id="modelRow" hidden>
         <button class="btn" id="saveModel">Save the 3D template</button>
@@ -3045,6 +3045,38 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     }
     return o;
   }
+  /* What to draw for a body, back to front: for a game that draws in 2D, live. prims: buildPrims(pose, character);
+     proj: a projector; ppm: its pixels to a metre; parts (optional): pictures by part name, as a drawing gives them
+     (drawing.js) or as loaded one by one ({ img, w, h, axis }). Each item is one of
+       { kind: 'part', slot, im, dark, at }      a picture: at is where it goes (partPlace); dark: on the far side
+       { kind: 'cap', a, b, r, col, sq }         a plain capsule from a to b on the screen, r thick; sq: square ends
+       { kind: 'ball', a, r, col }               a plain disc
+     col is { css, rgb }. A part that has a picture hides the plain shapes it stands for. */
+  function sprites(prims, proj, ppm, parts) {
+    var sorted = order(prims, proj), out = [], i, q, lv;
+    for (i = 0; i < sorted.length; i++) {
+      q = sorted[i]; lv = level(q);
+      if (parts && q.of && parts[q.of]) continue;
+      if (parts && q.part && parts[q.part]) out.push({ kind: 'part', slot: q.part, im: parts[q.part], dark: lv < 2, at: partPlace(parts[q.part], q.pa, q.pe || q.pb, q.r * ppm, ppm, sorted.flip), q: q });
+      else out.push({ kind: q.pb ? 'cap' : 'ball', a: q.pa, b: q.pb, r: Math.max(q.r * ppm, 0.6), col: shade(q.col, lv), sq: !!q.sq, q: q });
+    }
+    return out;
+  }
+  /* Draws what sprites() lists on a 2D canvas. A picture is im.img, or im.dark for the far side if there is one. */
+  function drawSprites(c, items) {
+    for (var i = 0; i < items.length; i++) {
+      var s = items[i];
+      if (s.kind === 'part') {
+        var o = s.at;
+        c.save(); c.translate(o.x, o.y); if (o.rot) c.rotate(o.rot); if (o.fx !== 1 || o.fy !== 1) c.scale(o.fx, o.fy);
+        c.drawImage(s.dark && s.im.dark ? s.im.dark : s.im.img, o.dx, o.dy, o.dw, o.dh); c.restore();
+      } else if (s.kind === 'cap') {
+        var bx = s.b[0], by = s.b[1];
+        if (Math.abs(bx - s.a[0]) + Math.abs(by - s.a[1]) < 0.05) bx += 0.05;
+        c.lineCap = s.sq ? 'butt' : 'round'; c.strokeStyle = s.col.css; c.lineWidth = 2 * s.r; c.beginPath(); c.moveTo(s.a[0], s.a[1]); c.lineTo(bx, by); c.stroke();
+      } else { c.fillStyle = s.col.css; c.beginPath(); c.arc(s.a[0], s.a[1], s.r, 0, 6.2832); c.fill(); }
+    }
+  }
   /* The other way, for reading a drawing: the turn and shift that take a point of the page into the bone's frame
      (the one im.box is measured in), for a bone drawn from a to b on the page. { rot (radians), x, y }: turn the page
      by rot about the origin after moving (x, y) to it. */
@@ -3076,7 +3108,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     return go(o, null);
   }
 
-  return { partPlace: partPlace, partFrame: partFrame, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });
 
@@ -3331,6 +3363,111 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       var atlas = { frames: frames, animations: anims, meta: { app: 'Gait Bench', version: '0.2', image: (o.image || ch.id + '_sheet.png'), format: 'RGBA8888',
         size: { w: W, h: H }, scale: '1', frameTags: tags, pivot: { x: 0.5, y: (fh - 4) / fh }, pixelsPerMetre: +(R.SPRITE[ch.id].ppm * fw / 64).toFixed(2), clips: info } };
       return { rgba: rgba, w: W, h: H, atlas: atlas };
+    }
+
+    // ---------------------------------------------------------------- cutout
+    // The character as a 2D cutout: every part a picture of its own, and for every clip where each picture is, frame
+    // by frame. A game plays it by moving the pictures (js/cutout.js shows how), so the motion is smooth at any frame
+    // rate and the pictures can be swapped. Seen from the right side, in place, like the sprite sheet.
+    //   o.parts   pictures by part name, as a drawing gives them (drawing.js); each needs its pixels as rgba
+    //             (w * h * 4 bytes) or a canvas img. Parts without a picture, and everything else, are plain shapes.
+    //   o.ppm     pixels to a metre for the plain shapes (default: the character about 512 pixels tall)
+    // Returns { json, rgba, w, h }: the description (see js/README.md) and the atlas the pictures are packed in.
+    function capsulePixels(L, rp, rgb, sq, m) {
+      var w = Math.ceil(L + 2 * rp) + 2 * m, h = Math.ceil(2 * rp) + 2 * m, px = new Uint8Array(w * h * 4), x, y, cy = m + rp, x0 = m + rp, x1 = m + rp + L;
+      for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+        var fx = x + 0.5, fy = y + 0.5, d;
+        if (sq) d = Math.max(Math.abs(fy - cy) - rp, m + 0.0 - (fx - m) > 0 ? m - fx : fx - (m + L + 2 * rp)) + rp;          // a box from end to end
+        else { var qx = fx < x0 ? x0 : fx > x1 ? x1 : fx; d = Math.sqrt((fx - qx) * (fx - qx) + (fy - cy) * (fy - cy)); }
+        var a = rp - d + 0.5; if (a <= 0) continue;
+        var k = (y * w + x) * 4; px[k] = rgb[0]; px[k + 1] = rgb[1]; px[k + 2] = rgb[2]; px[k + 3] = Math.round(255 * (a > 1 ? 1 : a));
+      }
+      return { w: w, h: h, rgba: px };
+    }
+    function packRects(sizes, pad) {        // shelves, tallest first
+      var area = 0, widest = 0, idx = sizes.map(function (s, i) { area += (s[0] + pad) * (s[1] + pad); widest = Math.max(widest, s[0]); return i; });
+      idx.sort(function (a, b) { return (sizes[b][1] - sizes[a][1]) || (a - b); });
+      var W = 64; while (W < widest + 2 * pad || W * W < area * 1.25) W *= 2;
+      var at = new Array(sizes.length), x = pad, y = pad, shelf = 0;
+      idx.forEach(function (i) {
+        var s = sizes[i];
+        if (x + s[0] + pad > W) { x = pad; y += shelf + pad; shelf = 0; }
+        at[i] = [x, y]; x += s[0] + pad; shelf = Math.max(shelf, s[1]);
+      });
+      return { w: W, h: y + shelf + pad, at: at };
+    }
+    function cutout(ch, clips, o) {
+      o = o || {};
+      var parts = o.parts || null, ppm = o.ppm || Math.round(512 / R.SPRITE[ch.id].tall), M2 = 2, name = o.name || ch.id;
+      var proj = R.projector({ cx: 0, cy: 0, cz: 0, yaw: 0, pit: 0, ppm: 1, ox: 0, oy: 0 });          // x forward, y down, metres, the ground at 0
+      var first = R.buildPrims(clips[0].frames[0], ch, { flash: false, model: true }), n = first.length;
+      var images = [], imgOf = {}, sprites = [], spriteOf = [], i;
+      function r5(v) { return Math.round(v * 1e5) / 1e5 + 0; }
+      first.forEach(function (q, k) {
+        spriteOf[k] = -1;
+        if (parts && q.of && parts[q.of]) return;
+        var key, im, sp;
+        if (parts && q.part && parts[q.part]) {
+          im = parts[q.part]; key = 'p:' + q.part;
+          if (imgOf[key] === undefined) { imgOf[key] = images.length; images.push({ part: q.part, w: im.w, h: im.h, src: im }); }
+          var bx = im.box, pv = bx ? [-bx[0] * im.w / (bx[2] - bx[0]), -bx[1] * im.h / (bx[3] - bx[1])] : im.axis === 'ball' || !(q.end || q.b) ? [im.w / 2, im.h / 2] : im.axis === 'right' ? [0, im.h / 2] : [im.w / 2, 0];
+          sp = { name: q.g + '/' + q.part, part: q.part, joint: q.j, image: imgOf[key], pivot: pv };
+        } else {
+          var d = q.b ? [q.b[0] - q.a[0], q.b[1] - q.a[1], q.b[2] - q.a[2]] : null, L = d ? Math.round(Math.sqrt(dot3(d, d)) * ppm) : 0, rp = Math.max(Math.round(q.r * ppm * 4) / 4, 0.75);
+          key = 's:' + L + ':' + rp + ':' + q.col + (q.sq ? 'q' : '') + (q.b ? '' : 'o');
+          if (imgOf[key] === undefined) { var cp = capsulePixels(L, rp, R.shade(q.col, -1).rgb, !!q.sq && !!q.b, M2); imgOf[key] = images.length; images.push({ w: cp.w, h: cp.h, rgba: cp.rgba, L: L, rp: rp }); }
+          sp = { name: q.g + '/' + (q.part || q.of || 'shape'), part: null, joint: q.j, image: imgOf[key], pivot: [M2 + rp, M2 + rp], capsule: [L, rp] };
+        }
+        spriteOf[k] = sprites.length; sprites.push(sp);
+      });
+      // the atlas
+      var pk = packRects(images.map(function (im) { return [im.w, im.h]; }), 1), W = pk.w, H = pk.h, rgba = new Uint8Array(W * H * 4), missing = [];
+      images.forEach(function (im, k) {
+        var px = im.rgba, x, y;
+        if (!px && im.src) px = im.src.rgba || (im.src.img && im.src.img.getContext ? im.src.img.getContext('2d').getImageData(0, 0, im.w, im.h).data : null);
+        if (!px) { missing.push(im.part); return; }
+        for (y = 0; y < im.h; y++) rgba.set(px.subarray ? px.subarray(y * im.w * 4, (y + 1) * im.w * 4) : px.slice(y * im.w * 4, (y + 1) * im.w * 4), ((pk.at[k][1] + y) * W + pk.at[k][0]) * 4);
+      });
+      if (missing.length) throw new Error('No pixels were given for the picture of: ' + missing.join(', '));
+      var json = { format: 'clio-motion-cutout', version: 1, id: ch.id, name: name, image: name + '_cutout.png', size: [W, H],
+        axes: 'x forward (to the right), y down, metres; the ground under the body is y = 0. Angles in radians, clockwise on the screen.',
+        frame: ['x', 'y', 'angle', 'scaleX', 'scaleY', 'order', 'tint'],
+        sprites: sprites.map(function (sp) {
+          var im = images[sp.image], at = pk.at[sp.image], o2 = { name: sp.name, part: sp.part, joint: sp.joint, rect: [at[0], at[1], im.w, im.h], pivot: [r5(sp.pivot[0]), r5(sp.pivot[1])] };
+          if (sp.capsule) o2.capsule = sp.capsule;          // a plain shape: its length between the round ends and its radius, in picture pixels
+          return o2;
+        }),
+        clips: {} };
+      clips.forEach(function (c) {
+        // a climb is in place: the body is brought down to where it would stand
+        var frames = [], ok = true, lift = c.ladder ? c.frames[0].root[1] - ch.rootHeight - 0.1 : 0;
+        c.frames.forEach(function (pose) {
+          var prims = R.buildPrims(pose, ch, { flash: false, model: true });
+          if (prims.length !== n) { ok = false; return; }
+          var items = R.sprites(prims, proj, 1, parts), row = new Array(sprites.length);
+          items.forEach(function (it, z) {
+            var q = it.q, sp = spriteOf[q.i], S = sprites[sp], im = images[S.image], x, y, ang, sx, sy, tint;
+            if (it.kind === 'part') {
+              var at = it.at, lx = at.fx * (at.dx + S.pivot[0] * at.dw / im.w), ly = at.fy * (at.dy + S.pivot[1] * at.dh / im.h), cs = Math.cos(at.rot), sn = Math.sin(at.rot);
+              x = at.x + cs * lx - sn * ly; y = at.y + sn * lx + cs * ly; ang = at.rot; sx = at.fx * at.dw / im.w; sy = at.fy * at.dh / im.h; tint = it.dark ? 0.68 : 1;
+            } else {
+              var a = q.pa, b = q.pb, ex = b ? b[0] - a[0] : 0, ey = b ? b[1] - a[1] : 0, dist = Math.sqrt(ex * ex + ey * ey), lv = R.level(q);
+              ang = dist > 1e-9 ? Math.atan2(ey, ex) : 0; sy = q.r / im.rp; sx = b ? (dist + 2 * q.r) / (im.L + 2 * im.rp) : sy;
+              var off = b ? -q.r + im.rp * sx : 0;                  // the picture's pivot is the middle of its first round end
+              x = a[0] + Math.cos(ang) * off; y = a[1] + Math.sin(ang) * off; tint = lv < 0 ? 1 : 0.6 + 0.1 * lv;
+            }
+            row[sp] = [r5(x), r5(y + lift), r5(ang), +sx.toPrecision(6), +sy.toPrecision(6), z, Math.round(tint * 100) / 100];
+          });
+          frames.push(row);
+        });
+        if (!ok) return;
+        var nF = frames.length, info = { loop: c.loop, seconds: +c.duration.toFixed(4), metresPerSecond: +c.speed.toFixed(3), times: [], frames: frames };
+        for (i = 0; i < nF; i++) info.times.push(+(c.duration * i / nF).toFixed(5));
+        if (c.travel) info.metres = +c.travel.toFixed(3);
+        if (c.rise) info.metresUp = +c.rise.toFixed(3);
+        json.clips[c.name] = info;
+      });
+      return { json: json, rgba: rgba, w: W, h: H };
     }
 
     // ----------------------------------------------------------------- CLIo
@@ -3679,7 +3816,8 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       return {
         format: 'clio-motion-rig', version: 1, id: ch.id, name: kit ? ch.id + '_' + kit : ch.id, kit: kit || (ch.mount.type === 'held' ? ch.mount.kit : null), kind: ch.kind,
         units: 'metres', axes: { up: '+Y', forward: '+Z', right: '-X' }, height: Math.round(top * 1e4) / 1e4, leg: ch.L, pose: 'template',
-        joints: prims.joints.map(function (j) { return { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; }),
+        // carried: a joint for something the body carries (a weapon, its magazine, a pack, a load), not part of the body
+        joints: prims.joints.map(function (j) { var o2 = { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; if (ch.kind === 'biped' && /^(Weapon|Magazine|Shield|Grenade|Carry|Pack)/.test(j.name)) o2.carried = true; return o2; }),
         parts: prims.map(function (q) { return { joint: q.j, group: q.g, slot: q.part || q.of || null, a: r6(conv(q.a)), b: q.b ? r6(conv(q.b)) : null, r: q.r, color: q.col }; }),
         slots: (R.SLOTS[ch.id] || []).map(function (sl) { return { id: sl[0], label: sl[1], axis: sl[2] }; }),
         clips: clipNames(ch)
@@ -4023,7 +4161,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 
     return { record: record, recordAll: recordAll, clipNames: clipNames, walkSpeed: walkSpeed, runSpeed: runSpeed, newPalette: newPalette, rasterize: rasterize,
       framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned,
-      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
+      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, cutout: cutout, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
   };
 });
 
@@ -4167,6 +4305,110 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
   }
 
   return { create: create, step: step, COMBOS: COMBOS, POWER: POWER, REACH: REACH };
+});
+
+</script>
+<script>
+// Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE). SPDX-License-Identifier: Apache-2.0
+/* Reads a character drawn on its template (templates/2d/<character>.svg) and cuts it into the pictures of its parts.
+   Browser only: it lets the browser lay the drawing out, measure it and paint it.
+
+     GaitDrawing.read(svgText, character, GaitRig).then(function (art) {
+       art.parts      pictures by part name, ready for GaitRig.sprites and for the baker: { img, dark, w, h, axis, box, len, r }
+       art.done       the names of the parts that were drawn; art.empty: layers left empty; art.missing: layers the file lacks;
+       art.failed     parts whose picture could not be painted; art.linked: parts with pictures linked from other files (left out)
+     }, function (error) { error.message says what is wrong with the file });
+
+   Every layer clio-part-<part> that has something in it becomes one picture, cut out along the bone the guide layer
+   gives for it (line clio-bone-<part>, circle clio-joint-<part>), at up to 640 pixels on its longer side.
+   img is a canvas; dark is the same picture darkened, for the far side of the body. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.GaitDrawing = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  function fail(msg) { return Promise.reject(new Error(msg)); }
+  // a picture and its darker twin, as canvases
+  function canvases(source, w, h) {
+    var a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').drawImage(source, 0, 0, w, h);
+    var d = document.createElement('canvas'); d.width = w; d.height = h; var dc = d.getContext('2d');
+    dc.drawImage(a, 0, 0); dc.globalCompositeOperation = 'source-atop'; dc.fillStyle = 'rgba(0,0,0,0.32)'; dc.fillRect(0, 0, w, h);
+    return { img: a, dark: d };
+  }
+  function read(text, ch, R, o) {
+    o = o || {};
+    if (typeof document === 'undefined' || typeof DOMParser === 'undefined') return fail('A drawing can only be read in a browser.');
+    var doc = new DOMParser().parseFromString(String(text), 'image/svg+xml'), root = doc.documentElement, id = ch.id;
+    if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) return fail('That is not an SVG file this browser can read. In Inkscape, save as Inkscape SVG or Plain SVG.');
+    // nothing in the file may run
+    [].slice.call(doc.querySelectorAll('script, foreignObject, iframe, object, embed')).forEach(function (n) { n.parentNode.removeChild(n); });
+    [].slice.call(doc.querySelectorAll('*')).forEach(function (el) {
+      [].slice.call(el.attributes).forEach(function (at) { if (/^on/i.test(at.name) || (/href$/i.test(at.name) && /^\s*javascript:/i.test(at.value))) el.removeAttribute(at.name); });
+    });
+    var guide = doc.querySelector('[id^="clio-guides-"]');
+    if (!guide) return fail('This drawing was not made on a template: its guide layer is missing. Save the template, draw in its layers, and load that file.');
+    var who = guide.id.slice(12);
+    if (who !== id) { var e = new Error('This drawing is for the ' + (o.label ? o.label(who) : who) + '. Choose that character first, then load it.'); e.character = who; return Promise.reject(e); }
+    // lay the file out, unseen, so that the browser can measure it
+    var host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none';
+    var live = document.importNode(root, true), jobs = [], art = { id: id, parts: {}, done: [], empty: [], missing: [], failed: [], linked: [] };
+    host.appendChild(live); document.body.appendChild(host);
+    try {
+      var inv = live.getCTM().inverse();
+      var toRoot = function (el) { return inv.multiply(el.getCTM()); };          // from an element's own measure to the page's
+      var at = function (m, x, y) { return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; };
+      var bar = live.querySelector('#clio-scale'), barLen = live.querySelector('#clio-scale-length'), ppmT = 0;
+      if (bar) {
+        var bm = toRoot(bar), p1 = at(bm, bar.x1.baseVal.value, bar.y1.baseVal.value), p2 = at(bm, bar.x2.baseVal.value, bar.y2.baseVal.value);
+        ppmT = Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)) / (parseFloat(barLen ? barLen.textContent : '1') || 1);
+      }
+      if (!(ppmT > 0)) return fail('The guide layer of this drawing has lost its scale bar. Start again from a fresh template and paste your layers in.');
+      var ser = new XMLSerializer(), defs = [].slice.call(live.querySelectorAll('defs, style')).map(function (d) { return ser.serializeToString(d); }).join('');
+      R.SLOTS[id].forEach(function (sl) {
+        var layer = live.querySelector('#clio-part-' + sl[0]), joint = live.querySelector('#clio-joint-' + sl[0]), bone = live.querySelector('#clio-bone-' + sl[0]);
+        if (!layer || !joint) { art.missing.push(sl[1]); return; }
+        layer.style.display = ''; if (layer.getAttribute('display') === 'none') layer.removeAttribute('display');          // a layer hidden in Inkscape still counts
+        if (!layer.querySelector('path, rect, circle, ellipse, line, polyline, polygon, image, text, use')) { art.empty.push(sl[1]); return; }
+        // a picture that is only linked from another file cannot come along
+        if ([].slice.call(layer.querySelectorAll('image')).some(function (n) { var h = n.getAttribute('href') || n.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || ''; return !/^data:/i.test(h.trim()); })) art.linked.push(sl[1]);
+        var jm = toRoot(joint), a = at(jm, joint.cx.baseVal.value, joint.cy.baseVal.value), rT = joint.r.baseVal.value * Math.sqrt(Math.abs(jm.a * jm.d - jm.b * jm.c)), b = null;
+        if (bone && sl[2] !== 'ball') { var bm2 = toRoot(bone); b = at(bm2, bone.x2.baseVal.value, bone.y2.baseVal.value); }
+        var fr = R.partFrame(sl[2], a, b), pm = toRoot(layer.parentNode);
+        var tf = 'rotate(' + (fr.rot * 180 / Math.PI) + ') translate(' + (-fr.x) + ' ' + (-fr.y) + ') matrix(' + [pm.a, pm.b, pm.c, pm.d, pm.e, pm.f].join(' ') + ')';
+        // its box in the bone's frame
+        var outer = document.createElementNS(NS, 'g'), inner = document.createElementNS(NS, 'g');
+        inner.setAttribute('transform', tf); inner.appendChild(layer.cloneNode(true)); outer.appendChild(inner); live.appendChild(outer);
+        var bb = outer.getBBox(); live.removeChild(outer);
+        if (!(bb.width > 0.5) || !(bb.height > 0.5)) { art.empty.push(sl[1]); return; }
+        var pad = 3 + 0.06 * Math.max(bb.width, bb.height), x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, h = bb.height + 2 * pad;        // room for the width of the strokes
+        var k = Math.min(3, (o.size || 640) / Math.max(w, h)), W2 = Math.max(2, Math.round(w * k)), H2 = Math.max(2, Math.round(h * k));
+        var xml = '<svg xmlns="' + NS + '" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + W2 + '" height="' + H2 + '" viewBox="' + [x0, y0, w, h].join(' ') + '">' + defs
+          + '<g transform="' + tf + '">' + ser.serializeToString(layer) + '</g></svg>';
+        jobs.push({ sl: sl, xml: xml, w: W2, h: H2, box: [x0 / ppmT, y0 / ppmT, (x0 + w) / ppmT, (y0 + h) / ppmT], r: rT / ppmT,
+          len: b ? Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) / ppmT : 0 });
+      });
+    } catch (e2) { return fail('This drawing could not be measured (' + (e2 && e2.message ? e2.message : e2) + ').'); }
+    finally { document.body.removeChild(host); }
+    if (!jobs.length) return fail('The part layers of this drawing are all empty. Draw each part in the layer that has its name.');
+    return Promise.all(jobs.map(function (j) {
+      return new Promise(function (res) {
+        var im = new Image(), url = null;
+        im.onload = function () {
+          var cv = canvases(im, j.w, j.h); if (url) URL.revokeObjectURL(url);
+          art.parts[j.sl[0]] = { img: cv.img, dark: cv.dark, w: j.w, h: j.h, axis: j.sl[2], box: j.box, len: j.len, r: j.r }; art.done.push(j.sl[1]); res();
+        };
+        im.onerror = function () {
+          // where pictures may not be given as data, hand the same thing over as a file in memory
+          if (!url) { try { url = URL.createObjectURL(new Blob([j.xml], { type: 'image/svg+xml' })); im.src = url; return; } catch (e3) { url = 'none'; } }
+          else if (url !== 'none') URL.revokeObjectURL(url);
+          art.failed.push(j.sl[1]); res();
+        };
+        im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(j.xml);
+      });
+    })).then(function () { return art; });
+  }
+  return { read: read, canvases: canvases };
 });
 
 </script>
@@ -4722,93 +4964,25 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
   }
 
   // ------------------------------------------------------ image parts
-  // more (optional): { box, len, r } for a picture taken from a drawing (see GaitRig.partPlace)
-  function storePart(id, slot, axis, source, w, h, label, more) {
-    var a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').drawImage(source, 0, 0, w, h);
-    var d = document.createElement('canvas'); d.width = w; d.height = h; var dc = d.getContext('2d');
-    dc.drawImage(a, 0, 0); dc.globalCompositeOperation = 'source-atop'; dc.fillStyle = 'rgba(0,0,0,0.32)'; dc.fillRect(0, 0, w, h);
-    IMG[id][slot] = { img: a, dark: d, w: w, h: h, axis: axis, label: label };
-    if (more) { IMG[id][slot].box = more.box; IMG[id][slot].len = more.len; IMG[id][slot].r = more.r; }
+  function storePart(id, slot, axis, source, w, h, label) {
+    var cv = GaitDrawing.canvases(source, w, h);
+    IMG[id][slot] = { img: cv.img, dark: cv.dark, w: w, h: h, axis: axis, label: label };
   }
-  // A whole character drawn on its template (templates/2d, or "Save the template"): every layer that has something
-  // in it becomes the picture of its part, cut out along the bone the guide layer gives for it.
+  // A whole character drawn on its template (templates/2d, or "Save the template"): drawing.js cuts it into the
+  // pictures of its parts.
   function loadDrawing(file) {
-    var note = $('drawingNote'), id = ch.id, rd = new FileReader();
-    function say(t) { note.textContent = t; }
-    rd.onerror = function () { say('That file could not be read.'); };
+    var note = $('drawingNote'), c0 = ch, id = ch.id, rd = new FileReader();
+    rd.onerror = function () { note.textContent = 'That file could not be read.'; };
     rd.onload = function () {
-      var doc = new DOMParser().parseFromString(String(rd.result), 'image/svg+xml'), root = doc.documentElement;
-      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) { say('That is not an SVG file this browser can read. In Inkscape, save as Inkscape SVG or Plain SVG.'); return; }
-      // nothing in the file may run
-      [].slice.call(doc.querySelectorAll('script, foreignObject, iframe, object, embed')).forEach(function (n) { n.parentNode.removeChild(n); });
-      [].slice.call(doc.querySelectorAll('*')).forEach(function (el) {
-        [].slice.call(el.attributes).forEach(function (at) { if (/^on/i.test(at.name) || (/href$/i.test(at.name) && /^\s*javascript:/i.test(at.value))) el.removeAttribute(at.name); });
-      });
-      var guide = doc.querySelector('[id^="clio-guides-"]');
-      if (!guide) { say('This drawing was not made on a template: its guide layer is missing. Save the template, draw in its layers, and load that file.'); return; }
-      var who = guide.id.slice(12);
-      if (who !== id) { say('This drawing is for the ' + (M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who) + '. Choose that character first, then load it.'); return; }
-      // lay the file out, unseen, so that the browser can measure it
-      var host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none';
-      var live = document.importNode(root, true), NS = 'http://www.w3.org/2000/svg', jobs = [], empty = [], lost = [], linked = [];
-      host.appendChild(live); document.body.appendChild(host);
-      try {
-        var inv = live.getCTM().inverse();
-        var toRoot = function (el) { return inv.multiply(el.getCTM()); };          // from an element's own measure to the page's
-        var at = function (m, x, y) { return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; };
-        var bar = live.querySelector('#clio-scale'), barLen = live.querySelector('#clio-scale-length'), ppmT = 0;
-        if (bar) {
-          var bm = toRoot(bar), p1 = at(bm, bar.x1.baseVal.value, bar.y1.baseVal.value), p2 = at(bm, bar.x2.baseVal.value, bar.y2.baseVal.value);
-          ppmT = Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)) / (parseFloat(barLen ? barLen.textContent : '1') || 1);
-        }
-        if (!(ppmT > 0)) { say('The guide layer of this drawing has lost its scale bar. Start again from a fresh template and paste your layers in.'); return; }
-        var ser = new XMLSerializer(), defs = [].slice.call(live.querySelectorAll('defs, style')).map(function (d) { return ser.serializeToString(d); }).join('');
-        R.SLOTS[id].forEach(function (sl) {
-          var layer = live.querySelector('#clio-part-' + sl[0]), joint = live.querySelector('#clio-joint-' + sl[0]), bone = live.querySelector('#clio-bone-' + sl[0]);
-          if (!layer || !joint) { lost.push(sl[1]); return; }
-          layer.style.display = ''; if (layer.getAttribute('display') === 'none') layer.removeAttribute('display');          // a layer hidden in Inkscape still counts
-          if (!layer.querySelector('path, rect, circle, ellipse, line, polyline, polygon, image, text, use')) { empty.push(sl[1]); return; }
-          // a picture that is only linked from another file cannot come along
-          if ([].slice.call(layer.querySelectorAll('image')).some(function (n) { var h = n.getAttribute('href') || n.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || ''; return !/^data:/i.test(h.trim()); })) linked.push(sl[1]);
-          var jm = toRoot(joint), a = at(jm, joint.cx.baseVal.value, joint.cy.baseVal.value), rT = joint.r.baseVal.value * Math.sqrt(Math.abs(jm.a * jm.d - jm.b * jm.c)), b = null;
-          if (bone && sl[2] !== 'ball') { var bm2 = toRoot(bone); b = at(bm2, bone.x2.baseVal.value, bone.y2.baseVal.value); }
-          var fr = R.partFrame(sl[2], a, b), pm = toRoot(layer.parentNode);
-          var tf = 'rotate(' + (fr.rot * 180 / Math.PI) + ') translate(' + (-fr.x) + ' ' + (-fr.y) + ') matrix(' + [pm.a, pm.b, pm.c, pm.d, pm.e, pm.f].join(' ') + ')';
-          // its box in the bone's frame
-          var outer = document.createElementNS(NS, 'g'), inner = document.createElementNS(NS, 'g');
-          inner.setAttribute('transform', tf); inner.appendChild(layer.cloneNode(true)); outer.appendChild(inner); live.appendChild(outer);
-          var bb = outer.getBBox(); live.removeChild(outer);
-          if (!(bb.width > 0.5) || !(bb.height > 0.5)) { empty.push(sl[1]); return; }
-          var pad = 3 + 0.06 * Math.max(bb.width, bb.height), x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, h = bb.height + 2 * pad;        // room for the width of the strokes
-          var k = Math.min(3, 640 / Math.max(w, h)), W2 = Math.max(2, Math.round(w * k)), H2 = Math.max(2, Math.round(h * k));
-          var xml = '<svg xmlns="' + NS + '" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + W2 + '" height="' + H2 + '" viewBox="' + [x0, y0, w, h].join(' ') + '">' + defs
-            + '<g transform="' + tf + '">' + ser.serializeToString(layer) + '</g></svg>';
-          jobs.push({ sl: sl, xml: xml, w: W2, h: H2, more: { box: [x0 / ppmT, y0 / ppmT, (x0 + w) / ppmT, (y0 + h) / ppmT], r: rT / ppmT,
-            len: b ? Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) / ppmT : 0 } });
-        });
-      } catch (e) { say('This drawing could not be measured (' + (e && e.message ? e.message : e) + ').'); return; }
-      finally { document.body.removeChild(host); }
-      if (!jobs.length) { say('The part layers of this drawing are all empty. Draw each part in the layer that has its name.'); return; }
-      var left = jobs.length, done = [], failed = [];
-      jobs.forEach(function (j) {
-        var im = new Image(), url = null;
-        im.onload = function () { storePart(id, j.sl[0], j.sl[2], im, j.w, j.h, file.name, j.more); if (url) URL.revokeObjectURL(url); done.push(j.sl[1]); fin(); };
-        im.onerror = function () {
-          // where pictures may not be given as data, hand the same thing over as a file in memory
-          if (!url) { try { url = URL.createObjectURL(new Blob([j.xml], { type: 'image/svg+xml' })); im.src = url; return; } catch (e) { url = 'none'; } }
-          else if (url !== 'none') URL.revokeObjectURL(url);
-          failed.push(j.sl[1]); fin();
-        };
-        im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(j.xml);
-      });
-      function fin() {
-        if (--left) return;
+      GaitDrawing.read(rd.result, c0, R, { label: function (who) { return M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who; } }).then(function (art) {
+        Object.keys(art.parts).forEach(function (slot) { var p = art.parts[slot]; p.label = file.name; IMG[id][slot] = p; });
         clearStrip(); if (ch.id === id) syncSlots();
-        say((done.length ? 'Loaded ' + done.length + ' part' + (done.length > 1 ? 's' : '') + ' from ' + file.name + ': ' + done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
-          + (failed.length ? ' Could not be drawn: ' + failed.join(', ') + '.' : '')
-          + (linked.length ? ' Pictures linked from other files were left out of ' + linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
-          + (empty.length ? ' Left as shapes (empty layers): ' + empty.join(', ') + '.' : '') + (lost.length ? ' Missing from the file: ' + lost.join(', ') + '.' : ''));
-      }
+        var n = art.done.length;
+        note.textContent = (n ? 'Loaded ' + n + ' part' + (n > 1 ? 's' : '') + ' from ' + file.name + ': ' + art.done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
+          + (art.failed.length ? ' Could not be drawn: ' + art.failed.join(', ') + '.' : '')
+          + (art.linked.length ? ' Pictures linked from other files were left out of ' + art.linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
+          + (art.empty.length ? ' Left as shapes (empty layers): ' + art.empty.join(', ') + '.' : '') + (art.missing.length ? ' Missing from the file: ' + art.missing.join(', ') + '.' : '');
+      }, function (e) { note.textContent = e && e.message ? e.message : String(e); });
     };
     rd.readAsText(file);
   }
@@ -4885,13 +5059,16 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     return ['Gait Bench export: ' + id, '',
       id + '_sheet.png   sprite sheet, 64 x 64 pixel frames, one clip per row (long clips wrap)',
       id + '_sheet.json  atlas in the JSON-hash form (TexturePacker / Aseprite style): frames, animations, meta.frameTags',
+      id + '_cutout.png  the character as a 2D cutout: every part a picture of its own' + (withImages ? ' (your image parts, and plain shapes for the rest)' : ''),
+      id + '_cutout.json where each picture is in every frame of every clip. A game moves the pictures, so the motion is smooth at any frame rate.',
+      '                  js/cutout.js in the repository plays it and says what the numbers mean; examples/cutout.html shows it.',
       id + '.glb         glTF 2.0, a skinned skeleton (one mesh, a joint hierarchy), one animation per clip',
       id + '_parts.glb   the same clips with every part as its own rigid node (no skin)',
       id + '_clio.json   an entry for CLIo sprites.json: palette letters, with walk and attack drawings (front view)', '',
       'Clips: ' + clips.map(function (c) { return c.name + ' (' + c.frames.length + ' frames, ' + (c.loop ? 'loops' : 'plays once') + ')'; }).join(', '),
       'All clips are in place. meta.clips in the atlas gives each clip\'s length in seconds and its ground speed in metres per second.',
       'The style sliders set on the bench at export time are baked in.',
-      withImages ? 'The sheet uses your image parts. The glTF and CLIo files use the plain shapes.' : '',
+      withImages ? 'The sheet and the cutout use your image parts. The glTF and CLIo files use the plain shapes.' : '',
       '', 'Unity: drop the .glb in with a glTF importer (glTFast); slice the sheet by 64 x 64 or import the atlas.',
       'Godot: the .glb imports directly; for 2D use the sheet with an AnimatedSprite2D or an Aseprite-JSON importer.',
       'Unreal: import the .glb through Interchange as a skeletal mesh with its animations.',
@@ -4918,11 +5095,13 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     setTimeout(function () {
       var clips = B.recordAll(ch, { style: set.style, frames: 8, kit: kit });
       var sh = B.sheet(ch, clips, imgs ? { render: function (p, c, fw, fh) { return framePixels(p, B.framePrims(ch, c, p), B.spriteView(ch, fw, fh, p, c.ladder), fw, fh); }, image: nm + '_sheet.png' } : { image: nm + '_sheet.png' });
-      var glb = B.glbSkinned(ch, clips), parts = B.glb(ch, clips), cl = B.clio(ch, clips, { name: nm });
-      deflate(B.pngScanlines(sh.rgba, sh.w, sh.h)).then(function (z) {
+      var glb = B.glbSkinned(ch, clips), parts = B.glb(ch, clips), cl = B.clio(ch, clips, { name: nm }), cut = B.cutout(ch, clips, { name: nm, parts: imgs }), cutZ;
+      deflate(B.pngScanlines(cut.rgba, cut.w, cut.h)).then(function (z0) { cutZ = z0; return deflate(B.pngScanlines(sh.rgba, sh.w, sh.h)); }).then(function (z) {
         var zip = B.zip([
           { name: nm + '_sheet.png', data: B.png(sh.w, sh.h, z) },
           { name: nm + '_sheet.json', data: enc.encode(JSON.stringify(sh.atlas, null, 1)) },
+          { name: nm + '_cutout.png', data: B.png(cut.w, cut.h, cutZ) },
+          { name: nm + '_cutout.json', data: enc.encode(JSON.stringify(cut.json)) },
           { name: nm + '.glb', data: glb },
           { name: nm + '_parts.glb', data: parts },
           { name: nm + '_clio.json', data: enc.encode(JSON.stringify(cl, null, 1)) },

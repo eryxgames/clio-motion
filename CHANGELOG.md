@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.21.0
+
+A drawn character, live in 2D and as a cutout; weights for a model in Blender.
+
+- Live 2D (JavaScript): `GaitRig.sprites` lists what to draw for a pose, back to front, with the
+  pictures of a drawn character if given; `GaitRig.drawSprites` draws the list on a canvas.
+  `js/drawing.js` (`GaitDrawing.read`) is the reader of drawn characters, moved out of the bench
+  so a game can use it. `examples/live2d.html`: the core running, a drawing loaded, arrow keys.
+- 2D cutout: `<name>_cutout.png` (every part a picture, packed into one file) and
+  `<name>_cutout.json` (where each picture is in every frame of every clip), written by the baker
+  and by Gait Bench's Export, with the drawn parts when a drawing is loaded. `js/cutout.js` is a
+  complete player with no dependencies; `examples/cutout.html` shows it;
+  `tools/godot/clio_cutout.gd` is the same for Godot 4 (not yet run in Godot).
+- Blender add-on, Bind: By Nearness (each vertex to the template part it is nearest, blended
+  across joints, never across to a limb that is not next to it), Whole Pieces (each loose piece
+  wholly to one bone, for machines), Automatic (Blender's automatic weights with the bones for
+  carried things left out). A mesh object named after a bone is bound wholly to it.
+- Rig files mark the joints for carried things (`carried`).
+- `notes/skinning-organic-models.md`: what an organic model still lacks (a number for how far
+  each joint is bent, corrective shapes, wrinkle maps, helper bones, things that swing) and how
+  each could be added.
+- Tests: `js/test/cutout_test.js` in the usual run; the Blender test now binds meshes all three
+  ways.
+
 ## 0.20.0
 
 Templates for artists: your own drawing or model on a character's skeleton, with every clip.

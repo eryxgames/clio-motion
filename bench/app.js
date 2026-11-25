@@ -549,93 +549,25 @@
   }
 
   // ------------------------------------------------------ image parts
-  // more (optional): { box, len, r } for a picture taken from a drawing (see GaitRig.partPlace)
-  function storePart(id, slot, axis, source, w, h, label, more) {
-    var a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').drawImage(source, 0, 0, w, h);
-    var d = document.createElement('canvas'); d.width = w; d.height = h; var dc = d.getContext('2d');
-    dc.drawImage(a, 0, 0); dc.globalCompositeOperation = 'source-atop'; dc.fillStyle = 'rgba(0,0,0,0.32)'; dc.fillRect(0, 0, w, h);
-    IMG[id][slot] = { img: a, dark: d, w: w, h: h, axis: axis, label: label };
-    if (more) { IMG[id][slot].box = more.box; IMG[id][slot].len = more.len; IMG[id][slot].r = more.r; }
+  function storePart(id, slot, axis, source, w, h, label) {
+    var cv = GaitDrawing.canvases(source, w, h);
+    IMG[id][slot] = { img: cv.img, dark: cv.dark, w: w, h: h, axis: axis, label: label };
   }
-  // A whole character drawn on its template (templates/2d, or "Save the template"): every layer that has something
-  // in it becomes the picture of its part, cut out along the bone the guide layer gives for it.
+  // A whole character drawn on its template (templates/2d, or "Save the template"): drawing.js cuts it into the
+  // pictures of its parts.
   function loadDrawing(file) {
-    var note = $('drawingNote'), id = ch.id, rd = new FileReader();
-    function say(t) { note.textContent = t; }
-    rd.onerror = function () { say('That file could not be read.'); };
+    var note = $('drawingNote'), c0 = ch, id = ch.id, rd = new FileReader();
+    rd.onerror = function () { note.textContent = 'That file could not be read.'; };
     rd.onload = function () {
-      var doc = new DOMParser().parseFromString(String(rd.result), 'image/svg+xml'), root = doc.documentElement;
-      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) { say('That is not an SVG file this browser can read. In Inkscape, save as Inkscape SVG or Plain SVG.'); return; }
-      // nothing in the file may run
-      [].slice.call(doc.querySelectorAll('script, foreignObject, iframe, object, embed')).forEach(function (n) { n.parentNode.removeChild(n); });
-      [].slice.call(doc.querySelectorAll('*')).forEach(function (el) {
-        [].slice.call(el.attributes).forEach(function (at) { if (/^on/i.test(at.name) || (/href$/i.test(at.name) && /^\s*javascript:/i.test(at.value))) el.removeAttribute(at.name); });
-      });
-      var guide = doc.querySelector('[id^="clio-guides-"]');
-      if (!guide) { say('This drawing was not made on a template: its guide layer is missing. Save the template, draw in its layers, and load that file.'); return; }
-      var who = guide.id.slice(12);
-      if (who !== id) { say('This drawing is for the ' + (M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who) + '. Choose that character first, then load it.'); return; }
-      // lay the file out, unseen, so that the browser can measure it
-      var host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none';
-      var live = document.importNode(root, true), NS = 'http://www.w3.org/2000/svg', jobs = [], empty = [], lost = [], linked = [];
-      host.appendChild(live); document.body.appendChild(host);
-      try {
-        var inv = live.getCTM().inverse();
-        var toRoot = function (el) { return inv.multiply(el.getCTM()); };          // from an element's own measure to the page's
-        var at = function (m, x, y) { return [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]; };
-        var bar = live.querySelector('#clio-scale'), barLen = live.querySelector('#clio-scale-length'), ppmT = 0;
-        if (bar) {
-          var bm = toRoot(bar), p1 = at(bm, bar.x1.baseVal.value, bar.y1.baseVal.value), p2 = at(bm, bar.x2.baseVal.value, bar.y2.baseVal.value);
-          ppmT = Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)) / (parseFloat(barLen ? barLen.textContent : '1') || 1);
-        }
-        if (!(ppmT > 0)) { say('The guide layer of this drawing has lost its scale bar. Start again from a fresh template and paste your layers in.'); return; }
-        var ser = new XMLSerializer(), defs = [].slice.call(live.querySelectorAll('defs, style')).map(function (d) { return ser.serializeToString(d); }).join('');
-        R.SLOTS[id].forEach(function (sl) {
-          var layer = live.querySelector('#clio-part-' + sl[0]), joint = live.querySelector('#clio-joint-' + sl[0]), bone = live.querySelector('#clio-bone-' + sl[0]);
-          if (!layer || !joint) { lost.push(sl[1]); return; }
-          layer.style.display = ''; if (layer.getAttribute('display') === 'none') layer.removeAttribute('display');          // a layer hidden in Inkscape still counts
-          if (!layer.querySelector('path, rect, circle, ellipse, line, polyline, polygon, image, text, use')) { empty.push(sl[1]); return; }
-          // a picture that is only linked from another file cannot come along
-          if ([].slice.call(layer.querySelectorAll('image')).some(function (n) { var h = n.getAttribute('href') || n.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || ''; return !/^data:/i.test(h.trim()); })) linked.push(sl[1]);
-          var jm = toRoot(joint), a = at(jm, joint.cx.baseVal.value, joint.cy.baseVal.value), rT = joint.r.baseVal.value * Math.sqrt(Math.abs(jm.a * jm.d - jm.b * jm.c)), b = null;
-          if (bone && sl[2] !== 'ball') { var bm2 = toRoot(bone); b = at(bm2, bone.x2.baseVal.value, bone.y2.baseVal.value); }
-          var fr = R.partFrame(sl[2], a, b), pm = toRoot(layer.parentNode);
-          var tf = 'rotate(' + (fr.rot * 180 / Math.PI) + ') translate(' + (-fr.x) + ' ' + (-fr.y) + ') matrix(' + [pm.a, pm.b, pm.c, pm.d, pm.e, pm.f].join(' ') + ')';
-          // its box in the bone's frame
-          var outer = document.createElementNS(NS, 'g'), inner = document.createElementNS(NS, 'g');
-          inner.setAttribute('transform', tf); inner.appendChild(layer.cloneNode(true)); outer.appendChild(inner); live.appendChild(outer);
-          var bb = outer.getBBox(); live.removeChild(outer);
-          if (!(bb.width > 0.5) || !(bb.height > 0.5)) { empty.push(sl[1]); return; }
-          var pad = 3 + 0.06 * Math.max(bb.width, bb.height), x0 = bb.x - pad, y0 = bb.y - pad, w = bb.width + 2 * pad, h = bb.height + 2 * pad;        // room for the width of the strokes
-          var k = Math.min(3, 640 / Math.max(w, h)), W2 = Math.max(2, Math.round(w * k)), H2 = Math.max(2, Math.round(h * k));
-          var xml = '<svg xmlns="' + NS + '" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + W2 + '" height="' + H2 + '" viewBox="' + [x0, y0, w, h].join(' ') + '">' + defs
-            + '<g transform="' + tf + '">' + ser.serializeToString(layer) + '</g></svg>';
-          jobs.push({ sl: sl, xml: xml, w: W2, h: H2, more: { box: [x0 / ppmT, y0 / ppmT, (x0 + w) / ppmT, (y0 + h) / ppmT], r: rT / ppmT,
-            len: b ? Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) / ppmT : 0 } });
-        });
-      } catch (e) { say('This drawing could not be measured (' + (e && e.message ? e.message : e) + ').'); return; }
-      finally { document.body.removeChild(host); }
-      if (!jobs.length) { say('The part layers of this drawing are all empty. Draw each part in the layer that has its name.'); return; }
-      var left = jobs.length, done = [], failed = [];
-      jobs.forEach(function (j) {
-        var im = new Image(), url = null;
-        im.onload = function () { storePart(id, j.sl[0], j.sl[2], im, j.w, j.h, file.name, j.more); if (url) URL.revokeObjectURL(url); done.push(j.sl[1]); fin(); };
-        im.onerror = function () {
-          // where pictures may not be given as data, hand the same thing over as a file in memory
-          if (!url) { try { url = URL.createObjectURL(new Blob([j.xml], { type: 'image/svg+xml' })); im.src = url; return; } catch (e) { url = 'none'; } }
-          else if (url !== 'none') URL.revokeObjectURL(url);
-          failed.push(j.sl[1]); fin();
-        };
-        im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(j.xml);
-      });
-      function fin() {
-        if (--left) return;
+      GaitDrawing.read(rd.result, c0, R, { label: function (who) { return M.CHARACTERS[who] ? M.CHARACTERS[who].label.toLowerCase() : who; } }).then(function (art) {
+        Object.keys(art.parts).forEach(function (slot) { var p = art.parts[slot]; p.label = file.name; IMG[id][slot] = p; });
         clearStrip(); if (ch.id === id) syncSlots();
-        say((done.length ? 'Loaded ' + done.length + ' part' + (done.length > 1 ? 's' : '') + ' from ' + file.name + ': ' + done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
-          + (failed.length ? ' Could not be drawn: ' + failed.join(', ') + '.' : '')
-          + (linked.length ? ' Pictures linked from other files were left out of ' + linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
-          + (empty.length ? ' Left as shapes (empty layers): ' + empty.join(', ') + '.' : '') + (lost.length ? ' Missing from the file: ' + lost.join(', ') + '.' : ''));
-      }
+        var n = art.done.length;
+        note.textContent = (n ? 'Loaded ' + n + ' part' + (n > 1 ? 's' : '') + ' from ' + file.name + ': ' + art.done.join(', ') + '.' : 'No part could be drawn from ' + file.name + '.')
+          + (art.failed.length ? ' Could not be drawn: ' + art.failed.join(', ') + '.' : '')
+          + (art.linked.length ? ' Pictures linked from other files were left out of ' + art.linked.join(', ') + ': embed them in the drawing (in Inkscape: Extensions > Images > Embed Images).' : '')
+          + (art.empty.length ? ' Left as shapes (empty layers): ' + art.empty.join(', ') + '.' : '') + (art.missing.length ? ' Missing from the file: ' + art.missing.join(', ') + '.' : '');
+      }, function (e) { note.textContent = e && e.message ? e.message : String(e); });
     };
     rd.readAsText(file);
   }
@@ -712,13 +644,16 @@
     return ['Gait Bench export: ' + id, '',
       id + '_sheet.png   sprite sheet, 64 x 64 pixel frames, one clip per row (long clips wrap)',
       id + '_sheet.json  atlas in the JSON-hash form (TexturePacker / Aseprite style): frames, animations, meta.frameTags',
+      id + '_cutout.png  the character as a 2D cutout: every part a picture of its own' + (withImages ? ' (your image parts, and plain shapes for the rest)' : ''),
+      id + '_cutout.json where each picture is in every frame of every clip. A game moves the pictures, so the motion is smooth at any frame rate.',
+      '                  js/cutout.js in the repository plays it and says what the numbers mean; examples/cutout.html shows it.',
       id + '.glb         glTF 2.0, a skinned skeleton (one mesh, a joint hierarchy), one animation per clip',
       id + '_parts.glb   the same clips with every part as its own rigid node (no skin)',
       id + '_clio.json   an entry for CLIo sprites.json: palette letters, with walk and attack drawings (front view)', '',
       'Clips: ' + clips.map(function (c) { return c.name + ' (' + c.frames.length + ' frames, ' + (c.loop ? 'loops' : 'plays once') + ')'; }).join(', '),
       'All clips are in place. meta.clips in the atlas gives each clip\'s length in seconds and its ground speed in metres per second.',
       'The style sliders set on the bench at export time are baked in.',
-      withImages ? 'The sheet uses your image parts. The glTF and CLIo files use the plain shapes.' : '',
+      withImages ? 'The sheet and the cutout use your image parts. The glTF and CLIo files use the plain shapes.' : '',
       '', 'Unity: drop the .glb in with a glTF importer (glTFast); slice the sheet by 64 x 64 or import the atlas.',
       'Godot: the .glb imports directly; for 2D use the sheet with an AnimatedSprite2D or an Aseprite-JSON importer.',
       'Unreal: import the .glb through Interchange as a skeletal mesh with its animations.',
@@ -745,11 +680,13 @@
     setTimeout(function () {
       var clips = B.recordAll(ch, { style: set.style, frames: 8, kit: kit });
       var sh = B.sheet(ch, clips, imgs ? { render: function (p, c, fw, fh) { return framePixels(p, B.framePrims(ch, c, p), B.spriteView(ch, fw, fh, p, c.ladder), fw, fh); }, image: nm + '_sheet.png' } : { image: nm + '_sheet.png' });
-      var glb = B.glbSkinned(ch, clips), parts = B.glb(ch, clips), cl = B.clio(ch, clips, { name: nm });
-      deflate(B.pngScanlines(sh.rgba, sh.w, sh.h)).then(function (z) {
+      var glb = B.glbSkinned(ch, clips), parts = B.glb(ch, clips), cl = B.clio(ch, clips, { name: nm }), cut = B.cutout(ch, clips, { name: nm, parts: imgs }), cutZ;
+      deflate(B.pngScanlines(cut.rgba, cut.w, cut.h)).then(function (z0) { cutZ = z0; return deflate(B.pngScanlines(sh.rgba, sh.w, sh.h)); }).then(function (z) {
         var zip = B.zip([
           { name: nm + '_sheet.png', data: B.png(sh.w, sh.h, z) },
           { name: nm + '_sheet.json', data: enc.encode(JSON.stringify(sh.atlas, null, 1)) },
+          { name: nm + '_cutout.png', data: B.png(cut.w, cut.h, cutZ) },
+          { name: nm + '_cutout.json', data: enc.encode(JSON.stringify(cut.json)) },
           { name: nm + '.glb', data: glb },
           { name: nm + '_parts.glb', data: parts },
           { name: nm + '_clio.json', data: enc.encode(JSON.stringify(cl, null, 1)) },

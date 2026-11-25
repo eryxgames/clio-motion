@@ -27,23 +27,24 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Riding: a rider sprung to the saddle, feet in the stirrups, hands on the reins, who can aim and
   fire from the back of a horse, a spider mech or a dragon in the air.
 - Hit reactions and a ragdoll the body can be handed to at any moment.
-- Baking: looping clips to a sprite sheet with an atlas, a skinned `.glb`, a `.glb` of rigid
-  parts, and CLIo sprite frames.
+- Baking: looping clips to a sprite sheet with an atlas, a 2D cutout (every part a picture, moved
+  by the game), a skinned `.glb`, a `.glb` of rigid parts, and CLIo sprite frames.
 - Your own art on the same skeletons: a drawing template for Inkscape and a rig for Blender for
   every character. A drawn or modelled character gets every clip with no rigging or animating by
-  hand. See [`templates/README.md`](templates/README.md).
+  hand, and a drawn one can be run live in 2D. See [`templates/README.md`](templates/README.md).
 
 ## Layout
 
 | Folder | What it holds |
 |---|---|
-| `js/` | The reference implementation: `core.js` (motion), `rig.js` (looks), `bake.js` (clips and files), `fight.js` (example game code), tests. Guide: [`js/README.md`](js/README.md). |
-| `tools/` | `gaitbake.js`, the command-line baker (also puts the clips on a model of your own); `templates.js`, which writes the templates; `blender/`, the Blender add-on; `spec.js` and `golden.js`, which write what the other versions are checked against. |
+| `js/` | The reference implementation: `core.js` (motion), `rig.js` (looks), `bake.js` (clips and files), `drawing.js` (reads a drawn character), `cutout.js` (plays a 2D cutout), `fight.js` (example game code), tests. Guide: [`js/README.md`](js/README.md). |
+| `tools/` | `gaitbake.js`, the command-line baker (also puts the clips on a model of your own); `templates.js`, which writes the templates; `blender/`, the Blender add-on; `godot/`, a cutout player for Godot 4; `spec.js` and `golden.js`, which write what the other versions are checked against. |
 | `templates/` | For artists: a drawing template for Inkscape (`2d/`) and a skeleton with a stand-in model for Blender (`3d/`), per character. Guide: [`templates/README.md`](templates/README.md). |
 | `spec/` | The characters as data, test vectors for the numeric kernel, and recorded runs of whole characters. |
 | `c/` | The C99 library. |
 | `python/` | The pure-Python version (standard library only), for CLIo. |
 | `bench/` | Gait Bench's sources; `python bench/build.py` builds `docs/index.html`. |
+| `examples/` | Two pages to open in a browser: a drawn character run live in 2D, and a cutout played. |
 | `docs/` | The built bench, for GitHub Pages. |
 | `notes/` | Design notes for work that has not started. |
 
@@ -155,10 +156,11 @@ touching.
   then cars and buggies, then tanks, as a new kind of body with crew seats. See
   [notes/groups-and-vehicles.md](notes/groups-and-vehicles.md).
 - A first-person arms view, with the FPS demo.
-- For artists, next: the drawn parts with their joints and every clip's part positions as data,
-  for the 2D skeleton tools of Godot and Unity (today a drawing is baked to a sprite sheet);
-  animal heads whose picture turns with the head; separate pictures for fore and hind legs; a
-  skeleton variant laid out for humanoid retargeting.
+- For artists, next: shape keys and wrinkle maps driven by how far each joint is bent, helper
+  bones, and the artist's own bones swung as chains
+  ([notes/skinning-organic-models.md](notes/skinning-organic-models.md)); a cutout player for
+  Unity; animal heads whose picture turns with the head; separate pictures for fore and hind
+  legs; a skeleton variant laid out for humanoid retargeting.
 - Flight that a game can use as behaviour, not only as a pose: take-off run and landing flare,
   banking turns with a turn radius that follows from speed, soaring and stooping (birds of prey),
   perching; a bat (erratic, flapping, roosting upside down); hovering insects with darting moves;

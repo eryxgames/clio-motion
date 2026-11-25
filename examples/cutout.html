@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE). SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIo Motion: playing a 2D cutout</title>
+<style>
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: #f3f4f1; color: #16181d; }
+  main { max-width: 860px; margin: 0 auto; padding: 18px; }
+  canvas { width: 100%; height: 420px; background: #fff; border: 1px solid #c9cdc6; display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  p { max-width: 70ch; }
+</style>
+</head>
+<body>
+<main>
+<h1>Playing a 2D cutout</h1>
+<p>Choose the two files the baker or Gait Bench wrote for a character: <code>&lt;name&gt;_cutout.json</code> and
+<code>&lt;name&gt;_cutout.png</code>. The whole player is <code>js/cutout.js</code>, about sixty lines; the top of that
+file says what the numbers mean, for a player in another engine.</p>
+<div class="row">
+  <label>Both files <input type="file" id="files" multiple accept=".json,.png"></label>
+  <label>Clip <select id="clip" disabled></select></label>
+  <label>Speed <input type="range" id="rate" min="0" max="2" step="0.05" value="1"></label>
+  <label><input type="checkbox" id="mirror"> Face left</label>
+</div>
+<canvas id="view" width="860" height="420"></canvas>
+<p id="note" role="status">Nothing loaded yet.</p>
+</main>
+<script src="../js/cutout.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('view'), ctx = cv.getContext('2d'), note = document.getElementById('note'), sel = document.getElementById('clip');
+  var pack = null, image = null, t = 0, last = null;
+  function ready() {
+    if (!pack || !image) { note.textContent = pack ? 'Now the picture file (' + pack.image + ').' : image ? 'Now the .json file.' : 'Nothing loaded yet.'; return; }
+    sel.textContent = '';
+    Object.keys(pack.clips).forEach(function (n) { var o = document.createElement('option'); o.textContent = n; sel.appendChild(o); });
+    sel.value = pack.clips.walk ? 'walk' : sel.options[0].value; sel.disabled = false; t = 0;
+    note.textContent = pack.name + ': ' + pack.sprites.length + ' pictures, ' + Object.keys(pack.clips).length + ' clips.';
+  }
+  function load(list) {
+    [].forEach.call(list, function (f) {
+      if (/\.json$/i.test(f.name)) { var rd = new FileReader(); rd.onload = function () { try { pack = JSON.parse(rd.result); if (pack.format !== 'clio-motion-cutout') throw 0; } catch (e) { pack = null; note.textContent = f.name + ' is not a cutout file.'; return; } ready(); }; rd.readAsText(f); }
+      else { var im = new Image(); im.onload = function () { image = im; ready(); }; im.onerror = function () { note.textContent = f.name + ' is not a picture this browser can read.'; }; im.src = URL.createObjectURL(f); }
+    });
+  }
+  document.getElementById('files').addEventListener('change', function () { load(this.files); });
+  sel.addEventListener('change', function () { t = 0; });
+  // for trying it from a web server: cutout.html?pack=path/to/name_cutout.json
+  var q = /[?&]pack=([^&]+)/.exec(location.search);
+  if (q) {
+    var url = decodeURIComponent(q[1]);
+    fetch(url).then(function (r) { return r.json(); }).then(function (j) { pack = j; var im = new Image(); im.onload = function () { image = im; ready(); }; im.src = url.replace(/[^/]*$/, '') + j.image; });
+  }
+  function frame(now) {
+    var dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000); last = now;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#d9dcd5'; ctx.fillRect(0, 340, cv.width, 80);
+    if (pack && image) {
+      var c = pack.clips[sel.value];
+      t += dt * +document.getElementById('rate').value;
+      if (!c.loop && t > c.seconds + 0.6) t = 0;                    // a clip that plays once starts again after a pause
+      // tall bodies are shown smaller: the tallest picture decides
+      var top = 0; pack.clips.idle.frames[0].forEach(function (f) { if (f) top = Math.min(top, f[1]); });
+      GaitCutout.draw(ctx, pack, image, GaitCutout.sample(pack, sel.value, t), { x: cv.width / 2, y: 340, ppm: 250 / Math.max(1, -top), mirror: document.getElementById('mirror').checked });
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.cutoutExample = { seek: function (clip, time) { sel.value = clip; t = time; document.getElementById('rate').value = 0; } };
+})();
+</script>
+</body>
+</html>

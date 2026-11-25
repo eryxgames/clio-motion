@@ -26,8 +26,23 @@ saves the same files for the character on screen ("Save the template", "Save the
 4. A layer left empty keeps its plain shape. Hidden layers still count. Leave the Guide layer in
    the file as it is: it tells the reader where the bones are.
 5. Save (Inkscape SVG or Plain SVG). In Gait Bench choose the character, then **Body parts as
-   images > Load a drawing**. The character moves in your drawing at once; **Export** bakes it
-   into the sprite sheet.
+   images > Load a drawing**. The character moves in your drawing at once.
+
+Three ways to use the drawing in a game:
+
+- **Live.** A game in JavaScript runs the motion core every frame and draws the character from
+  its pose in your drawing: `js/drawing.js` cuts the SVG into the parts' pictures once,
+  `GaitRig.sprites` lists what to draw each frame. `examples/live2d.html` is the whole of it in
+  one page: open it, load your SVG, walk about with the arrow keys.
+- **As a cutout.** Gait Bench's **Export** (and `node tools/gaitbake.js`, for the plain shapes)
+  writes `<name>_cutout.png`, your parts' pictures packed into one file, and
+  `<name>_cutout.json`, where each picture is in every frame of every clip. The game moves the
+  pictures, so the motion is smooth at any frame rate, the file is small, and a picture can be
+  swapped (another helmet, a wounded arm). `js/cutout.js` is a complete player in sixty lines
+  and says what the numbers mean; `examples/cutout.html` shows it; `tools/godot/clio_cutout.gd`
+  is the same player for Godot 4 (written from Godot's documentation; it has not been run yet).
+- **As a sprite sheet.** The same Export bakes your drawing into `<name>_sheet.png`, frame by
+  frame, for engines and tools that want plain frames.
 
 Good to know:
 
@@ -43,7 +58,10 @@ Good to know:
 - Animals with legs out to the side (spider, scorpion, mantis, wasp) and the octopus are drawn as
   the side view shows them, legs foreshortened. Their pictures stretch a good deal as the legs
   swing; simple shapes work best.
-- The picture parts are for the sprite sheet and the bench. The `.glb` files use the 3D model.
+- The picture parts are for 2D: live drawing, the cutout and the sprite sheet. The `.glb` files
+  use the 3D model.
+- The cutout and the sprite sheet show the character from its right side, in place. To face
+  left, mirror the whole character. Live, the core turns the body round by itself.
 
 The reader is in the bench because cutting a drawing apart needs something that can measure and
 draw SVG, which a browser is. There is no command-line version of it.
@@ -58,15 +76,16 @@ sidebar (N), tab **CLIo**, and under File > Import and File > Export.
    pose (standing still, both halves alike, a biped's arms held straight, out and down) and a
    stand-in model of capsules skinned to it, as a guide for size and for where the joints are.
 2. Model your mesh round the armature. Keep the bones' names and leave them where they are.
-   Bind the mesh to the armature in the usual way (Armature modifier, vertex groups named after
-   the bones). Hide or delete the stand-in when you no longer need it. Bones of your own are
-   fine below the rig's (fingers, a cloak, ears): each follows the rig bone above it.
-3. **Check**: lists what would go wrong, and why. Errors stop an export: a bone missing or
+   Hide or delete the stand-in when you no longer need it. Bones of your own are fine below the
+   rig's (fingers, a cloak, ears): each follows the rig bone above it.
+3. **Bind** the selected meshes: this gives them their weights and ties them to the armature
+   (see "Weights" below for which of the three ways to use).
+4. **Check**: lists what would go wrong, and why. Errors stop an export: a bone missing or
    renamed, the armature moved or scaled as an object, vertices with no weight (they are
    selected for you). Warnings do not: a bone that starts somewhere else, a bone under another
    parent, more than four bones on a vertex, no mesh bound.
-4. **Export .glb**: checks, then writes the armature and its meshes.
-5. Put the clips on it, outside Blender:
+5. **Export .glb**: checks, then writes the armature and its meshes.
+6. Put the clips on it, outside Blender:
 
        node tools/gaitbake.js soldier --model my_soldier.glb --out out
        node tools/gaitbake.js soldier --model my_knight.glb --kit sword
@@ -75,6 +94,47 @@ sidebar (N), tab **CLIo**, and under File > Import and File > Export.
    or in Gait Bench: **Export > Put the clips on my model** (it saves the file inside a zip).
    The result, `my_soldier_clips.glb`, is your model with every clip, ready for Unity, Godot,
    Unreal or Blender itself.
+
+### Weights, and what else a model needs
+
+A model follows the skeleton through its weights: for each vertex, which bones move it and by how
+much. Nothing else is needed for the clips to play. UV maps, textures, normal maps and materials
+are yours: they pass through untouched.
+
+**Machines** (robots, mechs, vehicles) need no painted weights. Build them of components and
+either name each mesh object after its bone (`Hull`, `Gun_R`, `UpperLeg_L`: such an object is
+always bound wholly to that bone), or select the lot and press **Bind > Whole Pieces**: each loose
+piece goes wholly to the bone it is nearest.
+
+**Organic bodies** need weights that blend across the joints. Three starts, then paint:
+
+- **Bind > By Nearness**: each vertex takes the bone of the template part it is nearest, shared
+  with the bones next to it where parts meet (Blend sets how far the sharing runs; 0 is a hard
+  edge). It always gives an answer, on any mesh, and it never ties a thigh to the other thigh.
+- **Bind > Automatic**: Blender's own automatic weights. Often smoother on a clean, closed,
+  single-surface body; it finds no answer on meshes with holes, loose shells or inner faces.
+  The bones for carried things are left out of it, so the rifle on the back does not pull on the
+  spine.
+- By hand, in Weight Paint, from either of those.
+
+Carried things (weapon, magazine, pack, grenade) are separate pieces: name the object after its
+bone. Export keeps the four strongest bones on a vertex; Check warns when there are more.
+
+What the skeleton does not give an organic model, and what can be done about it:
+
+- *Joints that pinch or lose volume* (elbows, knees, shoulders) come from the way every engine
+  blends bones. The cure that travels to every engine is in the mesh: enough edge loops at the
+  joint, and weights painted so the inside of the bend stays with one bone.
+- *Muscle bulges, creases, wrinkle and tension maps* need a number that says how far a joint is
+  bent. The library knows it at every moment but does not write it out yet. The plan: you sculpt
+  a shape key per joint, named for it; the baker writes how strong it is through every clip (as
+  morph target weights, which Unity, Godot, Unreal and Blender all read); a shader can use the
+  same number to fade a wrinkle normal map in. See `notes/skinning-organic-models.md`.
+- *Forearm twist, fingers, faces*: the rig has no bones for them (a horse has a jaw; nothing has
+  eyelids). Bones of your own follow the rig rigidly, which is right for fingers held still and
+  wrong for a twisting forearm.
+- *Cloth, hair, bellies, straps*: bones of your own are carried, not swung. The chains that
+  swing tails and tentacles could drive them; that is planned, not built.
 
 Good to know:
 
@@ -108,12 +168,21 @@ image parts), `clips`, `height`, and `leg` (leg length, the unit the checks use)
   turned some other way follow the rig as closely as the baker's own file does; a bone renamed or
   scaled out of shape is refused; a picture cut from a drawing is put back exactly where it was
   drawn and keeps to its joint and its bone's end when the bone changes.
+- `node js/test/cutout_test.js` (part of the usual run): in every frame of every clip each plain
+  picture covers exactly the part it stands for, each drawn picture is held at its joint and at
+  its bone's end, pictures never overlap in the atlas, and the player turns them the short way
+  round between frames. The player and the live example were also driven in Chromium with the
+  drawn soldier and horse.
 - `python tools/blender/test_addon.py` (needs `pip install bpy` and Node; not part of the usual
   tests): in Blender 5.0.1, without a screen, every rig was imported, checked and exported by the
-  add-on; the baker put the clips on each export; the results pass the Khronos glTF validator
+  add-on; meshes were bound all three ways (by nearness on the soldier, horse and scorpion: one
+  to four bones on every vertex, adding up to one, only bones next to each other, none on a
+  carried thing; whole pieces on the mech; Blender's automatic weights on a leg); the baker put
+  the clips on each export; the results pass the Khronos glTF validator
   with no errors or warnings; and with the clips played in Blender itself, every bone of the
   soldier, the horse and the scorpion was within 2 mm of where the rig puts the joint.
 - The drawing reader was tried in Chromium with drawings made by a script on the soldier, horse
   and scorpion templates (gradients, a hidden layer, an empty layer, parts larger than the
-  figure's). It has not been tried with a drawing saved by Inkscape itself, and the add-on has
-  not been tried in Blender's window or in Blender 4.x.
+  figure's). It has not been tried with a drawing saved by Inkscape itself; the add-on has not
+  been tried in Blender's window or in Blender 4.x, nor its binding on a real character mesh
+  (only on copies of the stand-in and simple shapes); the Godot player has not been run.

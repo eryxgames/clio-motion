@@ -7,11 +7,16 @@ The tools are in the 3D view's sidebar (N), tab "CLIo", and under File > Import 
 
 1. Import rig        reads templates/3d/<name>.rig.json and makes the armature in the template pose, with a
                      stand-in model of capsules skinned to it (a guide for size and joints; hide or delete it).
-2. Model your mesh   round the armature. Keep the bones' names. Bind the mesh to the armature (Armature modifier,
-                     vertex groups named after the bones). You may add bones of your own below the rig's.
-3. Check             says what would go wrong: a bone missing or moved, the armature moved or scaled, vertices
+2. Model your mesh   round the armature. Keep the bones' names. You may add bones of your own below the rig's.
+3. Bind              gives the selected meshes their weights and ties them to the armature, three ways:
+                     By Nearness: each vertex to the template part it is nearest, blended across joints. Always works.
+                     Whole Pieces: each loose piece of a mesh wholly to one bone. For machines built of components.
+                     Automatic: Blender's own automatic weights, with the bones for carried things left out.
+                     A mesh object named after a bone (Weapon, Head, Gun_R) is always bound wholly to that bone.
+                     These are a start: paint the weights afterwards where a joint needs it.
+4. Check             says what would go wrong: a bone missing or moved, the armature moved or scaled, vertices
                      with no weight, more than four bones on a vertex.
-4. Export            checks, then writes a .glb with the armature and its meshes.
+5. Export            checks, then writes a .glb with the armature and its meshes.
 
 Then, outside Blender, the clips are put onto the model:   node tools/gaitbake.js <character> --model my.glb
 (or in Gait Bench: Export > "Put the clips on my model").
@@ -24,13 +29,13 @@ import math
 import os
 
 import bpy
-from bpy.props import BoolProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 from bpy_extras.io_utils import ExportHelper, ImportHelper
 
 bl_info = {
     "name": "CLIo Motion",
     "author": "Daniel Sandner",
-    "version": (0, 20, 0),
+    "version": (0, 21, 0),
     "blender": (4, 2, 0),
     "location": "3D View > Sidebar > CLIo; File > Import, Export",
     "description": "Build a CLIo Motion skeleton, check a model skinned to it, export it as .glb",
@@ -217,6 +222,183 @@ def _unparented(context, arm):
     return [o for o in context.scene.objects if o.type == "MESH" and o.parent == arm and not any(m.type == "ARMATURE" and m.object == arm for m in o.modifiers)]
 
 
+# ------------------------------------------------------------------------------------------------- binding
+def _to_capsule(p, a, b, r):
+    """How far a point is from the surface of a capsule (0 inside it), and how far from its core as a share of its radius."""
+    if b is None:
+        d = math.sqrt((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2 + (p[2] - a[2]) ** 2)
+    else:
+        ex, ey, ez = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+        l2 = ex * ex + ey * ey + ez * ez
+        t = ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey + (p[2] - a[2]) * ez) / l2 if l2 > 1e-12 else 0.0
+        t = 0.0 if t < 0 else 1.0 if t > 1 else t
+        d = math.sqrt((p[0] - a[0] - ex * t) ** 2 + (p[1] - a[1] - ey * t) ** 2 + (p[2] - a[2] - ez * t) ** 2)
+    return (d - r, d / r) if d > r else (0.0, d / r)       # (outside by this much, how deep inside: 0 at the core, 1 at the skin)
+
+
+def _rig_parts(rig, carried):
+    """The template's parts by joint, in Blender's axes, and for each joint the joints next to it."""
+    skip = set() if carried else {j["name"] for j in rig["joints"] if j.get("carried")}
+    by = {}
+    for part in rig.get("parts", ()):
+        if part["joint"] not in skip:
+            by.setdefault(part["joint"], []).append((to_blender(part["a"]), to_blender(part["b"]) if part.get("b") else None, part["r"]))
+    near = {j["name"]: {j["name"]} for j in rig["joints"]}
+    for j in rig["joints"]:
+        if j["parent"] is not None:
+            near[j["name"]].add(j["parent"])
+            near[j["parent"]].add(j["name"])
+    # a joint with no part of its own (the hips of some animals) passes its neighbours on
+    return by, near
+
+
+def _points_in_armature(obj, arm):
+    m = arm.matrix_world.inverted() @ obj.matrix_world
+    return [tuple(m @ v.co) for v in obj.data.vertices]
+
+
+def _pieces(me):
+    """The loose pieces of a mesh: lists of vertex indices joined by edges."""
+    up = list(range(len(me.vertices)))
+
+    def find(i):
+        while up[i] != i:
+            up[i] = up[up[i]]
+            i = up[i]
+        return i
+
+    for e in me.edges:
+        a, b = find(e.vertices[0]), find(e.vertices[1])
+        if a != b:
+            up[a] = b
+    out = {}
+    for i in range(len(up)):
+        out.setdefault(find(i), []).append(i)
+    return list(out.values())
+
+
+def _write_weights(obj, arm, weights):
+    """weights: for each vertex a dict bone -> weight.  Replaces the mesh's weights on the armature's bones."""
+    bones = arm.data.bones
+    for g in [g for g in obj.vertex_groups if g.name in bones]:
+        obj.vertex_groups.remove(g)
+    groups, lists = {}, {}
+    for i, w in enumerate(weights):
+        for name, val in w.items():
+            lists.setdefault((name, round(val, 4)), []).append(i)
+    for (name, val), idx in lists.items():
+        g = groups.get(name) or groups.setdefault(name, obj.vertex_groups.new(name=name))
+        g.add(idx, val, "REPLACE")
+
+
+def _tie(obj, arm):
+    """Parent a mesh to the armature where it is, with an Armature modifier."""
+    if obj.parent != arm:
+        world = obj.matrix_world.copy()
+        obj.parent = arm
+        obj.matrix_world = world
+    if not any(m.type == "ARMATURE" and m.object == arm for m in obj.modifiers):
+        obj.modifiers.new("Armature", "ARMATURE").object = arm
+
+
+def bind_named(obj, arm):
+    """A mesh object named after a bone is bound wholly to it.  True if it was."""
+    base = obj.name.split(".")[0]
+    if base not in arm.data.bones:
+        return False
+    _write_weights(obj, arm, [{base: 1.0}] * len(obj.data.vertices))
+    _tie(obj, arm)
+    return True
+
+
+def bind_nearest(obj, arm, rig, blend=0.3, whole_pieces=False, carried=False):
+    """Weights from how near each vertex is to the template's parts.  blend (0..1): how far weights run across a
+    joint, 0 for a hard edge.  whole_pieces: each loose piece of the mesh wholly to the joint it is nearest.
+    Returns the number of joints used."""
+    by, near = _rig_parts(rig, carried)
+    names = list(by)
+    pts = _points_in_armature(obj, arm)
+    leg = rig.get("leg") or rig.get("height", 1.0) * 0.5
+    sigma = blend * 0.15 * leg
+    both = [[min(_to_capsule(p, a, b, r) for a, b, r in by[n]) for n in names] for p in pts]
+    dist = [[x[0] for x in row] for row in both]
+    weights = [None] * len(pts)
+    if whole_pieces:
+        for piece in _pieces(obj.data):
+            mean = [sum(dist[i][k] for i in piece) / len(piece) for k in range(len(names))]
+            w = {names[min(range(len(names)), key=lambda k: mean[k])]: 1.0}
+            for i in piece:
+                weights[i] = w
+    else:
+        for i, d in enumerate(dist):
+            k0 = min(range(len(names)), key=lambda k: both[i][k])          # inside several parts: the one it is deepest in
+            if sigma <= 0:
+                weights[i] = {names[k0]: 1.0}
+                continue
+            # only the joints next to the nearest one may share a vertex: a thigh does not pull on the other thigh
+            allowed = near[names[k0]]
+            w = {names[k]: math.exp(-((d[k] - d[k0]) / sigma) ** 2) for k in range(len(names)) if names[k] in allowed}
+            top = sorted(w.items(), key=lambda kv: -kv[1])[:4]
+            top = [(n, v) for n, v in top if v > 0.02]
+            total = sum(v for n, v in top)
+            weights[i] = {n: v / total for n, v in top}
+    _write_weights(obj, arm, weights)
+    _tie(obj, arm)
+    return len({n for w in weights for n in w})
+
+
+def tidy_weights(obj, arm):
+    """At most four bones on a vertex, and their weights add up to one."""
+    bones = arm.data.bones
+    name = {g.index: g.name for g in obj.vertex_groups if g.name in bones}
+    for v in obj.data.vertices:
+        ws = sorted(((g.weight, g.group) for g in v.groups if g.group in name and g.weight > 0), reverse=True)
+        for wt, gi in ws[4:]:
+            obj.vertex_groups[gi].remove([v.index])
+        total = sum(wt for wt, gi in ws[:4])
+        if total > 0:
+            for wt, gi in ws[:4]:
+                obj.vertex_groups[gi].add([v.index], wt / total, "REPLACE")
+
+
+def bind_automatic(context, objs, arm, rig):
+    """Blender's automatic weights, with the bones for carried things (weapon, pack, load) left out."""
+    carried = [arm.data.bones[j["name"]] for j in rig["joints"] if j.get("carried") and j["name"] in arm.data.bones]
+    was = [(b, b.use_deform) for b in carried]
+    before, active = list(context.selected_objects), context.view_layer.objects.active
+    for b in carried:
+        b.use_deform = False
+    for o in before:
+        o.select_set(False)
+    try:
+        for o in objs:
+            for g in [g for g in o.vertex_groups if g.name in arm.data.bones]:
+                o.vertex_groups.remove(g)
+            for m in [m for m in o.modifiers if m.type == "ARMATURE"]:
+                o.modifiers.remove(m)
+            o.select_set(True)
+        arm.select_set(True)
+        context.view_layer.objects.active = arm
+        bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+    finally:
+        for b, d in was:
+            b.use_deform = d
+        for o in objs:
+            o.select_set(False)
+        arm.select_set(False)
+        for o in before:
+            o.select_set(True)
+        context.view_layer.objects.active = active
+    left = []
+    for o in objs:
+        tidy_weights(o, arm)
+        _tie(o, arm)
+        deform = {g.index for g in o.vertex_groups if g.name in arm.data.bones}
+        if any(not any(g.group in deform and g.weight > 1e-6 for g in v.groups) for v in o.data.vertices):
+            left.append(o.name)
+    return left
+
+
 def check(context, arm, rig, select=False):
     """Compare the armature and the meshes bound to it with the rig.  Returns (errors, warnings, notes)."""
     errors, warnings, notes = [], [], []
@@ -350,6 +532,50 @@ class CLIO_OT_attach_rig(bpy.types.Operator, ImportHelper):
         return {"FINISHED"}
 
 
+class CLIO_OT_bind(bpy.types.Operator):
+    """Give the selected meshes their weights and tie them to the armature"""
+    bl_idname = "object.clio_bind"
+    bl_label = "Bind to CLIo Motion Rig"
+    bl_options = {"REGISTER", "UNDO"}
+    how: EnumProperty(name="How", default="NEAR", items=(
+        ("NEAR", "By Nearness", "Each vertex to the template part it is nearest, blended across joints"),
+        ("PIECES", "Whole Pieces", "Each loose piece of a mesh wholly to the bone it is nearest: for machines built of components"),
+        ("AUTO", "Automatic", "Blender's automatic weights, with the bones for carried things left out")))
+    blend: FloatProperty(name="Blend", description="By Nearness: how far weights run across a joint. 0 is a hard edge", default=0.3, min=0.0, max=1.0)
+    carried: BoolProperty(name="Carried things too", description="By Nearness and Whole Pieces: also bind to the bones of the weapon, magazine, pack, grenade and load", default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return _rig_of(_armature_of(context)) is not None and any(o.type == "MESH" for o in context.selected_objects)
+
+    def execute(self, context):
+        arm = _armature_of(context)
+        rig = _rig_of(arm)
+        if context.object and context.object.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        meshes = [o for o in context.selected_objects if o.type == "MESH"]
+        named = [o for o in meshes if bind_named(o, arm)]
+        rest = [o for o in meshes if o not in named]
+        said = []
+        if named:
+            said.append("%d by name (%s)" % (len(named), ", ".join(o.name for o in named[:4]) + (", ..." if len(named) > 4 else "")))
+        if rest and self.how == "AUTO":
+            try:
+                left = bind_automatic(context, rest, arm, rig)
+            except Exception as e:
+                self.report({"ERROR"}, "Blender's automatic weights failed (%s). Try By Nearness." % e)
+                return {"CANCELLED"}
+            if left:
+                self.report({"WARNING"}, "Automatic weights found no answer for part of %s (Blender needs a clean, closed surface for it). Try By Nearness." % ", ".join(left))
+            said.append("%d automatically" % len(rest))
+        elif rest:
+            for o in rest:
+                n = bind_nearest(o, arm, rig, self.blend, self.how == "PIECES", self.carried)
+                said.append("%s to %d bone%s" % (o.name, n, "" if n == 1 else "s"))
+        self.report({"INFO"}, "Bound: " + "; ".join(said) + ".")
+        return {"FINISHED"}
+
+
 class CLIO_OT_check(bpy.types.Operator):
     """Compare the armature and the meshes bound to it with the CLIo Motion rig"""
     bl_idname = "object.clio_check"
@@ -452,6 +678,11 @@ class CLIO_PT_panel(bpy.types.Panel):
         else:
             box.label(text="Select an armature or its mesh", icon="INFO")
         col = self.layout.column(align=True)
+        col.label(text="Bind the selected meshes:")
+        col.operator(CLIO_OT_bind.bl_idname, text="By Nearness", icon="MOD_VERTEX_WEIGHT").how = "NEAR"
+        col.operator(CLIO_OT_bind.bl_idname, text="Whole Pieces", icon="MOD_BUILD").how = "PIECES"
+        col.operator(CLIO_OT_bind.bl_idname, text="Automatic", icon="BONE_DATA").how = "AUTO"
+        col = self.layout.column(align=True)
         col.operator(CLIO_OT_check.bl_idname, text="Check", icon="VIEWZOOM")
         col.operator(CLIO_OT_export.bl_idname, text="Export .glb", icon="EXPORT")
         text = bpy.data.texts.get(REPORT)
@@ -469,7 +700,7 @@ def _menu_export(self, context):
     self.layout.operator(CLIO_OT_export.bl_idname, text="CLIo Motion Model (.glb)")
 
 
-CLASSES = (CLIO_OT_import_rig, CLIO_OT_attach_rig, CLIO_OT_check, CLIO_OT_export, CLIO_PT_panel)
+CLASSES = (CLIO_OT_import_rig, CLIO_OT_attach_rig, CLIO_OT_bind, CLIO_OT_check, CLIO_OT_export, CLIO_PT_panel)
 
 
 def register():

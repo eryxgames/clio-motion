@@ -4,7 +4,8 @@
    node tools/gaitbake.js [character|all] [--out DIR] [--clips idle,walk,...] [--frames 8] [--frame 64x64]
                     [--clio-size 28] [--clio-view front|side] [--kit rifle|pistols|sword]
    Writes, per character: <id>.glb (skinned skeleton), <id>_parts.glb (separate rigid parts),
-   <id>_sheet.png, <id>_sheet.json, <id>_clio.json
+   <id>_sheet.png, <id>_sheet.json, <id>_cutout.png, <id>_cutout.json (the parts as pictures, and where each is
+   in every frame: js/cutout.js plays them), <id>_clio.json
 
    node tools/gaitbake.js <character> --model my.glb [--kit ...] [--clips ...] [--out DIR] [--check]
    Puts the clips onto a model of your own that was built on the character's template (templates/3d): the file
@@ -65,6 +66,9 @@ for (const id of ids) {
   const png = B.png(sh.w, sh.h, new Uint8Array(zlib.deflateSync(Buffer.from(B.pngScanlines(sh.rgba, sh.w, sh.h)), { level: 9 })));
   const glb = B.glbSkinned(ch, clips), parts = B.glb(ch, clips);
   const clio = B.clio(ch, clips, { size: opt.clioSize, view: opt.clioView, name: name });
+  const cut = B.cutout(ch, clips, { name: name }), cutPng = B.png(cut.w, cut.h, new Uint8Array(zlib.deflateSync(Buffer.from(B.pngScanlines(cut.rgba, cut.w, cut.h)), { level: 9 })));
+  fs.writeFileSync(path.join(opt.out, name + '_cutout.png'), cutPng);
+  fs.writeFileSync(path.join(opt.out, name + '_cutout.json'), JSON.stringify(cut.json));
   fs.writeFileSync(path.join(opt.out, name + '_sheet.png'), png);
   fs.writeFileSync(path.join(opt.out, name + '_sheet.json'), JSON.stringify(sh.atlas, null, 1));
   fs.writeFileSync(path.join(opt.out, name + '.glb'), glb);
@@ -72,5 +76,5 @@ for (const id of ids) {
   fs.writeFileSync(path.join(opt.out, name + '_clio.json'), JSON.stringify(clio, null, 1));
   console.log(name.padEnd(8), clips.map(c => c.name + ':' + c.frames.length + (c.loop ? '' : '*')).join(' '),
     '| sheet', sh.w + 'x' + sh.h, (png.length / 1024).toFixed(1) + ' KB', '| glb', (glb.length / 1024).toFixed(0) + ' KB',
-    '| clio', clio[name].pixels[0].length + 'x' + clio[name].pixels.length);
+    '| cutout', cut.json.sprites.length + ' pictures', cut.w + 'x' + cut.h, '| clio', clio[name].pixels[0].length + 'x' + clio[name].pixels.length);
 }

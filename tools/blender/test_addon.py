@@ -131,9 +131,110 @@ bpy.ops.object.clio_attach_rig(filepath=T + "dragon.rig.json")
 e, w, n = A.check(bpy.context, arm, A.load_rig(arm[A.RIG_KEY]))
 expect(not e and export(os.path.join(OUT, "dragon_from_glb.glb")) == {"FINISHED"}, "the template .glb brought in by Blender's own importer checks and exports")
 
+# binding
+def loose_copy(src, name):
+    """A copy of a mesh with no weights and no ties: what an artist's fresh model is."""
+    o = bpy.data.objects.new(name, src.data.copy())
+    bpy.context.collection.objects.link(o)
+    for g in list(o.vertex_groups):
+        o.vertex_groups.remove(g)
+    return o
+
+
+def weights_of(o, arm):
+    name = {g.index: g.name for g in o.vertex_groups if g.name in arm.data.bones}
+    return [{name[g.group]: g.weight for g in v.groups if g.group in name and g.weight > 1e-6} for v in o.data.vertices]
+
+
+def select_only(objs, arm):
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = arm
+
+
+for name in ("soldier", "horse", "scorpion"):
+    arm, rig = fresh(name)
+    standin = [o for o in bpy.data.objects if o.type == "MESH"][0]
+    truth = weights_of(standin, arm)
+    body = loose_copy(standin, "body")
+    select_only([body], arm)
+    r = bpy.ops.object.clio_bind(how="NEAR", blend=0.0, carried=True)
+    got = weights_of(body, arm)
+    # where parts do not run into each other there is one right answer: the bone the part hangs on
+    parts = [(A.to_blender(q["a"]), A.to_blender(q["b"]) if q.get("b") else None, q["r"], q["joint"]) for q in rig["parts"]]
+    clear = [i for i, v in enumerate(body.data.vertices) if sum(1 for a, b, rr, jn in parts if jn not in truth[i] and A._to_capsule(tuple(v.co), a, b, rr)[0] < 0.02) == 0]
+    same = sum(1 for i in clear if list(truth[i]) == list(got[i]))
+    expect(r == {"FINISHED"} and len(clear) > 0.15 * len(truth) and same == len(clear) and all(len(w) == 1 for w in got),
+           "%s: bound by nearness with a hard edge, each vertex has one bone, and all %d that are clear of other parts have the bone their part hangs on" % (name, len(clear)))
+    r = bpy.ops.object.clio_bind(how="NEAR", blend=0.4, carried=False)
+    got = weights_of(body, arm)
+    carried = {j["name"] for j in rig["joints"] if j.get("carried")}
+    shared = sum(1 for w in got if len(w) > 1)
+    ok = all(0 < len(w) <= 4 and abs(sum(w.values()) - 1) < 1e-3 and not (set(w) & carried) for w in got)
+    by = {j["name"]: j["parent"] for j in rig["joints"]}
+    kin = all(all(a == b or by[a] == b or by[b] == a or by[a] == by[b] or by.get(by[a]) == b or by.get(by[b]) == a for a in w for b in w) for w in got)
+    e, w, n = A.check(bpy.context, arm, rig)
+    expect(ok and kin and shared > 0 and not e, "%s: blended, every vertex has one to four bones that add up to one, %d vertices share bones across a joint, none on a carried thing, only bones next to each other" % (name, shared))
+    expect(export(os.path.join(OUT, name + "_bound.glb")) == {"FINISHED"}, "%s: and it exports" % name)
+
+arm, rig = fresh("mech")
+me = bpy.data.meshes.new("parts")
+bm = bmesh.new()
+jb = {j["name"]: j for j in rig["joints"]}
+spots = {}
+for jn in ("Hips", "LowerLeg_R", "LowerLeg_L"):
+    j = jb[jn]
+    mid = [(j["head"][i] + j["tail"][i]) / 2 for i in range(3)]
+    c = A.to_blender(mid)
+    made = bmesh.ops.create_cube(bm, size=0.3)
+    bmesh.ops.translate(bm, verts=made["verts"], vec=c)
+    spots[jn] = c
+bm.to_mesh(me)
+bm.free()
+po = bpy.data.objects.new("parts", me)
+bpy.context.collection.objects.link(po)
+select_only([po], arm)
+r = bpy.ops.object.clio_bind(how="PIECES")
+got = weights_of(po, arm)
+pieces = [set(tuple(sorted(w.items())) for w in got[k * 8:(k + 1) * 8]) for k in range(3)]
+expect(r == {"FINISHED"} and all(len(p) == 1 for p in pieces) and len({next(iter(p)) for p in pieces}) == 3 and all(len(w) == 1 for w in got),
+       "whole pieces: three boxes on a mech go to three bones, each wholly (%s)" % ", ".join(next(iter(p))[0][0] for p in pieces))
+gun = loose_copy(po, "Gun_R") if "Gun_R" in arm.data.bones else loose_copy(po, list(arm.data.bones.keys())[-1])
+select_only([gun], arm)
+r = bpy.ops.object.clio_bind(how="NEAR")
+got = weights_of(gun, arm)
+expect(r == {"FINISHED"} and all(list(w) == [gun.name] for w in got), "a mesh object named after a bone (%s) is bound wholly to it" % gun.name)
+
+arm, rig = fresh("soldier", model=False)
+me = bpy.data.meshes.new("leg")
+bm = bmesh.new()
+bm.free()
+js = {j["name"]: j for j in rig["joints"]}
+top, low = A.to_blender(js["UpperLeg_R"]["head"]), A.to_blender(js["Foot_R"]["head"])
+bm = bmesh.new()
+made = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=16, radius1=0.09, radius2=0.09, depth=top[2] - low[2])
+bmesh.ops.translate(bm, verts=made["verts"], vec=((top[0] + low[0]) / 2, (top[1] + low[1]) / 2, (top[2] + low[2]) / 2))
+bmesh.ops.subdivide_edges(bm, edges=[e for e in bm.edges if abs(e.verts[0].co.z - e.verts[1].co.z) > 0.2], cuts=10)
+bm.to_mesh(me)
+bm.free()
+lo = bpy.data.objects.new("leg", me)
+bpy.context.collection.objects.link(lo)
+select_only([lo], arm)
+try:
+    r = bpy.ops.object.clio_bind(how="AUTO")
+    got = weights_of(lo, arm)
+    used = {n for w in got for n in w}
+    carried = {j["name"] for j in rig["joints"] if j.get("carried")}
+    expect(r == {"FINISHED"} and {"UpperLeg_R", "LowerLeg_R"} <= used and not (used & carried) and all(0 < len(w) <= 4 and abs(sum(w.values()) - 1) < 1e-3 for w in got),
+           "automatic weights: a tube round the right leg is shared between %s; nothing on a carried thing; four bones at most" % ", ".join(sorted(used)))
+except RuntimeError as ex:
+    expect(False, "automatic weights could not be run here: %s" % str(ex)[:120])
+
 # outside Blender: the clips onto what was exported
 FIT = os.path.join(OUT, "fit")
-for name in names + ["soldier_crest", "dragon_from_glb"]:
+for name in names + ["soldier_crest", "dragon_from_glb", "soldier_bound", "horse_bound", "scorpion_bound"]:
     cid = name.split("_")[0]
     kit = ["--kit", name.split("_")[1]] if name in ("soldier_pistols", "soldier_sword") else []
     r = subprocess.run(["node", os.path.join(ROOT, "tools", "gaitbake.js"), cid, "--model", os.path.join(OUT, name + ".glb"), "--out", FIT] + kit, capture_output=True, text=True)

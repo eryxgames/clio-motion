@@ -8,7 +8,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.dirname(here)
 page = open(os.path.join(here, 'page.html'), encoding='utf-8').read()
 parts = (('/*__CORE__*/', 'js/core.js'), ('/*__RIG__*/', 'js/rig.js'), ('/*__BAKE__*/', 'js/bake.js'),
-         ('/*__FIGHT__*/', 'js/fight.js'), ('/*__APP__*/', 'bench/app.js'))
+         ('/*__FIGHT__*/', 'js/fight.js'), ('/*__DRAWING__*/', 'js/drawing.js'), ('/*__APP__*/', 'bench/app.js'))
 for tag, name in parts:
     body = open(os.path.join(root, name), encoding='utf-8').read()
     assert '</script' not in body, name

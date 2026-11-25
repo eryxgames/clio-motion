@@ -249,6 +249,111 @@
       return { rgba: rgba, w: W, h: H, atlas: atlas };
     }
 
+    // ---------------------------------------------------------------- cutout
+    // The character as a 2D cutout: every part a picture of its own, and for every clip where each picture is, frame
+    // by frame. A game plays it by moving the pictures (js/cutout.js shows how), so the motion is smooth at any frame
+    // rate and the pictures can be swapped. Seen from the right side, in place, like the sprite sheet.
+    //   o.parts   pictures by part name, as a drawing gives them (drawing.js); each needs its pixels as rgba
+    //             (w * h * 4 bytes) or a canvas img. Parts without a picture, and everything else, are plain shapes.
+    //   o.ppm     pixels to a metre for the plain shapes (default: the character about 512 pixels tall)
+    // Returns { json, rgba, w, h }: the description (see js/README.md) and the atlas the pictures are packed in.
+    function capsulePixels(L, rp, rgb, sq, m) {
+      var w = Math.ceil(L + 2 * rp) + 2 * m, h = Math.ceil(2 * rp) + 2 * m, px = new Uint8Array(w * h * 4), x, y, cy = m + rp, x0 = m + rp, x1 = m + rp + L;
+      for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+        var fx = x + 0.5, fy = y + 0.5, d;
+        if (sq) d = Math.max(Math.abs(fy - cy) - rp, m + 0.0 - (fx - m) > 0 ? m - fx : fx - (m + L + 2 * rp)) + rp;          // a box from end to end
+        else { var qx = fx < x0 ? x0 : fx > x1 ? x1 : fx; d = Math.sqrt((fx - qx) * (fx - qx) + (fy - cy) * (fy - cy)); }
+        var a = rp - d + 0.5; if (a <= 0) continue;
+        var k = (y * w + x) * 4; px[k] = rgb[0]; px[k + 1] = rgb[1]; px[k + 2] = rgb[2]; px[k + 3] = Math.round(255 * (a > 1 ? 1 : a));
+      }
+      return { w: w, h: h, rgba: px };
+    }
+    function packRects(sizes, pad) {        // shelves, tallest first
+      var area = 0, widest = 0, idx = sizes.map(function (s, i) { area += (s[0] + pad) * (s[1] + pad); widest = Math.max(widest, s[0]); return i; });
+      idx.sort(function (a, b) { return (sizes[b][1] - sizes[a][1]) || (a - b); });
+      var W = 64; while (W < widest + 2 * pad || W * W < area * 1.25) W *= 2;
+      var at = new Array(sizes.length), x = pad, y = pad, shelf = 0;
+      idx.forEach(function (i) {
+        var s = sizes[i];
+        if (x + s[0] + pad > W) { x = pad; y += shelf + pad; shelf = 0; }
+        at[i] = [x, y]; x += s[0] + pad; shelf = Math.max(shelf, s[1]);
+      });
+      return { w: W, h: y + shelf + pad, at: at };
+    }
+    function cutout(ch, clips, o) {
+      o = o || {};
+      var parts = o.parts || null, ppm = o.ppm || Math.round(512 / R.SPRITE[ch.id].tall), M2 = 2, name = o.name || ch.id;
+      var proj = R.projector({ cx: 0, cy: 0, cz: 0, yaw: 0, pit: 0, ppm: 1, ox: 0, oy: 0 });          // x forward, y down, metres, the ground at 0
+      var first = R.buildPrims(clips[0].frames[0], ch, { flash: false, model: true }), n = first.length;
+      var images = [], imgOf = {}, sprites = [], spriteOf = [], i;
+      function r5(v) { return Math.round(v * 1e5) / 1e5 + 0; }
+      first.forEach(function (q, k) {
+        spriteOf[k] = -1;
+        if (parts && q.of && parts[q.of]) return;
+        var key, im, sp;
+        if (parts && q.part && parts[q.part]) {
+          im = parts[q.part]; key = 'p:' + q.part;
+          if (imgOf[key] === undefined) { imgOf[key] = images.length; images.push({ part: q.part, w: im.w, h: im.h, src: im }); }
+          var bx = im.box, pv = bx ? [-bx[0] * im.w / (bx[2] - bx[0]), -bx[1] * im.h / (bx[3] - bx[1])] : im.axis === 'ball' || !(q.end || q.b) ? [im.w / 2, im.h / 2] : im.axis === 'right' ? [0, im.h / 2] : [im.w / 2, 0];
+          sp = { name: q.g + '/' + q.part, part: q.part, joint: q.j, image: imgOf[key], pivot: pv };
+        } else {
+          var d = q.b ? [q.b[0] - q.a[0], q.b[1] - q.a[1], q.b[2] - q.a[2]] : null, L = d ? Math.round(Math.sqrt(dot3(d, d)) * ppm) : 0, rp = Math.max(Math.round(q.r * ppm * 4) / 4, 0.75);
+          key = 's:' + L + ':' + rp + ':' + q.col + (q.sq ? 'q' : '') + (q.b ? '' : 'o');
+          if (imgOf[key] === undefined) { var cp = capsulePixels(L, rp, R.shade(q.col, -1).rgb, !!q.sq && !!q.b, M2); imgOf[key] = images.length; images.push({ w: cp.w, h: cp.h, rgba: cp.rgba, L: L, rp: rp }); }
+          sp = { name: q.g + '/' + (q.part || q.of || 'shape'), part: null, joint: q.j, image: imgOf[key], pivot: [M2 + rp, M2 + rp], capsule: [L, rp] };
+        }
+        spriteOf[k] = sprites.length; sprites.push(sp);
+      });
+      // the atlas
+      var pk = packRects(images.map(function (im) { return [im.w, im.h]; }), 1), W = pk.w, H = pk.h, rgba = new Uint8Array(W * H * 4), missing = [];
+      images.forEach(function (im, k) {
+        var px = im.rgba, x, y;
+        if (!px && im.src) px = im.src.rgba || (im.src.img && im.src.img.getContext ? im.src.img.getContext('2d').getImageData(0, 0, im.w, im.h).data : null);
+        if (!px) { missing.push(im.part); return; }
+        for (y = 0; y < im.h; y++) rgba.set(px.subarray ? px.subarray(y * im.w * 4, (y + 1) * im.w * 4) : px.slice(y * im.w * 4, (y + 1) * im.w * 4), ((pk.at[k][1] + y) * W + pk.at[k][0]) * 4);
+      });
+      if (missing.length) throw new Error('No pixels were given for the picture of: ' + missing.join(', '));
+      var json = { format: 'clio-motion-cutout', version: 1, id: ch.id, name: name, image: name + '_cutout.png', size: [W, H],
+        axes: 'x forward (to the right), y down, metres; the ground under the body is y = 0. Angles in radians, clockwise on the screen.',
+        frame: ['x', 'y', 'angle', 'scaleX', 'scaleY', 'order', 'tint'],
+        sprites: sprites.map(function (sp) {
+          var im = images[sp.image], at = pk.at[sp.image], o2 = { name: sp.name, part: sp.part, joint: sp.joint, rect: [at[0], at[1], im.w, im.h], pivot: [r5(sp.pivot[0]), r5(sp.pivot[1])] };
+          if (sp.capsule) o2.capsule = sp.capsule;          // a plain shape: its length between the round ends and its radius, in picture pixels
+          return o2;
+        }),
+        clips: {} };
+      clips.forEach(function (c) {
+        // a climb is in place: the body is brought down to where it would stand
+        var frames = [], ok = true, lift = c.ladder ? c.frames[0].root[1] - ch.rootHeight - 0.1 : 0;
+        c.frames.forEach(function (pose) {
+          var prims = R.buildPrims(pose, ch, { flash: false, model: true });
+          if (prims.length !== n) { ok = false; return; }
+          var items = R.sprites(prims, proj, 1, parts), row = new Array(sprites.length);
+          items.forEach(function (it, z) {
+            var q = it.q, sp = spriteOf[q.i], S = sprites[sp], im = images[S.image], x, y, ang, sx, sy, tint;
+            if (it.kind === 'part') {
+              var at = it.at, lx = at.fx * (at.dx + S.pivot[0] * at.dw / im.w), ly = at.fy * (at.dy + S.pivot[1] * at.dh / im.h), cs = Math.cos(at.rot), sn = Math.sin(at.rot);
+              x = at.x + cs * lx - sn * ly; y = at.y + sn * lx + cs * ly; ang = at.rot; sx = at.fx * at.dw / im.w; sy = at.fy * at.dh / im.h; tint = it.dark ? 0.68 : 1;
+            } else {
+              var a = q.pa, b = q.pb, ex = b ? b[0] - a[0] : 0, ey = b ? b[1] - a[1] : 0, dist = Math.sqrt(ex * ex + ey * ey), lv = R.level(q);
+              ang = dist > 1e-9 ? Math.atan2(ey, ex) : 0; sy = q.r / im.rp; sx = b ? (dist + 2 * q.r) / (im.L + 2 * im.rp) : sy;
+              var off = b ? -q.r + im.rp * sx : 0;                  // the picture's pivot is the middle of its first round end
+              x = a[0] + Math.cos(ang) * off; y = a[1] + Math.sin(ang) * off; tint = lv < 0 ? 1 : 0.6 + 0.1 * lv;
+            }
+            row[sp] = [r5(x), r5(y + lift), r5(ang), +sx.toPrecision(6), +sy.toPrecision(6), z, Math.round(tint * 100) / 100];
+          });
+          frames.push(row);
+        });
+        if (!ok) return;
+        var nF = frames.length, info = { loop: c.loop, seconds: +c.duration.toFixed(4), metresPerSecond: +c.speed.toFixed(3), times: [], frames: frames };
+        for (i = 0; i < nF; i++) info.times.push(+(c.duration * i / nF).toFixed(5));
+        if (c.travel) info.metres = +c.travel.toFixed(3);
+        if (c.rise) info.metresUp = +c.rise.toFixed(3);
+        json.clips[c.name] = info;
+      });
+      return { json: json, rgba: rgba, w: W, h: H };
+    }
+
     // ----------------------------------------------------------------- CLIo
     // CLIo draws a sprite as rows of palette letters, with optional "walk" and "attack" drawings
     // of the same size. Its first-person levels show monsters from the front, so that is the default view.
@@ -595,7 +700,8 @@
       return {
         format: 'clio-motion-rig', version: 1, id: ch.id, name: kit ? ch.id + '_' + kit : ch.id, kit: kit || (ch.mount.type === 'held' ? ch.mount.kit : null), kind: ch.kind,
         units: 'metres', axes: { up: '+Y', forward: '+Z', right: '-X' }, height: Math.round(top * 1e4) / 1e4, leg: ch.L, pose: 'template',
-        joints: prims.joints.map(function (j) { return { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; }),
+        // carried: a joint for something the body carries (a weapon, its magazine, a pack, a load), not part of the body
+        joints: prims.joints.map(function (j) { var o2 = { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; if (ch.kind === 'biped' && /^(Weapon|Magazine|Shield|Grenade|Carry|Pack)/.test(j.name)) o2.carried = true; return o2; }),
         parts: prims.map(function (q) { return { joint: q.j, group: q.g, slot: q.part || q.of || null, a: r6(conv(q.a)), b: q.b ? r6(conv(q.b)) : null, r: q.r, color: q.col }; }),
         slots: (R.SLOTS[ch.id] || []).map(function (sl) { return { id: sl[0], label: sl[1], axis: sl[2] }; }),
         clips: clipNames(ch)
@@ -939,6 +1045,6 @@
 
     return { record: record, recordAll: recordAll, clipNames: clipNames, walkSpeed: walkSpeed, runSpeed: runSpeed, newPalette: newPalette, rasterize: rasterize,
       framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned,
-      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
+      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, cutout: cutout, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
   };
 });

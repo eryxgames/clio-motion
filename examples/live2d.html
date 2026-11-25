@@ -1,0 +1,79 @@
+<!doctype html>
+<!-- Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE). SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIo Motion: a drawn character, live in 2D</title>
+<style>
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: #f3f4f1; color: #16181d; }
+  main { max-width: 860px; margin: 0 auto; padding: 18px; }
+  canvas { width: 100%; height: 420px; background: #fff; border: 1px solid #c9cdc6; display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  p { max-width: 70ch; }
+  kbd { border: 1px solid #b4b8b0; border-radius: 3px; padding: 0 4px; background: #fff; }
+</style>
+</head>
+<body>
+<main>
+<h1>A drawn character, live in 2D</h1>
+<p>The motion core runs every frame and the character is drawn from its pose, in your own drawing if you load one
+(made on <code>templates/2d</code>). Nothing is baked. <kbd>Left</kbd> <kbd>Right</kbd> walk, with <kbd>Shift</kbd>
+run, <kbd>Space</kbd> jumps, <kbd>K</kbd> knocks it down and stands it up again.</p>
+<div class="row">
+  <label>Character <select id="who"></select></label>
+  <label>Drawing (.svg) <input type="file" id="drawing" accept=".svg,image/svg+xml"></label>
+</div>
+<canvas id="view" width="860" height="420" tabindex="0"></canvas>
+<p id="note" role="status">Plain shapes. Load a drawing to see it move.</p>
+</main>
+<script src="../js/core.js"></script>
+<script src="../js/rig.js"></script>
+<script src="../js/drawing.js"></script>
+<script>
+(function () {
+  'use strict';
+  var M = MotionCore, R = GaitRig, cv = document.getElementById('view'), ctx = cv.getContext('2d'), note = document.getElementById('note'), who = document.getElementById('who');
+  var STYLE = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3 }, env = { terrain: function (x) { return 0.25 * Math.sin(0.5 * x) + 0.08 * Math.sin(1.7 * x + 1); } };
+  var ch, S, art = {}, keys = {}, heading = 0, last = null, once = {};
+  Object.keys(M.CHARACTERS).forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = M.CHARACTERS[id].label; who.appendChild(o); });
+  function choose(id) { ch = M.CHARACTERS[id]; S = M.createState(ch, env); heading = 0; }
+  choose('soldier'); who.value = 'soldier';
+  who.addEventListener('change', function () { choose(who.value); note.textContent = art[ch.id] ? 'Using your drawing.' : 'Plain shapes. Load a drawing to see it move.'; });
+  document.getElementById('drawing').addEventListener('change', function () {
+    var f = this.files[0], c0 = ch; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      // once, when the drawing is loaded: cut it into the pictures of its parts
+      GaitDrawing.read(rd.result, c0, R).then(function (a) { art[c0.id] = a.parts; note.textContent = 'Using ' + f.name + ': ' + a.done.join(', ') + '.'; }, function (e) { note.textContent = e.message; });
+    };
+    rd.readAsText(f);
+  });
+  addEventListener('keydown', function (e) { if (!keys[e.code]) once[e.code] = true; keys[e.code] = true; if (/^(Arrow|Space)/.test(e.code)) e.preventDefault(); });
+  addEventListener('keyup', function (e) { keys[e.code] = false; });
+  function frame(now) {
+    var dt = last === null ? 1 / 60 : Math.min(1 / 20, (now - last) / 1000); last = now;
+    // the game's part: what the character should do
+    var go = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0), inp = { speed: 0, heading: heading };
+    if (go) { heading = go > 0 ? 0 : Math.PI; inp.heading = heading; inp.speed = keys.ShiftLeft || keys.ShiftRight ? Math.min(ch.vmax, 3.2 * Math.sqrt(ch.L / 0.92) + 1.5) : 1.5 * Math.sqrt(ch.L / 0.92); }
+    if (once.Space) inp.jump = true;
+    if (once.KeyK) { if (S.mode === 'ragdoll') M.stand(S, ch, env); else inp.die = {}; }
+    once = {};
+    // the library's part: the pose, then what to draw for it
+    var pose = M.step(S, ch, inp, STYLE, env, dt); S.events.length = 0;
+    var ppm = 190 / Math.max(1, ch.viewH / 2.25), view = { cx: S.px, cy: env.terrain(S.px), cz: S.pz, yaw: 0, pit: 0, ppm: ppm, ox: cv.width / 2, oy: 330 };
+    var proj = R.projector(view), items = R.sprites(R.buildPrims(pose, ch), proj, ppm, art[ch.id] || null);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#d9dcd5'; ctx.beginPath(); ctx.moveTo(0, cv.height);
+    for (var x = 0; x <= cv.width; x += 6) ctx.lineTo(x, proj([S.px + (x - cv.width / 2) / ppm, env.terrain(S.px + (x - cv.width / 2) / ppm), S.pz])[1]);
+    ctx.lineTo(cv.width, cv.height); ctx.fill();
+    R.drawSprites(ctx, items);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.live2dExample = { keys: keys, state: function () { return S; } };
+})();
+</script>
+</body>
+</html>

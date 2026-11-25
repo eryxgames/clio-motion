@@ -555,6 +555,38 @@
     }
     return o;
   }
+  /* What to draw for a body, back to front: for a game that draws in 2D, live. prims: buildPrims(pose, character);
+     proj: a projector; ppm: its pixels to a metre; parts (optional): pictures by part name, as a drawing gives them
+     (drawing.js) or as loaded one by one ({ img, w, h, axis }). Each item is one of
+       { kind: 'part', slot, im, dark, at }      a picture: at is where it goes (partPlace); dark: on the far side
+       { kind: 'cap', a, b, r, col, sq }         a plain capsule from a to b on the screen, r thick; sq: square ends
+       { kind: 'ball', a, r, col }               a plain disc
+     col is { css, rgb }. A part that has a picture hides the plain shapes it stands for. */
+  function sprites(prims, proj, ppm, parts) {
+    var sorted = order(prims, proj), out = [], i, q, lv;
+    for (i = 0; i < sorted.length; i++) {
+      q = sorted[i]; lv = level(q);
+      if (parts && q.of && parts[q.of]) continue;
+      if (parts && q.part && parts[q.part]) out.push({ kind: 'part', slot: q.part, im: parts[q.part], dark: lv < 2, at: partPlace(parts[q.part], q.pa, q.pe || q.pb, q.r * ppm, ppm, sorted.flip), q: q });
+      else out.push({ kind: q.pb ? 'cap' : 'ball', a: q.pa, b: q.pb, r: Math.max(q.r * ppm, 0.6), col: shade(q.col, lv), sq: !!q.sq, q: q });
+    }
+    return out;
+  }
+  /* Draws what sprites() lists on a 2D canvas. A picture is im.img, or im.dark for the far side if there is one. */
+  function drawSprites(c, items) {
+    for (var i = 0; i < items.length; i++) {
+      var s = items[i];
+      if (s.kind === 'part') {
+        var o = s.at;
+        c.save(); c.translate(o.x, o.y); if (o.rot) c.rotate(o.rot); if (o.fx !== 1 || o.fy !== 1) c.scale(o.fx, o.fy);
+        c.drawImage(s.dark && s.im.dark ? s.im.dark : s.im.img, o.dx, o.dy, o.dw, o.dh); c.restore();
+      } else if (s.kind === 'cap') {
+        var bx = s.b[0], by = s.b[1];
+        if (Math.abs(bx - s.a[0]) + Math.abs(by - s.a[1]) < 0.05) bx += 0.05;
+        c.lineCap = s.sq ? 'butt' : 'round'; c.strokeStyle = s.col.css; c.lineWidth = 2 * s.r; c.beginPath(); c.moveTo(s.a[0], s.a[1]); c.lineTo(bx, by); c.stroke();
+      } else { c.fillStyle = s.col.css; c.beginPath(); c.arc(s.a[0], s.a[1], s.r, 0, 6.2832); c.fill(); }
+    }
+  }
   /* The other way, for reading a drawing: the turn and shift that take a point of the page into the bone's frame
      (the one im.box is measured in), for a bone drawn from a to b on the page. { rot (radians), x, y }: turn the page
      by rot about the origin after moving (x, y) to it. */
@@ -586,6 +618,6 @@
     return go(o, null);
   }
 
-  return { partPlace: partPlace, partFrame: partFrame, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });

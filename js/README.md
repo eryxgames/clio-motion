@@ -39,6 +39,9 @@ The clip list must include `idle`: it is the rest pose.
 - `<id>_sheet.png` and `<id>_sheet.json`: sprite sheet and atlas in the JSON-hash form
   (`frames`, `animations`, `meta.frameTags`). `meta.clips` gives each clip's length in seconds
   and ground speed in metres per second; `meta.pivot` is the point on the ground under the body.
+- `<id>_cutout.png` and `<id>_cutout.json`: the character as a 2D cutout. Every part is a picture
+  of its own in the `.png`; the `.json` says where each picture is in every frame of every clip.
+  See "2D: live, and as a cutout" below.
 - `<id>_clio.json`: an entry for CLIo's `sprites.json` (`palette`, `pixels`, `walk`, `attack`, `muzzle`).
 
 Clips: `idle`, `walk`, `back`, `left`, `right` (walking backwards and stepping sideways while
@@ -90,7 +93,51 @@ facing forwards), `run` (trot for the quadruped), `sneak`, `jump`, `attack`, `hi
 - `B.glbFollows(ch, clips, bytes, bindPose)`: how closely a skinned file follows the rig (the
   stand-in model's parts, carried by the file's joints, against where the rig puts them).
 - `B.svgTemplate(ch)`: the drawing template. `R.partPlace` and `R.partFrame` say where a part's
-  picture goes on its bone, and take a drawing apart.
+  picture goes on its bone, and take a drawing apart. In the rig file, a joint marked `carried`
+  is for something the body carries (weapon, magazine, pack, load): the body's own skin is not
+  weighted to it.
+
+## 2D: live, and as a cutout
+
+Live, in a JavaScript game: the core gives a pose every frame, `rig.js` says what to draw for it.
+
+    const prims = R.buildPrims(pose, ch);                       // the character's parts, in the world
+    const proj = R.projector({ cx: camX, cy: camY, cz: S.pz, yaw: 0, pit: 0, ppm: 120, ox: 400, oy: 300 });
+    const items = R.sprites(prims, proj, 120, art);             // what to draw, back to front
+    R.drawSprites(ctx, items);                                  // on a 2D canvas; or draw the items yourself
+
+`art` is optional: the pictures of the parts, by name. `GaitDrawing.read(svgText, ch, R)`
+(`js/drawing.js`, browser only) makes them from a character drawn on its template and resolves
+to `{ parts, done, empty, missing, failed, linked }`; pass `parts`. Without it the plain shapes
+are drawn. Each item is a picture with the place `R.partPlace` gives it, or a plain capsule or
+disc with its colour. The body turns round by itself when its heading does; far-side parts come
+darker (`im.dark`). `examples/live2d.html` is a complete page.
+
+As a cutout, for any engine: `B.cutout(ch, clips, { parts })` returns `{ json, rgba, w, h }`, the
+description and the atlas (the baker and Gait Bench write them as `<id>_cutout.json` and
+`<id>_cutout.png`). In the file:
+
+- `sprites[i]`: `rect` `[x, y, w, h]`, the picture's place in the `.png`; `pivot` `[u, v]`, a
+  point of that picture in pixels from its top left (for a drawn part, its joint); `part`, the
+  drawn part it shows or null for a plain shape; `joint`, the skeleton joint it hangs on.
+- `clips[name]`: `loop`, `seconds`, `metresPerSecond`, `times`, and `frames[f][i]` =
+  `[x, y, angle, scaleX, scaleY, order, tint]` for sprite `i`: put the pivot at (x, y), in metres,
+  x to the right and y down with the ground at 0; turn the picture by `angle` (radians, clockwise
+  on the screen); scale it by `scaleX`, `scaleY` (metres to a picture pixel; negative means
+  mirrored); draw in rising `order`; multiply its colour by `tint`.
+- Between two frames move, turn (the short way round) and scale in a straight line; take order
+  and tint from the earlier one; if a scale changes sign (the body has turned round), hold the
+  earlier frame. A looping clip runs from its last frame into its first.
+
+`js/cutout.js` is a complete player (`GaitCutout.sample`, `GaitCutout.draw`) and needs no other
+file. `tools/godot/clio_cutout.gd` is the same for Godot 4; it was written from Godot's
+documentation and has not been run. For Unity: y is up there, so use (x, -y), turn by -angle,
+and measure the pivot from the picture's bottom left.
+
+The cutout shows the body from its right side, in place, like the sprite sheet; mirror the whole
+character to face left. A plain shape's picture is stretched along its length as the part
+foreshortens, so its round ends flatten a little. Muzzle flashes and the carried crate are not in
+it.
 
 ## Engines
 
