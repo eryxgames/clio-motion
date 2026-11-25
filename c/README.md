@@ -9,8 +9,9 @@ interface.
     make            # libclio_motion.a, then the tests against the JavaScript reference
     make test
 
-Ported so far: the numeric kernel (stage 1), the ground step (stage 2), and whole bodies on the
-ground (stage 3) for all twelve characters: weapons, actions, spines, tails, claws, arms.
+Ported so far: the numeric kernel (stage 1), the ground step (stage 2), whole bodies on the
+ground (stage 3) for all twelve characters, and off the ground (stage 4a): swimming, flight, the
+ladder and the ledge.
 
     static double ground(double x, double z, void *user) { return 0.0; }
 
@@ -31,17 +32,21 @@ ground (stage 3) for all twelve characters: weapons, actions, spines, tails, cla
     for (i = 0; i < S.n_events; i++) { /* S.events[i].type: CM_EV_FIRE, CM_EV_LAND, CM_EV_THROW, ... */ }
     S.n_events = 0;
 
+Off the ground, a call changes the mode and `cm_step` carries on: `cm_enter_fly` / `cm_leave_fly`
+(the wasp, the dragon; `in.speed`, `in.steer`, `in.height`), `cm_enter_swim` / `cm_leave_swim` (the
+octopus; `in.depth`, `in.ink`), `cm_enter_ladder` / `cm_leave_ladder` (a `cm_ladder` with a rung
+function; `in.speed` climbs), `cm_grab_ledge` (then `in.climb` or `in.drop`), `cm_place`.
 `cm_step_ground` gives the legs and hips alone.
 
-No allocation: the state is one struct of about 8 KB, the pose about 5.5 KB. Whole steps a second
+No allocation: the state is one struct of about 12 KB, the pose about 5.5 KB. Whole steps a second
 on one core: about 490,000 for the soldier, 240,000 for the hyena, 170,000 for the scorpion,
-140,000 for the dragon, 90,000 for the octopus.
+140,000 for the dragon, 90,000 for the octopus; in the air 240,000 for the wasp and 130,000 for
+the dragon; 70,000 for the octopus swimming.
 
 The Makefile turns fused multiply-add off (`-ffp-contract=off`) so that every platform rounds the
 way the JavaScript reference does. The kernel agrees with the reference to the last bit or two
-on 921 recorded cases; the ground step and the whole-body step reproduce 24 and 48 recorded runs
+on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 61 recorded runs
 to the ten digits they are recorded with (they also do with fused multiply-add on, on the machine
 they were tried on).
 
-Next: swimming, flight, ladder, ledge and ragdoll (stage 4); the Unity, Godot and Unreal wrappers
-sit on top of that.
+Next: the ragdoll and riding (stage 4b); the Unity, Godot and Unreal wrappers sit on top of that.

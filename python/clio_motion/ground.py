@@ -148,6 +148,13 @@ class State:
         self.jaw = Spring()
         self.chains = {}
         self.ink_t = 0.0
+        # off the ground (stage 4)
+        self.swim = None
+        self.fly = None
+        self.lad = None
+        self.ladder = None
+        self.lad_frame = None
+        self.ledge = None
         self.local = None
         self.legs = [Leg([l["rest"][0], terrain(l["rest"][0], 0.0), l["rest"][1]], g0) for l in ch["legs"]]
 

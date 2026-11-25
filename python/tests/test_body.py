@@ -6,6 +6,7 @@ every number of the pose, the count of each event and the sum of what the events
     python python/tests/test_body.py            every replay
     python python/tests/test_body.py soldier    those whose name starts so
 """
+import math
 import os
 import sys
 
@@ -21,7 +22,9 @@ TOL = 1e-6
 KITS = (None, "rifle", "pistols", "sword")
 PUNCHES = (None, "jab", "cross", "hook")
 SWINGS = (None, "slash", "chop", "thrust")
-TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop", "bite", "pounce", "pinch", "sting", "ink")
+TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop", "bite", "pounce", "pinch", "sting", "ink",
+         "grip", "top")
+MODES = ("ground", "ladder", "ragdoll", "swim", "fly", "ledge", "ride")
 
 
 def inputs(v):
@@ -57,6 +60,11 @@ def inputs(v):
         if how:
             inp[name] = {"target": w[37 + 4 * k: 40 + 4 * k]} if how > 1 else {}
     inp["ink"] = bool(w[52])
+    if w[53]:
+        inp["depth"] = w[54]
+    if w[55]:
+        inp["height"] = w[56]
+    inp["climb"], inp["drop"] = bool(w[57]), bool(w[58])
     return inp
 
 
@@ -84,19 +92,42 @@ def play(path):
     g = [float(x) for x in lines[1].split()[1:]]
     nw = int(g[0])
     terrain = ground([g[1 + 4 * k: 5 + 4 * k] for k in range(nw)], (g[2 + 4 * nw], g[3 + 4 * nw]) if g[1 + 4 * nw] else None)
-    changes, wants = {}, []
+    changes, calls, wants, ladder = {}, {}, [], None
     for ln in lines[2:]:
         w = ln.split()
         if not w:
             continue
         if w[0] == "i":
             changes[int(w[1])] = inputs([float(x) for x in w[2:]])
+        elif w[0] == "c":
+            calls.setdefault(int(w[1]), []).append([float(x) for x in w[2:]])
+        elif w[0] == "l":
+            lx, y0, spacing, amp, freq, phase = [float(x) for x in w[1:7]]
+            ladder = cm.Ladder(lx, y0, spacing, lambda k, y0=y0, spacing=spacing, amp=amp, freq=freq, phase=phase: y0 + k * spacing + amp * math.sin(freq * k + phase))
         else:
             wants.append([float(x) for x in w[2:]])
     S = cm.create_state(ch, terrain)
     inp, dt, k, tally, evsum = {}, 1 / hz, 0, [0] * len(TALLY), 0.0
     bad, worst, first = 0, 0.0, None
     for i in range(steps):
+        for c in calls.get(i, ()):
+            code = int(c[0])
+            if code == 1:
+                cm.enter_swim(S, ch)
+            elif code == 2:
+                cm.leave_swim(S, ch, terrain)
+            elif code == 3:
+                cm.enter_fly(S, ch)
+            elif code == 4:
+                cm.leave_fly(S, ch, terrain)
+            elif code == 5:
+                cm.enter_ladder(S, ch, ladder)
+            elif code == 6:
+                cm.leave_ladder(S, ch, terrain)
+            elif code == 7:
+                cm.grab_ledge(S, ch, c[1:4])
+            elif code == 8:
+                cm.place(S, ch, terrain, c[1], c[2], c[3])
         inp = changes.get(i, inp)
         pose = cm.step(S, ch, inp, cm.STYLE, terrain, dt)
         for e in S.events:
@@ -105,7 +136,7 @@ def play(path):
             evsum += sum(flat(e, []))
         S.events.clear()
         if i % every == every - 1:
-            got, want = flat(pose, []) + tally + [evsum], wants[k]
+            got, want = flat(pose, []) + tally + [evsum, MODES.index(S.mode)], wants[k]
             k += 1
             if len(got) != len(want):
                 bad += 1

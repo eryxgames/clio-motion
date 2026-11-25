@@ -29,6 +29,7 @@ typedef struct {
   double root[3], pitch, Tn, idle, P, bank, sway0, flex, prep, lean_base, aim[3], drift[2];
   double hip[CM_MAX_LEGS][3], knee[CM_MAX_LEGS][3], ankle[CM_MAX_LEGS][3];      /* the legs in the body's frame */
   int has_aim, leg0_side;
+  double fly_ax[3], fly_up[3];                 /* in the air: the body's long axis and its up, before the back's own lean */
   cm_gait_params gp;
 } cm_bctx;
 

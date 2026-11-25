@@ -50,7 +50,10 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
       + num(az ? az.half : 0) + ', ' + num(az ? az.strike || 0.5 : 0) + ', ' + list(az && az.thorax || [0, 0, 0, 0]) + ', ' + list(az && az.head || [0, 0]) + ', ' + list(az && az.stingAt || [0, 0]) + ',');
     out.push('    ' + list(cw ? cw.at : [0, 0, 0]) + ', ' + [cw ? cw.upper : 0, cw ? cw.lower : 0, cw ? cw.hand : 0].map(num).join(', ') + ', ' + list(cw ? cw.rest : [0, 0, 0]) + ', ' + list(cw && cw.strikeAt || [0, 0, 0]) + ',');
     out.push('    ' + (oc ? 1 : 0) + ', ' + num(oc ? oc.mantle : 0) + ', ' + num(oc ? oc.arm.seg : 0) + ', ' + (fl ? 1 : 0) + ', ' + (fl && fl.zfold === false ? 0 : 1) + ', ' + list(fl ? fl.at : [0, 0, 0]) + ', '
-      + [fl ? fl.w1 : 0, fl ? fl.w2 : 0, fl ? fl.chord : 0, fl ? fl.sweep || 0.15 : 0].map(num).join(', ') + ' },');
+      + [fl ? fl.w1 : 0, fl ? fl.w2 : 0, fl ? fl.chord : 0, fl ? fl.sweep || 0.15 : 0].map(num).join(', ') + ',');
+    const oa = oc && oc.arm, F = fl || {};
+    out.push('    ' + num(oc ? oc.vswim : 0) + ', { ' + (oa ? oa.n : 0) + ', ' + (oa ? [oa.seg, oa.rest, oa.curl, oa.omega, oa.zeta || 0.45, or(oa.soft, 0.5), or(oa.sag, 0.2), oa.bend || 1.3, or(oa.inert, 1)] : [0, 0, 0, 0, 0, 0, 0, 0, 0]).map(num).join(', ') + ' },');
+    out.push('    ' + (F.hover ? 1 : 0) + ', ' + (F.glide ? 1 : 0) + ', ' + [F.beat || 0, F.amp || 0, F.vmin || 0, F.vmax || 0, F.turn || 0, F.acc || 0, F.climb || 0, F.sink || 0, F.height || 0, F.low || 0, F.heave || 0, F.pitch0 || 0, F.slowPitch || 0].map(num).join(', ') + ', ' + list(F.hang || [0, 0]) + ' },');
   });
   out.push('};', '', 'int cm_character_count(void) { return (int)(sizeof CHARACTERS / sizeof CHARACTERS[0]); }',
     'const cm_character *cm_character_at(int i) { return i >= 0 && i < cm_character_count() ? &CHARACTERS[i] : 0; }',

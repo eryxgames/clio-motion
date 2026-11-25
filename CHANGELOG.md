@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.0
+
+- C99 and Python, stage 4a: off the ground. Swimming (the octopus: jets, depth, arms as chains),
+  flight (the wasp and the dragon: wingbeat, glide, bank, hanging legs, attacks in the air), the
+  ladder (hands and feet on real rungs) and the ledge grab (hang, pull up, drop). `cm_step` and
+  `step` follow a character through whichever of these it is in. Both reproduce 61 replays.
+- `spec/body/`: replays now carry the calls that change mode, a ladder as data, and the mode in
+  every sample; seven more recorded runs (62 in all).
+
 ## 0.17.0
 
 - A horse: walk, trot and gallop, a tail of hair, a saddle. It runs in the C and Python versions

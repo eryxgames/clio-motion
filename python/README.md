@@ -2,8 +2,9 @@
 
 Pure Python, standard library only, so CLIo can carry it without a compiler.
 
-Ported so far: the numeric kernel (stage 1), the ground step (stage 2), and whole bodies on the
-ground (stage 3) for all twelve characters: weapons, actions, spines, tails, claws, arms.
+Ported so far: the numeric kernel (stage 1), the ground step (stage 2), whole bodies on the
+ground (stage 3) for all twelve characters, and off the ground (stage 4a): swimming, flight, the
+ladder and the ledge.
 
     import clio_motion as cm
 
@@ -31,8 +32,15 @@ Inputs (all optional). Legs: `speed` (m/s), `crouch` (0..1), `steer` (-1..1) or 
 `swing: {"kind": "slash" | "chop" | "thrust"}`. Animals: `bite`, `pinch`, `sting`, `grab` (each
 `{"target": [x, y, z]}` or `{}`), `ink`. They mean what they mean in `js/README.md`.
 
-`step_ground` gives the legs and hips alone. Swimming, flight, the ladder, the ledge and the
-ragdoll (stage 4) are not ported yet.
+Off the ground, a call changes the mode and `step` carries on:
+
+    cm.enter_fly(S, ch); cm.leave_fly(S, ch, ground)            # the wasp, the dragon; inputs speed, steer, height
+    cm.enter_swim(S, ch); cm.leave_swim(S, ch, ground)          # the octopus; inputs speed, steer, depth, ink
+    cm.enter_ladder(S, ch, cm.Ladder(x, y0, spacing)); cm.leave_ladder(S, ch, ground)    # speed climbs
+    cm.grab_ledge(S, ch, [x, y, z])                             # then climb or drop
+    cm.place(S, ch, ground, x, z, heading)
+
+`step_ground` gives the legs and hips alone. The ragdoll (`die`) and riding are not ported yet.
 
 Speed on one core, whole steps a second: about 5,000 for the soldier, 7,000 for the hyena and
 the dragon, 6,000 for the scorpion, 2,800 for the octopus.

@@ -43,6 +43,11 @@ static void lerp3(const double a[3], const double b[3], double t, double o[3]) {
 static void set3(double o[3], double x, double y, double z) { o[0] = x; o[1] = y; o[2] = z; }
 static void copy3(double o[3], const double a[3]) { o[0] = a[0]; o[1] = a[1]; o[2] = a[2]; }
 
+static void scale3(const double a[3], double k, double o[3]) { o[0] = a[0] * k; o[1] = a[1] * k; o[2] = a[2] * k; }
+static void axpy3(const double a[3], const double d[3], double k, double o[3]) { set3(o, a[0] + d[0] * k, a[1] + d[1] * k, a[2] + d[2] * k); }
+static void unit3(double a[3]) { double l = len3(a); if (l == 0) l = 1; scale3(a, 1 / l, a); }
+static void cross3(const double a[3], const double b[3], double o[3]) { set3(o, a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]); }
+
 static const kit_def *held_kit(const cm_state *S, const cm_character *ch) { return ch->mount_type == CM_MOUNT_HELD && S->kit ? &KITS[S->kit] : 0; }
 static void full_ammo(cm_state *S) {
   const kit_def *k = &KITS[S->kit];
@@ -115,7 +120,7 @@ int cm_start_reload(cm_state *S, const cm_character *ch, int asked) {
   const kit_def *kit = held_kit(S, ch);
   int q[2], nq = 0, i;
   cm_action *a;
-  if (!kit || kit->melee || S->act || S->armed.x < 0.8) return 0;
+  if (!kit || kit->melee || S->act || S->armed.x < 0.8 || (S->mode != CM_MODE_GROUND && S->mode != CM_MODE_RIDE)) return 0;
   for (i = 0; i < kit->n; i++) if (S->ammo[i] < PROPS[kit->props[i]].rounds) q[nq++] = i;
   if (!nq && asked) for (i = 0; i < kit->n; i++) q[nq++] = i;
   if (!nq) return 0;
@@ -132,7 +137,7 @@ static void fire_control(cm_state *S, const cm_character *ch, const cm_input *in
   S->cool -= dt;
   for (i = 0; i < 2; i++) { S->flash[i] = fmax(0, S->flash[i] - dt / 0.06); cm_spring_step(&S->kick[i], 0, ch->mount_omega, 0.6, dt); }
   cm_spring_step(&S->rise, 0, ch->mount_omega * 0.7, 0.7, dt);
-  if (!inp->fire || S->cool > 0 || S->act > CM_ACT_RELOAD || ch->mount_type == CM_MOUNT_JAW) return;
+  if (!inp->fire || S->cool > 0 || (S->mode != CM_MODE_GROUND && S->mode != CM_MODE_RIDE) || S->act > CM_ACT_RELOAD || ch->mount_type == CM_MOUNT_JAW) return;
   if (kit) {
     if (S->armed.x < 0.8) return;
     /* the next gun in turn that has rounds and is not being reloaded; with none left, fire starts a reload */
@@ -256,7 +261,7 @@ static void beast_tick(cm_state *S, const cm_character *ch, const cm_input *inp,
   double k = sqrt(ch->L / 0.7), q;
   memset(AC, 0, sizeof *AC);
   S->act_back = 0; S->act_crouch = 0;
-  if (inp->bite && !S->act && J->stage == CM_JUMP_NONE) { a = new_action(S, CM_ACT_BITE, 0.46 * k); if (inp->bite > 1) { a->has_target = 1; copy3(a->target, inp->bite_target); } }
+  if (inp->bite && !S->act && (S->mode == CM_MODE_GROUND || S->mode == CM_MODE_FLY) && J->stage == CM_JUMP_NONE) { a = new_action(S, CM_ACT_BITE, 0.46 * k); if (inp->bite > 1) { a->has_target = 1; copy3(a->target, inp->bite_target); } }
   if (S->act == CM_ACT_BITE) {
     a->t += dt; q = fmin(a->t / a->dur, 1);
     AC->ext = cm_smooth(0.05, 0.34, q) * (1 - cm_smooth(0.42, 1, q));
@@ -274,11 +279,11 @@ static void beast_tick(cm_state *S, const cm_character *ch, const cm_input *inp,
    over the head onto the target. */
 static void arthro_tick(cm_state *S, const cm_character *ch, const cm_input *inp, double dt, act_out *AC) {
   cm_action *a = &S->action;
-  int free_ = !S->act;
+  int free_ = !S->act && (S->mode == CM_MODE_GROUND || S->mode == CM_MODE_FLY);
   double q;
   memset(AC, 0, sizeof *AC);
   S->act_back = 0; S->act_crouch = 0;
-  if (ch->arthro_rock != 0 && S->standing) S->act_back = ch->arthro_rock * sin(TAU * S->t / 1.4);       /* a mantis rocks like a leaf in the wind */
+  if (ch->arthro_rock != 0 && S->standing && S->mode == CM_MODE_GROUND) S->act_back = ch->arthro_rock * sin(TAU * S->t / 1.4);       /* a mantis rocks like a leaf in the wind */
   if (inp->pinch && free_) { a = new_action(S, CM_ACT_PINCH, ch->arthro_strike); if (inp->pinch > 1) { a->has_target = 1; copy3(a->target, inp->pinch_target); } }
   else if (inp->sting && free_ && ch->has_tail) { a = new_action(S, CM_ACT_STING, 0.72); if (inp->sting > 1) { a->has_target = 1; copy3(a->target, inp->sting_target); } }
   if (S->act == CM_ACT_PINCH || S->act == CM_ACT_STING) {
@@ -299,7 +304,7 @@ static void octo_tick(cm_state *S, const cm_input *inp, double dt, act_out *AC) 
   double q;
   memset(AC, 0, sizeof *AC);
   S->act_back = 0; S->act_crouch = 0; S->ink_t = fmax(0, S->ink_t - dt);
-  if (inp->grab && !S->act) { a = new_action(S, CM_ACT_GRAB, 0.8); a->arm = -1; if (inp->grab > 1) { a->has_target = 1; copy3(a->target, inp->grab_target); } }
+  if (inp->grab && !S->act && S->mode == CM_MODE_GROUND) { a = new_action(S, CM_ACT_GRAB, 0.8); a->arm = -1; if (inp->grab > 1) { a->has_target = 1; copy3(a->target, inp->grab_target); } }
   if (S->act == CM_ACT_GRAB) {
     a->t += dt; q = fmin(a->t / a->dur, 1); AC->alert = 1;
     AC->ext = cm_smooth(0.04, 0.40, q) * (1 - cm_smooth(0.62, 1, q)); AC->lean = 0.15 * AC->ext; S->act_back = -0.05 * AC->ext;
@@ -316,13 +321,11 @@ typedef struct { double lift, yaw, curl, pull_k; double (*pull_pts)[3]; } chain_
    link is also a pendulum on a moving pivot: when the body speeds up, stops, bounces or turns, the links swing the
    other way. With pull_k > 0 the links are turned to pass through pull_pts (a strike). pts gets the n + 1 points,
    in the body's frame. */
-static void tail_step(cm_state *S, const cm_character *ch, const cm_bctx *B, const double base[3], double body_ang, const chain_ctl *ctl, double dt, double (*pts)[3]) {
-  cm_chain *C = &S->tail;
-  int n = ch->tail_n, k, sub, nsub, pulling = ctl->pull_pts && ctl->pull_k > 0;
-  double sz = sqrt(ch->L / 0.7), om0 = ch->tail_omega / sz, zeta = ch->tail_zeta, soft = ch->tail_soft, seg = ch->tail_seg, bend = ch->tail_bend;
-  double th0 = body_ang + PI + ch->tail_rest - ctl->lift, ps0 = cm_clamp(ctl->yaw, -1.2, 1.2), curl = ch->tail_curl + ctl->curl, sag = ch->tail_sag;
-  double vy, kf, hdt, inert = ch->tail_inert, pth, pps, pvt, pvp;
-  const double *dr = B->drift;
+static void chain_step(cm_state *S, cm_chain *C, const cm_chain_def *T, double l_size, const cm_frame *fr, const double dr[2], const double base[3], double body_ang, const chain_ctl *ctl, double dt, double (*pts)[3]) {
+  int n = T->n, k, sub, nsub, pulling = ctl->pull_pts && ctl->pull_k > 0;
+  double sz = sqrt(l_size / 0.7), om0 = T->omega / sz, zeta = T->zeta, soft = T->soft, seg = T->seg, bend = T->bend;
+  double th0 = body_ang + PI + T->rest - ctl->lift, ps0 = cm_clamp(ctl->yaw, -1.2, 1.2), curl = T->curl + ctl->curl, sag = T->sag;
+  double vy, kf, hdt, inert = T->inert, pth, pps, pvt, pvp;
   if (C->n != n) {
     memset(C, 0, sizeof *C);
     C->n = n; C->by = base[1]; C->dr[0] = dr[0]; C->dr[1] = dr[1];
@@ -361,7 +364,7 @@ static void tail_step(cm_state *S, const cm_character *ch, const cm_bctx *B, con
       if (fabs(ps) > smax) { ps = cm_clamp(ps, -smax, smax); C->vps[k] = 0; }
       cps = cos(ps);
       set3(q, prev[0] + seg * cos(th) * cps, prev[1] + seg * sin(th) * cps, prev[2] + seg * sin(ps));
-      gy = cm_ter(&B->fr, q[0], q[2]) + 0.03;
+      gy = cm_ter(fr, q[0], q[2]) + 0.03;
       if (q[1] < gy && prev[1] >= gy - 1e-6) {
         double sv = cm_clamp((gy - prev[1]) / (seg * fmax(cps, 0.2)), -1, 1), a1 = asin(sv), a2 = PI - a1;
         th = fabs(cm_wrap_pi(a1 - th)) < fabs(cm_wrap_pi(a2 - th)) ? a1 : a2; if (C->vth[k] * cos(th) < 0) C->vth[k] = 0;
@@ -371,6 +374,13 @@ static void tail_step(cm_state *S, const cm_character *ch, const cm_bctx *B, con
       pth = th; pps = ps; pvt = C->vth[k]; pvp = C->vps[k];
     }
   }
+}
+
+static void tail_step(cm_state *S, const cm_character *ch, const cm_bctx *B, const double base[3], double body_ang, const chain_ctl *ctl, double dt, double (*pts)[3]) {
+  cm_chain_def T;
+  T.n = ch->tail_n; T.seg = ch->tail_seg; T.rest = ch->tail_rest; T.curl = ch->tail_curl; T.omega = ch->tail_omega; T.zeta = ch->tail_zeta;
+  T.soft = ch->tail_soft; T.sag = ch->tail_sag; T.bend = ch->tail_bend; T.inert = ch->tail_inert;
+  chain_step(S, &S->tail, &T, ch->L, &B->fr, B->drift, base, body_ang, ctl, dt, pts);
 }
 
 /* An octopus arm through its leg: seven points on a curve from hip to tip, with links of one length. */
@@ -442,10 +452,6 @@ static double aim_from(cm_state *S, const cm_character *ch, const cm_bctx *B, co
 }
 
 typedef struct { int on; double p[3], k, pole[3]; } hand_over;
-static void scale3(const double a[3], double k, double o[3]) { o[0] = a[0] * k; o[1] = a[1] * k; o[2] = a[2] * k; }
-static void axpy3(const double a[3], const double d[3], double k, double o[3]) { set3(o, a[0] + d[0] * k, a[1] + d[1] * k, a[2] + d[2] * k); }
-static void unit3(double a[3]) { double l = len3(a); if (l == 0) l = 1; scale3(a, 1 / l, a); }
-static void cross3(const double a[3], const double b[3], double o[3]) { set3(o, a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]); }
 static void pos_event(cm_state *S, const cm_frame *fr, int type, const double local[3], int has_target, const double target[3], int which) {
   cm_event e;
   double d[3];
@@ -668,16 +674,47 @@ static void horizontal(cm_state *S, const cm_character *ch, const cm_bctx *B, cm
 static void point_w(const cm_frame *fr, double p[3]) { double t[3]; cm_to_w(fr, p, t); copy3(p, t); }
 static void dir_w(const cm_frame *fr, double d[3]) { double x = d[0] * fr->hc - d[2] * fr->hs, z = d[0] * fr->hs + d[2] * fr->hc; d[0] = x; d[2] = z; }
 
-int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
-  cm_bctx B;
+typedef struct { const cm_frame *fr; int roll; double c[3], ax[3], cs, sn; } xform;
+static void x_dir(const xform *x, double d[3]) {
+  if (x->roll) { double dp = dot3(x->ax, d) * (1 - x->cs), r[3]; cross3(x->ax, d, r); set3(d, d[0] * x->cs + r[0] * x->sn + x->ax[0] * dp, d[1] * x->cs + r[1] * x->sn + x->ax[1] * dp, d[2] * x->cs + r[2] * x->sn + x->ax[2] * dp); }
+  else dir_w(x->fr, d);
+}
+static void x_pt(const xform *x, double p[3]) {
+  if (x->roll) { double v[3]; sub3(p, x->c, v); x_dir(x, v); add3(x->c, v, p); }
+  else point_w(x->fr, p);
+}
+/* every point and direction of a horizontal body's pose, rolled about its long axis or moved to the world */
+static void x_pose(const xform *x, cm_pose *pose, int legs) {
+  int k, j;
+  x_dir(x, pose->axis); x_dir(x, pose->up); x_pt(x, pose->back); x_pt(x, pose->front); x_pt(x, pose->tail);
+  if (pose->body == CM_BODY_BEAST || pose->body == CM_BODY_QUAD) { x_pt(x, pose->neck); x_pt(x, pose->head); x_dir(x, pose->gaze); x_dir(x, pose->side); }
+  else { x_pt(x, pose->dome); x_pt(x, pose->eye); }
+  x_pt(x, pose->mount[0].joint); x_pt(x, pose->mount[0].base); x_pt(x, pose->mount[0].tip); x_dir(x, pose->mount[0].dir);
+  for (k = 0; k < pose->n_tail_pts; k++) x_pt(x, pose->tail_pts[k]);
+  for (k = 0; k < pose->n_claws; k++) {
+    cm_claw_pose *cl = &pose->claw[k];
+    x_pt(x, cl->shoulder); x_pt(x, cl->elbow); x_pt(x, cl->wrist); x_pt(x, cl->tip); x_pt(x, cl->finger_a); x_pt(x, cl->finger_b);
+  }
+  if (pose->has_thorax) { x_pt(x, pose->thorax[0]); x_pt(x, pose->thorax[1]); }
+  for (k = 0; k < pose->n_arms; k++) for (j = 0; j < 7; j++) x_pt(x, pose->arms[k][j]);
+  if (pose->has_mantle) { x_pt(x, pose->mantle_c); x_pt(x, pose->mantle_tip); }
+  for (k = 0; k < pose->n_wings; k++) { cm_wing_pose *w = &pose->wing[k]; x_pt(x, w->root); x_pt(x, w->mid); x_pt(x, w->tip); x_dir(x, w->t1); x_dir(x, w->t2); }
+  if (legs) {
+    x_pt(x, pose->base.root);
+    for (k = 0; k < pose->base.legs; k++) { cm_leg_pose *l = &pose->base.leg[k]; x_pt(x, l->hip); x_pt(x, l->knee); x_pt(x, l->ankle); x_pt(x, l->ball); }
+  }
+}
+
+/* The upper body, weapons and actions, on legs that are already worked out. On the ground the legs in pose->base are
+   in the world already; flying (wing_a, wing_a2: the wings' stroke), they are in the body's frame and are rolled and moved
+   with the rest. */
+static int body_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, double dt, const cm_bctx *Bp, cm_pose *pose, int flying, double wing_a, double wing_a2) {
+  cm_bctx B = *Bp;
   act_out AC;
   const double *root;
   double lean, FL, bank, sway0, u[3], f[3], zax[3];
   int biped = ch->kind == CM_BIPED, kit_want, busy, ready, i;
 
-  memset(pose, 0, sizeof *pose);
-  pose->kind = ch->kind;
-  cm_ground_core(S, ch, inp, st, terrain, user, dt, &pose->base, &B);
   root = B.root;
   /* kits: the weapons are put away before changing to another set, then the new ones come up */
   kit_want = ch->mount_type == CM_MOUNT_HELD ? (inp->kit >= CM_KIT_RIFLE && inp->kit <= CM_KIT_SWORD ? inp->kit : S->kit) : CM_KIT_NONE;
@@ -701,23 +738,19 @@ int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_s
   pose->lean = lean; pose->pack = cm_clamp(S->pack.x, -0.06 * ch->L, 0.06 * ch->L);
 
   if (!biped && ch->kind != CM_MECH) {
-    int k, j;
+    xform x;
     horizontal(S, ch, &B, pose, &AC, lean, FL, dt);
-    if (ch->has_fly) { wing_pose(ch, root, pose->axis, pose->up, 0, 0, 1, pose->wing); pose->n_wings = 2; }      /* on the ground the wings are folded along the body */
-    /* to the world: points are moved and turned, directions only turned */
-    dir_w(&B.fr, pose->axis); dir_w(&B.fr, pose->up); point_w(&B.fr, pose->back); point_w(&B.fr, pose->front); point_w(&B.fr, pose->tail);
-    if (pose->body == CM_BODY_BEAST || pose->body == CM_BODY_QUAD) { point_w(&B.fr, pose->neck); point_w(&B.fr, pose->head); dir_w(&B.fr, pose->gaze); dir_w(&B.fr, pose->side); }
-    else { point_w(&B.fr, pose->dome); point_w(&B.fr, pose->eye); }
-    point_w(&B.fr, pose->mount[0].joint); point_w(&B.fr, pose->mount[0].base); point_w(&B.fr, pose->mount[0].tip); dir_w(&B.fr, pose->mount[0].dir);
-    for (k = 0; k < pose->n_tail_pts; k++) point_w(&B.fr, pose->tail_pts[k]);
-    for (k = 0; k < pose->n_claws; k++) {
-      cm_claw_pose *cl = &pose->claw[k];
-      point_w(&B.fr, cl->shoulder); point_w(&B.fr, cl->elbow); point_w(&B.fr, cl->wrist); point_w(&B.fr, cl->tip); point_w(&B.fr, cl->finger_a); point_w(&B.fr, cl->finger_b);
+    /* on the ground the wings are folded along the body */
+    if (ch->has_fly) { wing_pose(ch, root, flying ? B.fly_ax : pose->axis, flying ? B.fly_up : pose->up, flying ? wing_a : 0, flying ? wing_a2 : 0, flying ? 0 : 1, pose->wing); pose->n_wings = 2; }
+    memset(&x, 0, sizeof x); x.fr = &B.fr;
+    if (flying) {
+      /* the whole body banks: it is rolled about its long axis */
+      x.roll = 1; copy3(x.c, root); copy3(x.ax, B.fly_ax); x.cs = cos(S->bank.x); x.sn = sin(S->bank.x);
+      copy3(pose->base.root, root); pose->flying = 1;
+      x_pose(&x, pose, 1);
+      x.roll = 0;
     }
-    if (pose->has_thorax) { point_w(&B.fr, pose->thorax[0]); point_w(&B.fr, pose->thorax[1]); }
-    for (k = 0; k < pose->n_arms; k++) for (j = 0; j < 7; j++) point_w(&B.fr, pose->arms[k][j]);
-    if (pose->has_mantle) { point_w(&B.fr, pose->mantle_c); point_w(&B.fr, pose->mantle_tip); }
-    for (k = 0; k < pose->n_wings; k++) { cm_wing_pose *w = &pose->wing[k]; point_w(&B.fr, w->root); point_w(&B.fr, w->mid); point_w(&B.fr, w->tip); dir_w(&B.fr, w->t1); dir_w(&B.fr, w->t2); }
+    x_pose(&x, pose, flying);
     return 0;
   }
   pose->body = biped ? CM_BODY_BIPED : CM_BODY_MECH;
@@ -1014,7 +1047,436 @@ int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_s
       if (pw->has_fore) point_w(&B.fr, pw->fore);
       point_w(&B.fr, pw->mag_a); point_w(&B.fr, pw->mag_b); dir_w(&B.fr, pw->dir); dir_w(&B.fr, pw->up);
     }
-    if (pose->has_carry) { point_w(&B.fr, pose->carry.c); dir_w(&B.fr, pose->carry.f); dir_w(&B.fr, pose->carry.u); dir_w(&B.fr, pose->carry.side); }
+    if (pose->has_carry) { point_w(&B.fr, pose->carry.c); dir_w(&B.fr, pose->carry.f); dir_w(&B.fr, pose->carry.u); dir_w(&B.fr, pose->carry.side); copy3(S->crate_pos, pose->carry.c); }
+    S->has_crate_pos = pose->has_carry;
   }
   return 0;
+}
+
+/* ------------------------------------------------------------------------------------------- off the ground
+   Stage 4: swimming (the octopus), flight (the wasp, the dragon), the ladder and the ledge (the soldier). Ports of
+   stepSwim, stepFly, stepLadder, stepLedge and their enter and leave functions in js/core.js. */
+
+static const double LAD_PH[4] = { 0, 0.5, 0.55, 0.05 }, LAD_OFF[4] = { 0.62, 0.62, -0.60, -0.60 };
+#define LAD_DUTY 0.62
+
+/* whatever the hands were doing stops: a crate is dropped, an action is given up */
+static void let_go(cm_state *S) {
+  if (S->carry && S->crate.held) {
+    cm_event e;
+    memset(&e, 0, sizeof e); e.type = CM_EV_DROP; e.leg = -1; e.hd = S->h;
+    copy3(e.pos, S->has_crate_pos ? S->crate_pos : S->crate.at);
+    cm_event_push(S, &e);
+  }
+  S->carry = 0; S->act_crouch = 0; S->act_back = 0;
+  if (S->act > CM_ACT_RELOAD) S->act = CM_ACT_NONE;
+}
+static void no_chains(cm_state *S) { int i; S->tail.n = 0; for (i = 0; i < CM_MAX_LEGS; i++) S->arm[i].n = 0; }
+
+void cm_leave_ladder(cm_state *S, const cm_character *ch, cm_terrain_fn terrain, void *user) {
+  double hc, hs;
+  int i;
+  S->mode = CM_MODE_GROUND; S->v = 0; S->standing = 1; S->reach_drop = 0; S->jump.stage = CM_JUMP_NONE; S->hop.x = S->hop.v = 0; S->air_b = 0;
+  S->om = 0; S->kv[0] = S->kv[1] = 0; S->bank.x = S->bank.v = 0; S->side.x = S->side.v = 0;
+  S->mv[0] = S->mv[1] = 0; S->act_crouch = 0; S->act_back = 0; no_chains(S); S->has_vl = 0; S->tv[0] = 1; S->tv[1] = 0;
+  S->guard.x = S->guard.v = 0; S->stance.x = S->stance.v = 0;
+  hc = cos(S->h); hs = sin(S->h);
+  S->g_ref.x = terrain(S->px, S->pz, user); S->g_ref.v = 0; S->y = S->last_y = S->g_ref.x + ch->root_height;
+  for (i = 0; i < ch->legs; i++) {
+    const double *r = ch->leg[i].rest;
+    cm_leg_state *lg = &S->leg[i];
+    memset(lg, 0, sizeof *lg);
+    set3(lg->ball, S->x + r[0], terrain(S->px + r[0] * hc - r[1] * hs, S->pz + r[0] * hs + r[1] * hc, user), r[1]);
+    lg->ref_y = S->g_ref.x; lg->hd = S->h;
+  }
+}
+void cm_place(cm_state *S, const cm_character *ch, cm_terrain_fn terrain, void *user, double x, double z, double heading) {
+  S->px = x; S->pz = z; S->h = heading; S->act = CM_ACT_NONE; S->carry = 0;
+  cm_leave_ladder(S, ch, terrain, user);
+}
+
+int cm_enter_swim(cm_state *S, const cm_character *ch) {
+  if (!ch->has_octo || S->mode != CM_MODE_GROUND) return 0;
+  let_go(S); S->mode = CM_MODE_SWIM; S->swim_vm = 0; S->v = 0; S->a = 0; S->om = 0; no_chains(S); S->pitch.x = S->pitch.v = 0; S->jump.stage = CM_JUMP_NONE;
+  S->kv[0] = S->kv[1] = 0; S->mv[0] = S->mv[1] = 0;
+  return 1;
+}
+int cm_leave_swim(cm_state *S, const cm_character *ch, cm_terrain_fn terrain, void *user) {
+  if (S->mode != CM_MODE_SWIM) return 0;
+  cm_leave_ladder(S, ch, terrain, user);
+  return 1;
+}
+/* inputs in the water: speed, steer or heading, depth (metres above the bottom), ink */
+static void step_swim(cm_state *S, const cm_character *ch, const cm_input *inp, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
+  act_out AC;
+  cm_frame fr;
+  xform x;
+  cm_mount_pose *mp = &pose->mount[0];
+  double he = inp->has_heading ? cm_wrap_pi(inp->heading - S->h) : 0, om_t = inp->has_heading ? cm_clamp(he * 3, -1.8, 1.8) : cm_clamp(inp->steer, -1, 1) * 1.8;
+  double hc, hs, k, P, drag = 2.4, stroke, v0, floor_, yT, vy, cpi, sp2, hov, root[3], ax[3], up[3], squeeze, spread, ang, drift[2] = { 0, 0 };
+  int i;
+  S->t += dt;
+  S->om += (om_t - S->om) * cm_decay(5, dt); S->h = cm_wrap_pi(S->h + S->om * dt);
+  hc = cos(S->h); hs = sin(S->h);
+  fr.s = S; fr.hc = hc; fr.hs = hs; fr.fn = terrain; fr.user = user;
+  octo_tick(S, inp, dt, &AC);
+  /* jets: a stroke takes the first third of the cycle; drag does the rest */
+  S->swim_vm += (cm_clamp(inp->speed, 0, ch->octo_vswim) - S->swim_vm) * cm_decay(1.6, dt);
+  k = S->swim_vm / ch->octo_vswim; P = cm_lerp(1.5, 0.8, k);
+  S->phase = cm_frac(S->phase + dt / P);
+  stroke = S->phase < 0.32 ? sin(PI * S->phase / 0.32) : 0; v0 = S->v;
+  S->v += (drag * S->swim_vm / 0.204 * stroke - drag * S->v) * dt;
+  if (AC.ink) S->v += 1.6;
+  S->a += ((S->v - v0) / dt - S->a) * cm_decay(30, dt);
+  /* depth: it climbs or sinks towards the height asked for, nose following the path */
+  floor_ = cm_ter(&fr, S->x, 0); yT = floor_ + cm_clamp(inp->has_depth ? inp->depth : 1.2, 0.32, 8);
+  vy = cm_clamp((yT - S->y) * 1.6, -0.9, 0.9) * (0.35 + 0.65 * fmin(1, S->v / 0.8 + 0.3));
+  S->y = fmax(S->y + vy * dt, floor_ + 0.28); S->last_y = S->y;
+  cm_spring_step(&S->pitch, cm_clamp(atan2(vy, fmax(S->v, 0.6)), -0.7, 0.7), 6, 1, dt);
+  cm_spring_step(&S->bank, cm_clamp(S->v * S->om / G * 1.5, -0.5, 0.5), 8, 1, dt);
+  cpi = cos(S->pitch.x); sp2 = sin(S->pitch.x);
+  S->x += S->v * cpi * dt; S->px += hc * S->v * cpi * dt; S->pz += hs * S->v * cpi * dt;
+  S->g_ref.x = floor_; S->standing = 0;
+  cm_spring_step(&S->lean, 0, 10, 1, dt); cm_spring_step(&S->flinch, 0, 14, 0.5, dt);
+  /* the body: it travels mantle first, so the mantle is ahead and the arms trail behind */
+  hov = 1 - cm_smooth(0.05, 0.5, S->swim_vm);
+  set3(root, S->x, S->y + 0.03 * hov * sin(TAU * S->t / 2.6), 0.05 * hov * sin(TAU * S->t / 3.7));
+  set3(ax, cpi, sp2, 0); set3(up, -sp2, cpi, 0);
+  squeeze = cm_clamp(0.9 * stroke * (0.3 + 0.7 * k) + S->jaw.x * 0.3, 0, 1);
+#define AT(dst, f_, u_, z_) set3(dst, root[0] + ax[0] * (f_) + up[0] * (u_), root[1] + ax[1] * (f_) + up[1] * (u_), root[2] + (z_))
+  pose->body = CM_BODY_OCTO; pose->swimming = 1; pose->base.pitch = S->pitch.x; pose->base.heading = S->h;
+  copy3(pose->base.root, root); copy3(pose->axis, ax); copy3(pose->up, up);
+  AT(pose->back, -0.2, 0, 0); AT(pose->front, 0.2, 0, 0); AT(pose->eye, 0.02, 0.10, 0);
+  pose->has_mantle = 1; AT(pose->mantle_c, 0.16, 0.02, 0); AT(pose->mantle_tip, 0.16 + 0.34 * (1 + 0.3 * squeeze), 0.03, 0);
+  pose->mantle_r = ch->octo_mantle * (1 - 0.22 * squeeze + 0.04 * sin(TAU * S->t / 1.7) * hov); copy3(pose->dome, pose->mantle_c);
+  spread = cm_lerp(0.62, 0.10, cm_smooth(0, 0.6, squeeze)) + 0.5 * hov; ang = S->pitch.x;
+  pose->n_arms = 8;
+  for (i = 0; i < 8; i++) {
+    double ra = TAU * (i + 0.5) / 8, sw = 0.22 * sin(TAU * S->t / 2.3 + 1.9 * i) * (0.4 + 0.6 * hov), base[3];
+    chain_ctl ctl;
+    memset(&ctl, 0, sizeof ctl);
+    /* hovering, the arms hang below and spread like a skirt; under way they stream straight back */
+    ctl.lift = -(spread * sin(ra) + sw) - 0.9 * hov; ctl.yaw = spread * cos(ra) * (1 + 0.8 * hov) + 0.5 * sw + 0.3 * S->bank.x;
+    AT(base, -0.09, 0.05 * sin(ra), 0.06 * cos(ra));
+    chain_step(S, &S->arm[i], &ch->octo_arm, ch->L, &fr, drift, base, ang, &ctl, dt, pose->arms[i]);
+  }
+  copy3(pose->tail, pose->arms[0][ch->octo_arm.n]);
+  pose->n_mounts = 1; memset(mp, 0, sizeof *mp); copy3(mp->joint, root); copy3(mp->base, root); copy3(mp->tip, pose->eye); copy3(mp->dir, ax);
+  if (AC.ink) {
+    cm_event e;
+    double ip[3];
+    memset(&e, 0, sizeof e); e.type = CM_EV_INK; e.leg = -1;
+    AT(ip, -0.05, -0.05, 0); cm_to_w(&fr, ip, e.pos); set3(e.vel, -hc * cpi, -sp2, -hs * cpi);
+    cm_event_push(S, &e);
+  }
+#undef AT
+  memset(&x, 0, sizeof x); x.fr = &fr;
+  x_pose(&x, pose, 1);
+}
+
+int cm_enter_fly(cm_state *S, const cm_character *ch) {
+  if (!ch->has_fly || S->mode != CM_MODE_GROUND) return 0;
+  let_go(S); S->mode = CM_MODE_FLY; S->fly_vy = 0; S->fly_effort = 0.6; S->om = 0; S->jump.stage = CM_JUMP_NONE;
+  S->kv[0] = S->kv[1] = 0; S->mv[0] = S->mv[1] = 0; S->a = 0; S->reach_drop = 0;
+  return 1;
+}
+int cm_leave_fly(cm_state *S, const cm_character *ch, cm_terrain_fn terrain, void *user) {
+  if (S->mode != CM_MODE_FLY) return 0;
+  cm_leave_ladder(S, ch, terrain, user);
+  return 1;
+}
+/* inputs in the air: speed, steer or heading, height (metres above the ground), aim, and the creature's own attacks */
+static int step_fly(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
+  cm_bctx B;
+  double L = ch->L, he = inp->has_heading ? cm_wrap_pi(inp->heading - S->h) : 0;
+  double om_t = inp->has_heading ? cm_clamp(he * 2.5, -ch->fly_turn, ch->fly_turn) : cm_clamp(inp->steer, -1, 1) * ch->fly_turn;
+  double hc, hs, vT, dv, floor_, yT, slow, glide, amp_k, freq, ph, fa, fa2, heave, cp, sn, hov, root[3], ax[3], up[3];
+  int i;
+  S->t += dt;
+  S->om += (om_t - S->om) * cm_decay(4, dt); S->h = cm_wrap_pi(S->h + S->om * dt);
+  hc = cos(S->h); hs = sin(S->h);
+  memset(&B, 0, sizeof B);
+  B.fr.s = S; B.fr.hc = hc; B.fr.hs = hs; B.fr.fn = terrain; B.fr.user = user;
+  /* speed: a big flier cannot go slower than its wings will carry it */
+  vT = cm_clamp(inp->speed, ch->fly_hover ? 0 : ch->fly_vmin, ch->fly_vmax); dv = cm_clamp(vT - S->v, -ch->fly_acc * dt, ch->fly_acc * dt);
+  S->a += (dv / dt - S->a) * cm_decay(12, dt); S->v += dv;
+  floor_ = cm_ter(&B.fr, S->x, 0); yT = floor_ + cm_clamp(inp->has_height ? inp->height : ch->fly_height, ch->fly_low, 40);
+  S->fly_vy += (cm_clamp((yT - S->y) * 1.3, -ch->fly_sink, ch->fly_climb) - S->fly_vy) * cm_decay(3, dt);
+  S->y = fmax(S->y + S->fly_vy * dt, floor_ + ch->fly_low * 0.8); S->last_y = S->y; S->g_ref.x = floor_; S->standing = 0;
+  /* how hard the wings work: more to climb and to fly slowly, less at speed or coming down, where a glider stops beating */
+  slow = ch->fly_hover ? 1 - 0.4 * S->v / ch->fly_vmax : 1 - (S->v - ch->fly_vmin) / (ch->fly_vmax - ch->fly_vmin);
+  S->fly_effort += (cm_clamp(0.35 + 0.5 * slow + 0.6 * S->fly_vy / ch->fly_climb, 0, 1.3) - S->fly_effort) * cm_decay(4, dt);
+  glide = ch->fly_glide ? 1 - cm_smooth(0.18, 0.42, S->fly_effort) : 0;
+  amp_k = (0.55 + 0.45 * fmin(S->fly_effort, 1)) * (1 - 0.88 * glide); freq = ch->fly_beat * (0.75 + 0.45 * S->fly_effort);
+  S->phase = cm_frac(S->phase + dt * freq);
+  ph = TAU * S->phase; fa = ch->fly_amp * amp_k * sin(ph) + 0.14 * glide;
+  fa2 = ch->fly_amp * amp_k * 1.15 * sin(ph - 0.8) - 0.3 * amp_k * fmax(0, cos(ph)) + 0.05 * glide;
+  heave = -ch->fly_heave * amp_k * cos(ph - TAU / 4);          /* the body rises through each downstroke */
+  cm_spring_step(&S->pitch, cm_clamp(ch->fly_pitch0 + 0.7 * atan2(S->fly_vy, fmax(S->v, 0.4 * ch->fly_vmax)) + ch->fly_slow_pitch * cm_smooth(0.55, 1, slow), -0.8, 1.0), 5, 1, dt);
+  cm_spring_step(&S->bank, cm_clamp(atan(S->v * S->om / G) + 0.25 * S->om, -1.0, 1.0), 6, 1, dt);
+  cp = cos(S->pitch.x); sn = sin(S->pitch.x);
+  S->x += S->v * dt; S->px += hc * S->v * dt; S->pz += hs * S->v * dt;
+  hov = ch->fly_hover ? 1 - cm_smooth(0.05, 0.5, S->v / ch->fly_vmax) : 0;
+  set3(root, S->x, S->y + heave + 0.02 * L * hov * sin(TAU * S->t / 1.9), 0.05 * L * hov * sin(TAU * S->t / 2.7));
+  set3(ax, cp, sn, 0); set3(up, -sn, cp, 0);
+  /* legs: they hang (or are held tucked) under the body and swing back when it speeds up */
+  pose->base.legs = ch->legs;
+  for (i = 0; i < ch->legs; i++) {
+    const cm_leg_def *ld = &ch->leg[i];
+    cm_leg_pose *o = &pose->base.leg[i];
+    const double *at = ld->attach;
+    double len2 = ld->upper + ld->lower, lag = cm_clamp(-0.03 * S->a, -0.2, 0.2) + 0.03 * sin(TAU * S->t / 1.3 + 1.7 * i), foot[3];
+    memset(o, 0, sizeof *o);
+    set3(o->hip, root[0] + ax[0] * at[0] + up[0] * at[1], root[1] + ax[1] * at[0] + up[1] * at[1], at[2]);
+    set3(foot, o->hip[0] + (ch->fly_hang[0] + lag) * len2, o->hip[1] + ch->fly_hang[1] * len2, at[2] + ld->side * 0.3 * fabs(ld->rest[1] - at[2]));
+    cm_ik2(o->hip, foot, ld->upper, ld->lower, ld->pole, o->knee, o->ankle);
+    copy3(o->ball, o->ankle); o->side = ld->side;
+  }
+  copy3(B.root, root); copy3(B.fly_ax, ax); copy3(B.fly_up, up); B.pitch = S->pitch.x; B.Tn = TAU * sqrt(L / G); B.idle = hov; B.P = 2.1 * TAU * sqrt(L / G);
+  B.gp.run = ch->fly_hover ? 0.3 : 1; B.gp.moving = 1 - hov; B.gp.Tn = B.Tn;
+  B.has_aim = inp->has_aim != 0;
+  if (B.has_aim) { double a3[3]; set3(a3, inp->aim[0], inp->aim[1], inp->has_aim > 2 ? inp->aim[2] : S->pz); cm_to_l(&B.fr, a3, B.aim); }
+  pose->base.pitch = S->pitch.x; pose->base.heading = S->h; pose->base.crouch = S->crouch;
+  return body_step(S, ch, inp, st, dt, &B, pose, 1, fa, fa2);
+}
+
+/* a point or a direction of the frame the body had when it took hold of a ladder or a ledge, in the world */
+static void lf_pt(const double fr[5], double p[3]) { double x = p[0] - fr[0], z = p[2]; set3(p, fr[1] + x * fr[3] - z * fr[4], p[1], fr[2] + x * fr[4] + z * fr[3]); }
+static void lf_dir(const double fr[5], double d[3]) { double x = d[0] * fr[3] - d[2] * fr[4], z = d[0] * fr[4] + d[2] * fr[3]; d[0] = x; d[2] = z; }
+static void frame_now(const cm_state *S, double fr[5]) { fr[0] = S->x; fr[1] = S->px; fr[2] = S->pz; fr[3] = cos(S->h); fr[4] = sin(S->h); }
+static int nearest_rung(const cm_ladder *lad, double y, int kmin) {
+  int k0 = (int)floor((y - lad->y0) / lad->spacing + 0.5), best = k0, k;
+  double bd = 1e9;
+  for (k = k0 - 2; k <= k0 + 2; k++) { double d = fabs(lad->rung(k, lad->user) - y); if (d < bd) { bd = d; best = k; } }
+  return best > kmin ? best : kmin;
+}
+int cm_enter_ladder(cm_state *S, const cm_character *ch, const cm_ladder *ladder) {
+  double y;
+  int i;
+  if (ch->kind != CM_BIPED || !ladder || !ladder->rung) return 0;
+  let_go(S);
+  S->ladder = ladder; frame_now(S, S->lad_frame);          /* the ladder stands where the body faced it */
+  S->mode = CM_MODE_LADDER; S->jump.stage = CM_JUMP_NONE; S->hop.x = S->hop.v = 0; S->air_b = 0; S->om = 0; S->kv[0] = S->kv[1] = 0; S->act = CM_ACT_NONE;
+  S->twist.x = S->twist.v = 0;
+  y = ladder->y0 + ch->root_height + 0.75; S->lad_y = y;
+  for (i = 0; i < 4; i++) {
+    S->limb[i].k = nearest_rung(ladder, y + LAD_OFF[i] + (i % 2 ? 0.15 : -0.15) * (i < 2 ? 1 : -1), -99);
+    S->limb[i].swinging = 0; S->limb[i].psi = cm_frac(S->phase + LAD_PH[i]);
+  }
+  S->v = 0;
+  return 1;
+}
+/* the weapons on their way to their stowed places: the rifle across the back, pistols in their holsters */
+static void stowed_props(cm_state *S, const cm_character *ch, const double root[3], const double chest[3], const double u[3], const double f[3], double zc, cm_pose *pose) {
+  const kit_def *kit = held_kit(S, ch);
+  int i;
+  pose->n_props = 0;
+  if (kit) for (i = 0; i < kit->n; i++) {
+    place_t pl = mix_place(stow_place(kit->props[i], i, root, u, f, zc), ready_place(kit->props[i], i, chest, u, f, 0, 0), S->armed.x);
+    cm_prop_pose *w = &pose->prop[pose->n_props++];
+    prop_at(kit->props[i], pl.o, pl.th, pl.z, w); w->stow = 1 - S->armed.x;
+  }
+}
+/* a climbing biped's pose, from the frame it took hold in to the world */
+static void climb_to_world(const double fr[5], cm_pose *pose) {
+  int i;
+  lf_pt(fr, pose->base.root); lf_pt(fr, pose->chest); lf_pt(fr, pose->head); lf_dir(fr, pose->gaze); lf_dir(fr, pose->u); lf_dir(fr, pose->f);
+  for (i = 0; i < 2; i++) {
+    cm_leg_pose *l = &pose->base.leg[i];
+    lf_pt(fr, l->hip); lf_pt(fr, l->knee); lf_pt(fr, l->ankle); lf_pt(fr, l->heel); lf_pt(fr, l->toe); lf_pt(fr, l->ball);
+    lf_pt(fr, pose->arm[i].shoulder); lf_pt(fr, pose->arm[i].elbow); lf_pt(fr, pose->arm[i].hand);
+  }
+  for (i = 0; i < pose->n_props; i++) {
+    cm_prop_pose *pw = &pose->prop[i];
+    lf_pt(fr, pw->o); lf_pt(fr, pw->muzzle); lf_pt(fr, pw->body); lf_pt(fr, pw->grip); lf_pt(fr, pw->grip_low); if (pw->has_fore) lf_pt(fr, pw->fore);
+    lf_pt(fr, pw->mag_a); lf_pt(fr, pw->mag_b); lf_dir(fr, pw->dir); lf_dir(fr, pw->up);
+  }
+}
+/* Hands and feet each hold a real rung. A limb lets go, reaches for the rung nearest to where it wants to be, and
+   the body is carried by the other three. */
+static int step_ladder(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, double dt, cm_pose *pose) {
+  const cm_ladder *lad = S->ladder;
+  cm_input quiet;
+  double vc, T, px, pz, pts[4][3], root[3], lean, u[3], f[3], chest[3], head[3], wr[3];
+  int moving, i, held[4];
+  if (!lad) return -1;
+  S->t += dt;
+  S->crouch += (0 - S->crouch) * cm_decay(6, dt);
+  vc = cm_clamp(inp->speed * 0.3, 0, 1.3);
+  S->v += cm_clamp(vc - S->v, -2 * dt, 2 * dt);
+  T = 2 * lad->spacing / fmax(S->v, 0.05);
+  moving = S->v > 0.03;
+  if (moving) S->phase = cm_frac(S->phase + dt / T);
+  S->lad_y += S->v * dt;
+  px = lad->x - 0.36 + 0.012 * sin(2 * TAU * S->phase); pz = 0.02 * sin(TAU * S->phase);
+  for (i = 0; i < 4; i++) {
+    int hand = i < 2, side = i % 2 == 0 ? 1 : -1;
+    double psi = cm_frac(S->phase + LAD_PH[i]), z = side * (hand ? 0.13 : 0.11), x0 = lad->x;
+    if (!S->limb[i].swinging && moving && psi >= LAD_DUTY && S->limb[i].psi < LAD_DUTY) {
+      double dur = (1 - LAD_DUTY) * T, want = S->lad_y + S->v * dur + LAD_OFF[i] + S->v * LAD_DUTY * T * 0.5;
+      S->limb[i].swinging = 1; S->limb[i].s = 0; S->limb[i].dur = dur; S->limb[i].from = S->limb[i].k; S->limb[i].to = nearest_rung(lad, want, S->limb[i].k + 1);
+    }
+    S->limb[i].psi = psi;
+    set3(pts[i], x0, lad->rung(S->limb[i].k, lad->user), z);
+    if (S->limb[i].swinging) {
+      S->limb[i].s += dt / S->limb[i].dur;
+      if (S->limb[i].s >= 1) {
+        cm_event e;
+        S->limb[i].k = S->limb[i].to; S->limb[i].swinging = 0; set3(pts[i], x0, lad->rung(S->limb[i].k, lad->user), z);
+        memset(&e, 0, sizeof e); e.type = CM_EV_GRIP; e.leg = -1; e.hand = i; cm_event_push(S, &e);
+      } else {
+        double e = cm_ease(S->limb[i].s, st->snap), arc = sin(PI * S->limb[i].s);
+        set3(pts[i], x0 - (hand ? 0.10 : 0.13) * arc * st->step, cm_lerp(lad->rung(S->limb[i].from, lad->user), lad->rung(S->limb[i].to, lad->user), e) + 0.02 * arc, z);
+      }
+    }
+    held[i] = !S->limb[i].swinging;
+  }
+  S->x = px; S->y = S->lad_y; S->last_y = S->y;
+  set3(wr, px, 0, 0); lf_pt(S->lad_frame, wr); S->px = wr[0]; S->pz = wr[2];
+  set3(root, px, S->lad_y, pz);
+  pose->body = CM_BODY_BIPED; pose->climbing = 1; pose->base.legs = 2; pose->base.heading = S->h;
+  for (i = 0; i < 2; i++) {
+    const cm_leg_def *ld = &ch->leg[i];
+    const cm_foot *F = &ld->foot;
+    cm_leg_pose *o = &pose->base.leg[i];
+    const double *ball = pts[2 + i];
+    double ankle[3], pole[3];
+    memset(o, 0, sizeof *o);
+    set3(o->hip, root[0] + ld->attach[0], root[1] + ld->attach[1], root[2] + ld->attach[2]);
+    set3(ankle, ball[0] - F->fb, ball[1] + F->ah, ball[2]); set3(pole, 0.35, 0.1, ld->side);
+    cm_ik2(o->hip, ankle, ld->upper, ld->lower, pole, o->knee, o->ankle);
+    set3(o->heel, ball[0] - F->fb - F->hb, ball[1], ball[2]); set3(o->toe, ball[0] + F->toe, ball[1], ball[2]); copy3(o->ball, ball);
+    o->planted = held[2 + i]; o->has_foot = 1; o->side = ld->side;
+  }
+  memset(&quiet, 0, sizeof quiet);
+  fire_control(S, ch, &quiet, dt);
+  cm_spring_step(&S->lean, 0.15, 12, 1, dt); cm_spring_step(&S->armed, 0, 14, 1, dt); cm_spring_step(&S->pack, 0, 30, 0.4, dt);
+  lean = S->lean.x; set3(u, sin(lean), cos(lean), 0); set3(f, cos(lean), -sin(lean), 0);
+  set3(chest, root[0] + u[0] * ch->torso_len, root[1] + u[1] * ch->torso_len, root[2] * 0.5);
+  set3(head, chest[0] + 0.03, chest[1] + ch->torso_neck + ch->torso_head_r * 0.7, chest[2]);
+  for (i = 0; i < 2; i++) {
+    int sd = i == 0 ? 1 : -1;
+    double sh[3], pole[3];
+    set3(sh, chest[0] + u[0] * -0.04, chest[1] + u[1] * -0.04, chest[2] + sd * ch->torso_shoulder_w); set3(pole, -0.4, -1, sd * 0.7);
+    copy3(pose->arm[i].shoulder, sh); cm_ik2(sh, pts[i], ch->arm_upper, ch->arm_lower, pole, pose->arm[i].elbow, pose->arm[i].hand); pose->arm[i].side = sd;
+  }
+  stowed_props(S, ch, root, chest, u, f, chest[2], pose);
+  copy3(pose->base.root, root); pose->lean = lean; copy3(pose->chest, chest); copy3(pose->head, head); set3(pose->gaze, cos(0.5), sin(0.5), 0); copy3(pose->u, u); copy3(pose->f, f);
+  climb_to_world(S->lad_frame, pose);
+  return 0;
+}
+
+int cm_grab_ledge(cm_state *S, const cm_character *ch, const double edge[3]) {
+  double x, z;
+  cm_event e;
+  if (ch->kind != CM_BIPED || (S->mode != CM_MODE_GROUND && S->mode != CM_MODE_LADDER)) return 0;
+  let_go(S);
+  frame_now(S, S->lad_frame);
+  x = edge[0] - S->lad_frame[1]; z = edge[2] - S->lad_frame[2];
+  S->mode = CM_MODE_LEDGE; S->jump.stage = CM_JUMP_NONE; S->hop.x = S->hop.v = 0; S->air_b = 0; S->om = 0; S->kv[0] = S->kv[1] = 0; S->mv[0] = S->mv[1] = 0;
+  S->act = CM_ACT_NONE; S->twist.x = S->twist.v = 0; S->has_vl = 0;
+  S->ledge.ex = S->lad_frame[0] + x * S->lad_frame[3] + z * S->lad_frame[4]; S->ledge.ey = edge[1]; S->ledge.up = 0; S->ledge.t = 0;
+  S->ledge.sw.x = cm_clamp(0.12 * S->v, 0, 0.5); S->ledge.sw.v = 0;
+  S->v = 0; S->a = 0;
+  memset(&e, 0, sizeof e); e.type = CM_EV_GRAB; e.leg = -1; cm_event_push(S, &e);
+  return 1;
+}
+static int ground_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
+  cm_bctx B;
+  cm_ground_core(S, ch, inp, st, terrain, user, dt, &pose->base, &B);
+  return body_step(S, ch, inp, st, dt, &B, pose, 0, 0, 0);
+}
+/* Hanging by the hands with the feet against the wall. climb (or jump) pulls up: chin to the edge, chest over, a knee
+   up, stand. drop lets go. */
+static int step_ledge(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
+  double k = ch->L / 0.92, ex = S->ledge.ex, ey = S->ledge.ey, q = 0, dur, a, b, c, sway, lean, u[3], f[3], top[2], cx, cy, chest[3], root[3], head[3], hr, off, wr[3], swx;
+  cm_input quiet;
+  cm_event ev;
+  int i;
+  S->t += dt; S->ledge.t += dt;
+  S->crouch += (0 - S->crouch) * cm_decay(6, dt);
+  memset(&quiet, 0, sizeof quiet);
+  if (!S->ledge.up) {
+    if (inp->drop) {
+      cm_leave_ladder(S, ch, terrain, user);
+      memset(&ev, 0, sizeof ev); ev.type = CM_EV_DROP; ev.leg = -1; cm_event_push(S, &ev);
+      return ground_step(S, ch, &quiet, st, terrain, user, dt, pose);
+    }
+    if ((inp->climb || inp->jump) && S->ledge.t > 0.25) { S->ledge.up = 1; S->ledge.t = 0; }
+  }
+  dur = 1.5 * sqrt(k);
+  if (S->ledge.up) q = fmin(S->ledge.t / dur, 1);
+  cm_spring_step(&S->ledge.sw, 0, 5.5, 0.25, dt);              /* the swing left over from arriving dies away */
+  swx = S->ledge.sw.x;
+  /* where the chest is, and how far the back leans: hanging; pulled up; over the edge; standing on top */
+  a = cm_smooth(0, 0.38, q); b = cm_smooth(0.33, 0.62, q); c = cm_smooth(0.56, 1, q); sway = 0.02 * sin(TAU * S->t / 2.6) * (1 - a);
+  lean = cm_lerp(cm_lerp(cm_lerp(0.10, 0.36, a), 0.62, b), 0.06, c) - 0.5 * swx * (1 - a);
+  set3(u, sin(lean), cos(lean), 0); set3(f, cos(lean), -sin(lean), 0);
+  top[0] = ex + 0.22 * k + u[0] * ch->torso_len; top[1] = ey + ch->root_height + u[1] * ch->torso_len;
+  cx = cm_lerp(cm_lerp(cm_lerp(ex - 0.20 * k, ex - 0.13 * k, a), ex + 0.10 * k, b), top[0], c) - 0.3 * swx * (1 - a);
+  cy = cm_lerp(cm_lerp(cm_lerp(ey - 0.43 * k, ey + 0.10 * k, a), ey + 0.56 * k, b), top[1], c) + sway;
+  set3(chest, cx, cy, 0); set3(root, cx - u[0] * ch->torso_len, cy - u[1] * ch->torso_len, 0);
+  hr = ch->torso_neck + ch->torso_head_r * 0.7;
+  set3(head, chest[0] + sin(lean * 0.4) * hr, chest[1] + cos(lean * 0.4) * hr, 0);
+  pose->body = CM_BODY_BIPED; pose->climbing = 1; pose->base.legs = 2; pose->base.heading = S->h;
+  /* hands: on the lip, pressing down on it as the body comes over, and off it at the end */
+  off = cm_smooth(0.68, 0.92, q);
+  for (i = 0; i < 2; i++) {
+    int sd = i == 0 ? 1 : -1;
+    double sh[3], grip[3], loose[3], hand[3], p0[3], p1[3], pole[3];
+    set3(sh, chest[0] + u[0] * -0.04, chest[1] + u[1] * -0.04, sd * ch->torso_shoulder_w);
+    set3(grip, ex - 0.01, ey + 0.02, sd * 0.17); set3(loose, sh[0] + 0.05, sh[1] - 0.50 * k, sd * 0.24); lerp3(grip, loose, off, hand);
+    set3(p0, -0.3, -1, sd * 0.6); set3(p1, -0.8, 0.6, sd * 0.7); lerp3(p0, p1, b * (1 - off), pole);
+    copy3(pose->arm[i].shoulder, sh); cm_ik2(sh, hand, ch->arm_upper, ch->arm_lower, pole, pose->arm[i].elbow, pose->arm[i].hand); pose->arm[i].side = sd;
+  }
+  /* feet: toes on the wall while hanging and pulling; then one foot up onto the top, then the other */
+  for (i = 0; i < 2; i++) {
+    const cm_leg_def *ld = &ch->leg[i];
+    const cm_foot *F = &ld->foot;
+    cm_leg_pose *o = &pose->base.leg[i];
+    double wall[3], on, upp[3], ball[3], ankle[3], pole[3], mid[3], end[3];
+    memset(o, 0, sizeof *o);
+    set3(o->hip, root[0] + ld->attach[0], root[1] + ld->attach[1], ld->attach[2]);
+    set3(wall, ex - 0.03 - F->toe, o->hip[1] - cm_lerp(0.95, 0.74, a) * ch->L + (i ? 0.05 : 0) * k - 0.25 * swx, ld->attach[2]);
+    wall[0] -= 0.35 * fmax(0, swx);
+    on = cm_smooth(i ? 0.62 : 0.40, i ? 0.86 : 0.64, q); set3(upp, ex + (i ? 0.20 : 0.10) * k + (i ? 0.02 : 0.04), ey, ld->rest[1]);
+    lerp3(wall, upp, on, ball); ball[1] += 0.16 * k * sin(PI * on); ball[0] -= 0.12 * k * sin(PI * on);
+    set3(ankle, ball[0] - F->fb, ball[1] + F->ah, ball[2]); set3(pole, 1, 0.2, ld->side * 0.4);
+    cm_ik2(o->hip, ankle, ld->upper, ld->lower, pole, mid, end);
+    if (mid[0] > ex - 0.09 * k && mid[1] < ey) {               /* a knee that would go into the wall turns outwards instead */
+      double lo = 0, hi = 1.45, km[3], ke[3];
+      int j;
+      for (j = 0; j < 7; j++) { double ph = 0.5 * (lo + hi); set3(pole, cos(ph), 0.2, ld->side * (0.4 + sin(ph))); cm_ik2(o->hip, ankle, ld->upper, ld->lower, pole, km, ke); if (km[0] > ex - 0.09 * k) lo = ph; else hi = ph; }
+      set3(pole, cos(hi), 0.2, ld->side * (0.4 + sin(hi))); cm_ik2(o->hip, ankle, ld->upper, ld->lower, pole, mid, end);
+    }
+    copy3(o->knee, mid); copy3(o->ankle, end);
+    set3(o->heel, ball[0] - F->fb - F->hb, ball[1], ball[2]); set3(o->toe, ball[0] + F->toe, ball[1], ball[2]); copy3(o->ball, ball);
+    o->planted = on <= 0 || on >= 1; o->has_foot = 1; o->side = ld->side;
+  }
+  fire_control(S, ch, &quiet, dt);
+  cm_spring_step(&S->lean, lean, 12, 1, dt); cm_spring_step(&S->armed, 0, 14, 1, dt); cm_spring_step(&S->pack, 0, 30, 0.4, dt);
+  stowed_props(S, ch, root, chest, u, f, 0, pose);
+  S->x = root[0]; S->y = root[1]; S->last_y = S->y;
+  set3(wr, root[0], 0, 0); lf_pt(S->lad_frame, wr); S->px = wr[0]; S->pz = wr[2];
+  copy3(pose->base.root, root); pose->lean = lean; copy3(pose->chest, chest); copy3(pose->head, head);
+  set3(pose->gaze, cos(0.45 * (1 - c)), sin(0.45 * (1 - c)), 0); copy3(pose->u, u); copy3(pose->f, f);
+  climb_to_world(S->lad_frame, pose);
+  if (q >= 1) {                                                /* on its feet on the top: the ground code takes over */
+    cm_leave_ladder(S, ch, terrain, user);
+    memset(&ev, 0, sizeof ev); ev.type = CM_EV_TOP; ev.leg = -1; cm_event_push(S, &ev);
+  }
+  return 0;
+}
+
+int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *pose) {
+  memset(pose, 0, sizeof *pose);
+  pose->kind = ch->kind;
+  switch (S->mode) {
+    case CM_MODE_SWIM: step_swim(S, ch, inp, terrain, user, dt, pose); return 0;
+    case CM_MODE_FLY: return step_fly(S, ch, inp, st, terrain, user, dt, pose);
+    case CM_MODE_LADDER: return step_ladder(S, ch, inp, st, dt, pose);
+    case CM_MODE_LEDGE: return step_ledge(S, ch, inp, st, terrain, user, dt, pose);
+    case CM_MODE_RAGDOLL: case CM_MODE_RIDE: return -1;
+    default: return ground_step(S, ch, inp, st, terrain, user, dt, pose);
+  }
 }

@@ -1065,7 +1065,8 @@
      "x": 3,
      "h": 2.3
     }
-   }
+   },
+   "stage": 4
   },
   {
    "id": "soldier_knocked_down",
@@ -1129,7 +1130,8 @@
       2.0
      ]
     ]
-   }
+   },
+   "stage": 5
   },
   {
    "id": "hyena_hunt",
@@ -1388,7 +1390,8 @@
       2.0
      ]
     ]
-   }
+   },
+   "stage": 4
   },
   {
    "id": "wasp_flight",
@@ -1438,7 +1441,8 @@
      "call",
      "leaveFly"
     ]
-   ]
+   ],
+   "stage": 4
   },
   {
    "id": "dragon_flight",
@@ -1494,7 +1498,8 @@
      "call",
      "leaveFly"
     ]
-   ]
+   ],
+   "stage": 4
   },
   {
    "id": "soldier_headings",
@@ -3669,6 +3674,494 @@
       "speed": 2,
       "dir": 3.14159
      }
+    ]
+   ]
+  },
+  {
+   "id": "soldier_ladder",
+   "character": "soldier",
+   "seconds": 9,
+   "script": [
+    [
+     0,
+     {
+      "speed": 1.2
+     }
+    ],
+    [
+     0.8,
+     "call",
+     "enterLadder"
+    ],
+    [
+     0.9,
+     {
+      "speed": 2
+     }
+    ],
+    [
+     3.5,
+     {
+      "speed": 0
+     }
+    ],
+    [
+     4.5,
+     {
+      "speed": 4.5
+     }
+    ],
+    [
+     7,
+     "call",
+     "leaveLadder"
+    ],
+    [
+     7.1,
+     {
+      "speed": 1.4,
+      "armed": true
+     }
+    ]
+   ],
+   "stage": 4,
+   "ladder": {
+    "x": 1.3,
+    "y0": 0.25,
+    "spacing": 0.3,
+    "amp": 0.035,
+    "freq": 1.7,
+    "phase": 0.4
+   }
+  },
+  {
+   "id": "soldier_ladder_pistols",
+   "character": "soldier",
+   "seconds": 8,
+   "script": [
+    [
+     0,
+     {
+      "kit": "pistols",
+      "armed": true
+     }
+    ],
+    [
+     1.5,
+     "call",
+     "enterLadder"
+    ],
+    [
+     1.6,
+     {
+      "speed": 3
+     }
+    ],
+    [
+     4.5,
+     "call",
+     "grabLedge",
+     [
+      1.9,
+      3.2,
+      0
+     ]
+    ],
+    [
+     5,
+     {
+      "!climb": true
+     }
+    ],
+    [
+     7,
+     {
+      "speed": 2,
+      "heading": 1
+     }
+    ]
+   ],
+   "stage": 4,
+   "ladder": {
+    "x": 1.3,
+    "y0": 0.25,
+    "spacing": 0.3,
+    "amp": 0.035,
+    "freq": 1.7,
+    "phase": 0.4
+   },
+   "ground": {
+    "wall": {
+     "x": 1.9,
+     "h": 3.2
+    }
+   }
+  },
+  {
+   "id": "soldier_ledge_drop",
+   "character": "soldier",
+   "seconds": 6,
+   "script": [
+    [
+     0,
+     {
+      "speed": 3,
+      "heading": 0.6
+     }
+    ],
+    [
+     1.5,
+     "call",
+     "grabLedge",
+     [
+      4,
+      2.2,
+      2.5
+     ]
+    ],
+    [
+     2.4,
+     {
+      "speed": 0,
+      "!climb": true
+     }
+    ],
+    [
+     2.6,
+     {
+      "!drop": true
+     }
+    ],
+    [
+     3.0,
+     "call",
+     "place",
+     1,
+     0.5,
+     -0.4
+    ],
+    [
+     3.2,
+     "call",
+     "grabLedge",
+     [
+      1.4,
+      2.4,
+      0.3
+     ]
+    ],
+    [
+     4.0,
+     {
+      "!drop": true
+     }
+    ],
+    [
+     4.6,
+     {
+      "speed": 1.4
+     }
+    ]
+   ],
+   "stage": 4
+  },
+  {
+   "id": "octopus_swim_deep",
+   "character": "octopus",
+   "seconds": 9,
+   "script": [
+    [
+     0.3,
+     "call",
+     "enterSwim"
+    ],
+    [
+     0.4,
+     {
+      "speed": 0,
+      "depth": 2.5
+     }
+    ],
+    [
+     2,
+     {
+      "speed": 3,
+      "heading": 1.8
+     }
+    ],
+    [
+     4,
+     {
+      "depth": 0.4,
+      "!ink": true
+     }
+    ],
+    [
+     5.5,
+     {
+      "speed": 1,
+      "steer": -1,
+      "heading": null
+     }
+    ],
+    [
+     7,
+     {
+      "speed": 0,
+      "steer": 0,
+      "!grab": {}
+     }
+    ],
+    [
+     8.2,
+     "call",
+     "leaveSwim"
+    ]
+   ],
+   "stage": 4,
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "wasp_hover_turns",
+   "character": "wasp",
+   "seconds": 7,
+   "script": [
+    [
+     0.2,
+     "call",
+     "enterFly"
+    ],
+    [
+     0.3,
+     {
+      "speed": 0,
+      "height": 0.9,
+      "aim": [
+       3,
+       1,
+       1
+      ]
+     }
+    ],
+    [
+     1.5,
+     {
+      "steer": 1
+     }
+    ],
+    [
+     2.5,
+     {
+      "steer": 0,
+      "speed": 7,
+      "height": 3
+     }
+    ],
+    [
+     4,
+     {
+      "heading": -2,
+      "!sting": {}
+     }
+    ],
+    [
+     5.5,
+     {
+      "speed": 0,
+      "height": 0.5,
+      "!pinch": {}
+     }
+    ],
+    [
+     6.4,
+     "call",
+     "leaveFly"
+    ]
+   ],
+   "stage": 4,
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "dragon_dive",
+   "character": "dragon",
+   "seconds": 9,
+   "script": [
+    [
+     0,
+     {
+      "speed": 4
+     }
+    ],
+    [
+     0.8,
+     "call",
+     "enterFly"
+    ],
+    [
+     0.9,
+     {
+      "speed": 16,
+      "height": 12,
+      "aim": [
+       80,
+       2,
+       30
+      ]
+     }
+    ],
+    [
+     3.5,
+     {
+      "height": 2,
+      "heading": 1.2
+     }
+    ],
+    [
+     5.5,
+     {
+      "speed": 5,
+      "height": 6,
+      "!bite": {}
+     }
+    ],
+    [
+     7,
+     {
+      "steer": -1,
+      "heading": null,
+      "!hit": {
+       "impulse": [
+        -2,
+        0,
+        1
+       ]
+      }
+     }
+    ],
+    [
+     8.3,
+     "call",
+     "leaveFly"
+    ]
+   ],
+   "stage": 4,
+   "ground": {
+    "waves": [
+     [
+      0.18,
+      0.55,
+      0.0,
+      0.3
+     ],
+     [
+      0.1,
+      0.21,
+      0.37,
+      1.1
+     ],
+     [
+      0.05,
+      1.3,
+      0.6,
+      2.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "soldier_crate_ladder",
+   "character": "soldier",
+   "seconds": 6,
+   "stage": 4,
+   "ladder": {
+    "x": 1.3,
+    "y0": 0.25,
+    "spacing": 0.3,
+    "amp": 0.035,
+    "freq": 1.7,
+    "phase": 0.4
+   },
+   "script": [
+    [
+     0.3,
+     {
+      "!pickup": {}
+     }
+    ],
+    [
+     2.6,
+     "call",
+     "enterLadder"
+    ],
+    [
+     2.7,
+     {
+      "speed": 3
+     }
+    ],
+    [
+     4.5,
+     "call",
+     "leaveLadder"
+    ],
+    [
+     4.6,
+     {
+      "speed": 0,
+      "!pickup": {}
+     }
+    ],
+    [
+     5.2,
+     "call",
+     "grabLedge",
+     [
+      0.6,
+      2.2,
+      0
+     ]
     ]
    ]
   }

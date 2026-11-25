@@ -60,7 +60,8 @@ void cm_gait_params_step(const cm_gait_config *c, cm_gait_state *s, double v, do
 #define CM_MAX_CHAIN 12                        /* links in a tail */
 enum { CM_BIPED, CM_MECH, CM_QUAD, CM_HEX };
 enum { CM_EV_HIT = 1, CM_EV_JUMP, CM_EV_LAND, CM_EV_FIRE, CM_EV_RELOAD, CM_EV_LOADED, CM_EV_THROW, CM_EV_GRAB, CM_EV_PUTDOWN, CM_EV_PUNCH, CM_EV_STRIKE, CM_EV_DROP,
-       CM_EV_BITE, CM_EV_POUNCE, CM_EV_PINCH, CM_EV_STING, CM_EV_INK };
+       CM_EV_BITE, CM_EV_POUNCE, CM_EV_PINCH, CM_EV_STING, CM_EV_INK, CM_EV_GRIP, CM_EV_TOP };
+enum { CM_MODE_GROUND, CM_MODE_LADDER, CM_MODE_RAGDOLL, CM_MODE_SWIM, CM_MODE_FLY, CM_MODE_LEDGE, CM_MODE_RIDE };
 enum { CM_MOUNT_HELD, CM_MOUNT_FIXED, CM_MOUNT_TURRET, CM_MOUNT_JAW };
 enum { CM_KIT_NONE, CM_KIT_RIFLE, CM_KIT_PISTOLS, CM_KIT_SWORD };
 enum { CM_PROP_RIFLE, CM_PROP_PISTOL, CM_PROP_SWORD, CM_PROP_SHIELD };
@@ -71,6 +72,8 @@ enum { CM_SWING_SLASH = 1, CM_SWING_CHOP, CM_SWING_THRUST };
 enum { CM_GAIT_STANDING, CM_GAIT_WALK, CM_GAIT_RUN, CM_GAIT_TROT, CM_GAIT_GALLOP, CM_GAIT_JUMP };
 
 typedef struct { double fb, hb, toe, ah, heel_lift, strike; } cm_foot;
+/* a chain of links (a tail, an arm in the water): how many, how long, how it hangs and how stiff it is */
+typedef struct { int n; double seg, rest, curl, omega, zeta, soft, sag, bend, inert; } cm_chain_def;
 typedef struct { double attach[3], rest[2], upper, lower, pole[3]; int side, has_foot; cm_foot foot; } cm_leg_def;
 typedef struct {
   const char *id;
@@ -96,6 +99,10 @@ typedef struct {
   double claw_at[3], claw_upper, claw_lower, claw_hand, claw_rest[3], claw_strike_at[3];
   int has_octo; double octo_mantle, octo_arm_seg;
   int has_fly, fly_zfold; double fly_at[3], fly_w1, fly_w2, fly_chord, fly_sweep;
+  /* off the ground (stage 4): the octopus in the water, fliers in the air */
+  double octo_vswim; cm_chain_def octo_arm;
+  int fly_hover, fly_glide;
+  double fly_beat, fly_amp, fly_vmin, fly_vmax, fly_turn, fly_acc, fly_climb, fly_sink, fly_height, fly_low, fly_heave, fly_pitch0, fly_slow_pitch, fly_hang[2];
 } cm_character;
 
 /* The built-in characters (clio_motion_characters.c, written by tools/spec.js from the reference). */
@@ -121,6 +128,10 @@ typedef struct { double at[3], size[3], yaw, ca, hk; int held; } cm_carry;      
 /* A tail's links: each has an angle up or down (th), an angle to the side (ps), and their turning speeds. */
 typedef struct { int n; double th[CM_MAX_CHAIN], ps[CM_MAX_CHAIN], vth[CM_MAX_CHAIN], vps[CM_MAX_CHAIN], by, vy, ay, dr[2], ax, az; } cm_chain;
 
+/* A ladder standing in front of the body: x is how far ahead it is (in the frame the body had when it took hold),
+   rung(k) the height of rung k, about y0 + k * spacing (the rungs need not be even). */
+typedef struct { double x, y0, spacing; double (*rung)(int k, void *user); void *user; } cm_ladder;
+
 /* Everything a character carries from one step to the next. */
 typedef struct {
   double t, x, y, v, a, phase, crouch;
@@ -141,6 +152,15 @@ typedef struct {
   cm_spring jaw;
   double ink_t;
   cm_chain tail;
+  /* off the ground (stage 4) */
+  int mode;                                    /* CM_MODE_... */
+  double swim_vm, fly_vy, fly_effort;
+  cm_chain arm[CM_MAX_LEGS];                   /* the octopus's arms in the water */
+  const cm_ladder *ladder;                     /* the ladder being climbed (must outlive the climb) */
+  double lad_frame[5], lad_y;                  /* the frame the body had when it took hold: local x, px, pz, cos, sin */
+  struct { int k, swinging, from, to; double s, dur, psi; } limb[4];
+  struct { double ex, ey, t; int up; cm_spring sw; } ledge;
+  int has_crate_pos; double crate_pos[3];
   cm_jump jump;
   int legs;
   cm_leg_state leg[CM_MAX_LEGS];
@@ -166,6 +186,10 @@ typedef struct {
   int swing;                                   /* CM_SWING_... */
   /* animals: 1 at nothing in particular, 2 at the target */
   int bite, pinch, sting, grab, ink; double bite_target[3], pinch_target[3], sting_target[3], grab_target[3];
+  /* off the ground (stage 4) */
+  int has_depth; double depth;                 /* swimming: metres above the bottom */
+  int has_height; double height;               /* flying: metres above the ground */
+  int climb, drop;                             /* hanging from a ledge: pull up; let go */
 } cm_input;
 typedef struct { double bounce, stride, arm, lean, step, snap; } cm_style;
 extern const cm_style CM_STYLE;                /* 1, 1, 1, 1, 1, 0.3 */
@@ -173,7 +197,7 @@ extern const cm_style CM_STYLE;                /* 1, 1, 1, 1, 1, 0.3 */
 /* Ground height at a point of the world. */
 typedef double (*cm_terrain_fn)(double x, double z, void *user);
 
-typedef struct { double hip[3], knee[3], ankle[3], ball[3], heel[3], toe[3], target[3]; int planted, has_foot, side; } cm_leg_pose;
+typedef struct { double hip[3], knee[3], ankle[3], ball[3], heel[3], toe[3], target[3]; int planted, has_foot, has_target, side; } cm_leg_pose;
 typedef struct {
   double root[3], pitch, heading, crouch;      /* points are in world coordinates */
   int legs;
@@ -207,14 +231,28 @@ typedef struct {
   int n_arms; double arms[CM_MAX_LEGS][7][3];  /* the octopus's arms, seven points each */
   int has_mantle; double mantle_c[3], mantle_tip[3], mantle_r;
   int n_wings; cm_wing_pose wing[2];
+  int swimming, flying, climbing;              /* in the water; in the air; on a ladder or a ledge (then no carry, grenade or side) */
 } cm_pose;
 
 void cm_state_init(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
 void cm_step_ground(cm_state *s, const cm_character *ch, const cm_input *in, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_ground_pose *out);
 
 /* Stage 3: one step of a whole character on the ground: legs and hips, then the upper body, weapons and actions,
-   for every built-in character. Returns 0. */
+   for every built-in character, and from stage 4 in the water, in the air, on a ladder and on a ledge. Returns 0
+   (-1 for the ragdoll and riding, which are not ported yet). */
 int cm_step(cm_state *s, const cm_character *ch, const cm_input *in, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *out);
+/* Stage 4: off the ground. cm_step goes on stepping a character in whatever mode these put it in. Each returns 1 if
+   it took effect. Leaving a mode stands the body on the ground where it is. */
+int cm_enter_swim(cm_state *s, const cm_character *ch);                       /* the octopus */
+int cm_leave_swim(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
+int cm_enter_fly(cm_state *s, const cm_character *ch);                        /* the wasp, the dragon */
+int cm_leave_fly(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
+int cm_enter_ladder(cm_state *s, const cm_character *ch, const cm_ladder *ladder);      /* bipeds; speed climbs */
+void cm_leave_ladder(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
+int cm_grab_ledge(cm_state *s, const cm_character *ch, const double edge[3]);  /* bipeds; in.climb pulls up, in.drop lets go */
+/* Stand a character somewhere in the world, facing a given way, feet on the ground there. */
+void cm_place(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user, double x, double z, double heading);
+
 /* Start a reload by hand (asked: reload full weapons too). Returns 1 if it started. */
 int cm_start_reload(cm_state *s, const cm_character *ch, int asked);
 

@@ -430,7 +430,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
       if (B) { memcpy(B->hip[i], hip, sizeof hip); memcpy(B->knee[i], knee, sizeof knee); memcpy(B->ankle[i], end, sizeof end); }
       memset(o, 0, sizeof *o);
       cm_to_w(&fr, hip, o->hip); cm_to_w(&fr, knee, o->knee); cm_to_w(&fr, end, o->ankle); cm_to_w(&fr, balls[i], o->ball);
-      o->has_foot = ld->has_foot; o->side = ld->side; o->planted = !lg->swing.active;
+      o->has_foot = ld->has_foot; o->side = ld->side; o->planted = !lg->swing.active; o->has_target = lg->swing.active;
       if (ld->has_foot) { cm_to_w(&fr, heels[i], o->heel); cm_to_w(&fr, toes[i], o->toe); }
       if (lg->swing.active) {
         double tg[3];

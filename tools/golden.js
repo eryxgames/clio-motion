@@ -18,12 +18,15 @@
      i step  <19 input numbers>           the inputs from this step on (see inputLine below)
      p n v1 ... vn                        what the ground step left behind (see groundLine below)
 
-   A run marked "stage": 2 or 3 (it stays on the ground: no calls into other modes) is written to
-   spec/body/<id>.txt instead of spec/golden/, the same way: i lines with every input (see inputLine3 below), and p lines with the
+   A run marked "stage": 2, 3 or 4 is written to spec/body/<id>.txt instead of spec/golden/, the same way
+   (stage 4 runs also swim, fly, climb a ladder or a ledge: they have c lines, "c step call arguments", with call
+   1 enterSwim, 2 leaveSwim, 3 enterFly, 4 leaveFly, 5 enterLadder, 6 leaveLadder, 7 grabLedge x y z, 8 place x z heading,
+   and an l line for a ladder: x y0 spacing amp freq phase): i lines with every input (see inputLine3 below), and p lines with the
    whole pose (every number, keys in alphabetical order at every level) followed by how many of each event
    there have been so far (fire reload loaded throw grab putdown punch strike land jump hit drop bite pounce pinch
-   sting ink), and the sum of
-   every number the events have carried (positions, velocities, which gun or hand).
+   sting ink grip top), and the sum of
+   every number the events have carried (positions, velocities, which gun or hand), and the mode the body is in
+   (0 ground, 1 ladder, 2 ragdoll, 3 swim, 4 fly, 5 ledge, 6 ride).
 
    The ground:  { "waves": [[height, kx, kz, phase], ...], "wall": { "x": 3, "h": 2.3 } }
    height(x, z) = sum of height * sin(kx * x + kz * z + phase), plus h beyond the wall.  No waves: flat.
@@ -63,9 +66,13 @@ function inputLine(inp) {
    aim (0 none, 2 or 3 numbers given) ax ay az, fire, armed, kit (0 unsaid, 1 rifle, 2 pistols, 3 sword), reload,
    throw (0, 1 no target, 2 target) tx ty tz, pickup, hasAt ax ay az, hasHeading heading, hasSize d h w, putdown, guard, block,
    punch (0, 1 jab, 2 cross, 3 hook), hasTarget tx ty tz, hasTrack tx ty tz, swing (0, 1 slash, 2 chop, 3 thrust),
-   then bite, pinch, sting and grab, each as (0, 1 no target, 2 target) tx ty tz, and ink */
+   then bite, pinch, sting and grab, each as (0, 1 no target, 2 target) tx ty tz, and ink,
+   then hasDepth depth (swimming), hasHeight height (flying), climb, drop (hanging from a ledge) */
 const KITN = { rifle: 1, pistols: 2, sword: 3 }, PUNCHN = { jab: 1, cross: 2, hook: 3 }, SWINGN = { slash: 1, chop: 2, thrust: 3 };
-const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop', 'bite', 'pounce', 'pinch', 'sting', 'ink'];
+const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop', 'bite', 'pounce', 'pinch', 'sting', 'ink', 'grip', 'top'];
+const MODES = ['ground', 'ladder', 'ragdoll', 'swim', 'fly', 'ledge', 'ride'], CALLS = ['', 'enterSwim', 'leaveSwim', 'enterFly', 'leaveFly', 'enterLadder', 'leaveLadder', 'grabLedge', 'place'];
+// a ladder as data: rung k is at y0 + k * spacing + amp * sin(freq * k + phase), so the rungs can be uneven
+function ladderOf(l) { return { x: l.x, y0: l.y0, spacing: l.spacing, rung: function (k) { return l.y0 + k * l.spacing + (l.amp || 0) * Math.sin((l.freq || 0) * k + (l.phase || 0)); } }; }
 function inputLine3(inp) {
   const v3 = function (a) { return a ? [a[0], a[1], a[2] || 0] : [0, 0, 0]; };
   const aimed = function (x) { return [x ? (x.target ? 2 : 1) : 0].concat(v3(x && x.target)); };
@@ -74,7 +81,8 @@ function inputLine3(inp) {
     th ? (th.target ? 2 : 1) : 0], v3(th && th.target), [pk ? 1 : 0, pk && pk.at ? 1 : 0], v3(pk && pk.at), [pk && pk.heading != null ? 1 : 0, pk && pk.heading || 0,
     sz ? 1 : 0, sz ? sz.d : 0, sz ? sz.h : 0, sz ? sz.w : 0, inp.putdown ? 1 : 0, inp.guard ? 1 : 0, inp.block ? 1 : 0,
     pu ? PUNCHN[pu.kind] || 1 : 0, pu && pu.target ? 1 : 0], v3(pu && pu.target), [tr ? 1 : 0], v3(tr), [sw ? SWINGN[sw.kind] || 1 : 0],
-    aimed(inp.bite), aimed(inp.pinch), aimed(inp.sting), aimed(inp.grab), [inp.ink ? 1 : 0]);
+    aimed(inp.bite), aimed(inp.pinch), aimed(inp.sting), aimed(inp.grab), [inp.ink ? 1 : 0],
+    [inp.depth === undefined ? 0 : 1, inp.depth || 0, inp.height === undefined ? 0 : 1, inp.height || 0, inp.climb ? 1 : 0, inp.drop ? 1 : 0]);
   return inputLine(inp) + ' ' + v.map(fmt17).join(' ');
 }
 /* What the ground step leaves behind: px pz h x y v a phase om crouch run gal ground pitch-state reach-drop hop bank side,
@@ -94,7 +102,7 @@ function fmt(x) { return Number.isFinite(x) ? Number(x.toPrecision(10)).toString
 
 function play(sc) {
   const ch = M.CHARACTERS[sc.character], env = { terrain: ground(sc.ground) };
-  if (sc.ladder) env.ladder = sc.ladder;
+  if (sc.ladder) env.ladder = ladderOf(sc.ladder);
   const S = M.createState(ch, env), hz = sc.hz || 60, dt = 1 / hz, every = sc.every || 10, n = Math.round(sc.seconds * hz);
   const inp = { speed: 0 }, script = sc.script.slice(), lines = ['# ' + sc.id + ' ' + sc.character + ' ' + hz];
   let at = 0, lastIn = null, lands = 0, jumps = 0;
@@ -105,8 +113,9 @@ function play(sc) {
   }
   play.ground = G2;
   // a whole-body replay for every run that stays on the ground (no calls into other modes)
-  const whole = sc.stage === 2 || sc.stage === 3;
+  const whole = sc.stage === 2 || sc.stage === 3 || sc.stage === 4;
   const B3 = whole ? ['# ' + sc.id + ' ' + sc.character + ' ' + hz + ' ' + n + ' ' + every, G2 ? G2[1] : 'g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0')] : null;
+  if (B3 && sc.ladder) B3.push('l ' + [sc.ladder.x, sc.ladder.y0, sc.ladder.spacing, sc.ladder.amp || 0, sc.ladder.freq || 0, sc.ladder.phase || 0].map(fmt17).join(' '));
   const tally = TALLY.map(function () { return 0; });
   let lastIn3 = null, evsum = 0;
   play.body = B3;
@@ -115,7 +124,10 @@ function play(sc) {
     const t = i * dt, once = [];
     while (at < script.length && script[at][0] <= t + 1e-9) {
       const e = script[at++];
-      if (e[1] === 'call') M[e[2]].apply(null, [S, ch, env].concat(e.slice(3)));
+      if (e[1] === 'call') {
+        M[e[2]].apply(null, [S, ch, env].concat(e.slice(3)));
+        if (B3) B3.push('c ' + i + ' ' + CALLS.indexOf(e[2]) + ' ' + [].concat.apply([], e.slice(3)).map(fmt17).join(' '));
+      }
       else Object.keys(e[1]).forEach(function (k) { if (k[0] === '!') { inp[k.slice(1)] = e[1][k]; once.push(k.slice(1)); } else inp[k] = e[1][k]; });
     }
     if (B3) { const iv3 = inputLine3(inp); if (iv3 !== lastIn3) { B3.push('i ' + i + ' ' + iv3); lastIn3 = iv3; } }
@@ -127,7 +139,7 @@ function play(sc) {
     S.events.length = 0;
     once.forEach(function (k) { delete inp[k]; });
     if (G2 && i % every === every - 1) G2.push('p ' + groundLine(S, ch, lands, jumps));
-    if (B3 && i % every === every - 1) { const v3 = flat(S.pose, []).concat(tally, [evsum]); B3.push('p ' + v3.length + ' ' + v3.map(fmt).join(' ')); }
+    if (B3 && i % every === every - 1) { const v3 = flat(S.pose, []).concat(tally, [evsum, MODES.indexOf(S.mode)]); B3.push('p ' + v3.length + ' ' + v3.map(fmt).join(' ')); }
     if (i % every === every - 1) { const v = flat(S.pose, []); lines.push(fmt((i + 1) * dt) + ' ' + S.mode + ' ' + v.length + ' ' + v.map(fmt).join(' ')); }
   }
   return lines.join('\n') + '\n';
