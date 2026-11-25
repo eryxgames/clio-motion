@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.22.0
+
+The skeleton of a pose, live, in C and Python (stage 5a): what an engine needs to show a
+character while the core runs.
+
+- C: `cm_skeleton_step` gives every joint of a pose (place and axes, in the rig's order and
+  names); `cm_joint_move` the matrix that takes a model's bone from the template pose to where it
+  is now; `cm_skeleton_parts` and `cm_parts_order` the parts the joints carry, back to front for a
+  view, with their shade; `cm_part_place` where a part's picture goes on the screen. The rigs are
+  data: `cm_rig_find`, `cm_rig_for`. New sources `clio_motion_rig.c` and `clio_motion_rigs.c`.
+- Python: the same as `clio_motion.rig` (`skeleton`, `joint_move`, `parts`, `order`,
+  `part_place`, `rigs`), with `rigs.json` in the package.
+- JavaScript reference: `liveSkeleton`, `liveParts`, `jointMove`, `rigData` in `js/bake.js`;
+  `GaitRig.LOOK`.
+- `spec/rigs.json`: every character's and kit's joints, template pose and parts as data.
+  `spec/skeleton/`: the skeleton of every third recorded pose (1,154), which both ports reproduce.
+  160 kernel vectors for `partPlace` (1,142 in all).
+- Examples: `c/examples/live2d_svg.c` and `python/examples/live2d_svg.py` draw a character live
+  and write the same SVG file, byte for byte, for all twelve characters.
+- Cutout files: `pictures` (each drawn part's picture as `partPlace` wants it) and
+  `sprites[i].rigPart`, for drawing live instead of from the clips.
+- Godot cutout player: reads a picture the project has not imported.
+  `tools/godot/check_cutout.gd` with `expect_cutout.js` compares it with the tested player. Both
+  scripts are still not run in Godot.
+- Tests: `js/test/skeleton_test.js` in the usual run; the C and Python whole-body tests also
+  check the skeletons.
+
 ## 0.21.0
 
 A drawn character, live in 2D and as a cutout; weights for a model in Blender.

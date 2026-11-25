@@ -1,9 +1,10 @@
 # CLIo Motion in C
 
-C99, no dependencies but the maths library. One header (`clio_motion.h`) and four sources:
+C99, no dependencies but the maths library. One header (`clio_motion.h`) and six sources:
 `clio_motion.c` (kernel), `clio_motion_ground.c` (ground step), `clio_motion_body.c` (upper
-bodies, weapons, actions) and `clio_motion_characters.c` (the built-in characters, written by
-`tools/spec.js`). `clio_motion_internal.h` is shared between the sources and is not part of the
+bodies, weapons, actions), `clio_motion_rig.c` (the skeleton of a pose) and two written by
+`tools/spec.js`: `clio_motion_characters.c` (the built-in characters) and `clio_motion_rigs.c`
+(their joints and parts). `clio_motion_internal.h` is shared between the sources and is not part of the
 interface.
 
     make            # libclio_motion.a, then the tests against the JavaScript reference
@@ -11,7 +12,8 @@ interface.
 
 Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
 (stage 2), whole bodies on the ground (stage 3) for all twelve characters, and off the ground
-(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding.
+(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; and the skeleton of a
+pose for showing it (stage 5a, below).
 
     static double ground(double x, double z, void *user) { return 0.0; }
 
@@ -65,18 +67,74 @@ hand to the bit or the neck strap until a weapon is drawn. To throw a rider, giv
     cm_step(&horse_s, horse, &horse_in, &CM_STYLE, ground, NULL, 1.0 / 60, &horse_p);
     cm_step(&rider_s, soldier, &rider_in, &CM_STYLE, ground, NULL, 1.0 / 60, &rider_p);
 
+## Showing a pose: the skeleton, live
+
+A pose is points in the world. A game showing a model, or drawing the parts in 2D, wants joints:
+where each is and how it is turned.
+
+    cm_skeleton sk;                               /* keep one for each character */
+    cm_part parts[CM_MAX_PARTS];
+    int order[CM_MAX_PARTS], n, i, j;
+    double m[16];
+
+    memset(&sk, 0, sizeof sk);                    /* once, before its first use */
+    /* every frame, after cm_step: */
+    cm_skeleton_step(ch, &pose, &sk);             /* sk.joint[j].o, .x, .y, .z; sk.rig->joints[j].name, .parent */
+
+    /* 3D, a model built on templates/3d: the matrix for each bone */
+    for (j = 0; j < sk.n; j++) cm_joint_move(&sk, j, m);        /* glTF axes, column after column: world = m * rest */
+
+    /* 2D, or a stand-in in 3D: the parts the joints carry, back to front */
+    n = cm_skeleton_parts(&sk, parts);
+    cm_parts_order(parts, n, sk.heading, camera_yaw, order);
+    for (i = 0; i < n; i++) {
+      const cm_part *q = &parts[order[i]];
+      /* a capsule from q->a to q->b of radius q->def->r (a ball if !q->def->has_b), colour q->def->color,
+         shade q->level (0 dark to 4 light, -1: as it is); q->def->part names the picture of a drawn character */
+    }
+
+The joints are those of the character's rig file (`templates/3d/<name>.rig.json`), in the same
+order and with the same names; `cm_rig_find("soldier_pistols")` and `sk.rig` give the rig as data
+(joints with parents and the template pose, parts in their joints' frames). A soldier's rig
+follows the kit in his hands. A joint's `y` runs along its bone and `x` to its side; a bone seen
+exactly end on keeps the turn it had the frame before, which is why the skeleton is kept between
+frames. Nothing else is kept in it.
+
+`cm_joint_move` is in glTF's axes (+Y up, +Z forward, right-handed), which is what a model
+exported from Blender is in. Unity and Unreal convert on import; the wrappers will carry that.
+
+For a drawn character (parts as pictures, from a cutout's `pictures` and `sprites[i].rigPart`, or
+your own atlas) `cm_part_place` says where a picture goes: project the part's two ends, give the
+radius in pixels, and it returns the place, turn, scale and box, anchored at the joint and
+stretched to the bone's end as `js/rig.js` does.
+
+`examples/live2d_svg.c` is a complete program: a character walking over rolling ground and
+knocked down, written as an SVG strip. `python/examples/live2d_svg.py` writes the same file,
+byte for byte, for all twelve characters.
+
+The parts carried rigidly by the joints are within a few hundredths of a percent of leg length of
+where the reference's own drawing code puts them, on average. The exceptions are bodies that
+squash: the octopus's mantle while it swims (up to 19%) and a body rolling as a ragdoll (a few
+percent); the reference stretches those, a rigid part cannot. And a foot drawn as one picture:
+the reference aims it from the heel at the toe tip, so it tilts by up to 8 degrees as the toes
+bend at push-off; carried by the foot joint it stays straight.
+
+## Size and speed
+
 No allocation: the state is one struct of about 24 KB (it keeps the last pose and the ragdoll), the
 pose about 5.5 KB. Whole steps a second
 on one core: about 490,000 for the soldier, 240,000 for the hyena, 170,000 for the scorpion,
 140,000 for the dragon, 80,000 for the octopus; in the air 240,000 for the wasp and 130,000 for
 the dragon; 70,000 for the octopus swimming; falling as a ragdoll about 100,000 for the soldier
-and 180,000 for the horse; a galloping horse and its rider together about 140,000 pairs.
+and 180,000 for the horse; a galloping horse and its rider together about 140,000 pairs. The
+skeleton (5.4 KB) with its parts, their order and every joint's matrix: about 630,000 a second
+for the soldier, 380,000 for the scorpion, 280,000 for the octopus.
 
 The Makefile turns fused multiply-add off (`-ffp-contract=off`) so that every platform rounds the
 way the JavaScript reference does. The kernel agrees with the reference to the last bit or two
-on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 85 recorded runs
-to the ten digits they are recorded with (they also do with fused multiply-add on, on the machine
-they were tried on). The whole-body test also runs clean under the address and undefined-behaviour
+on 1,142 recorded cases; the ground step and the whole-body step reproduce 25 and 85 recorded runs
+to the ten digits they are recorded with, and the skeleton 1,154 recorded poses (they also do with fused multiply-add on, on the machine
+they were tried on). The whole-body test, with the skeleton, also runs clean under the address and undefined-behaviour
 sanitizers and under valgrind, and gives the same result built with clang.
 
 Next: the Unity, Godot and Unreal wrappers sit on top of this.

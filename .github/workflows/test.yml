@@ -20,5 +20,12 @@ jobs:
           python python/tests/test_kernel.py
           python python/tests/test_ground.py
           python python/tests/test_body.py
+      - name: The C and Python examples draw the same picture
+        run: |
+          for n in soldier horse scorpion octopus; do
+            c/examples/live2d_svg $n /tmp/$n.c.svg
+            python python/examples/live2d_svg.py $n /tmp/$n.py.svg
+            cmp /tmp/$n.c.svg /tmp/$n.py.svg
+          done
       - name: The bench builds
         run: python bench/build.py

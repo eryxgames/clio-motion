@@ -36,6 +36,12 @@ int main(int argc, char **argv) {
     }
     else if (!strcmp(name, "ik2")) { cm_ik2(in, in + 3, in[6], in[7], in + 8, got, got + 3); ng = 6; }
     else if (!strcmp(name, "lob")) { cm_lob(in, in + 3, in[6], got); ng = 3; }
+    else if (!strcmp(name, "partPlace")) {
+      cm_picture im; cm_placing o;
+      im.axis = (int)in[0]; im.w = (int)in[9]; im.h = (int)in[10]; im.has_box = (int)in[11]; memcpy(im.box, in + 12, 4 * sizeof(double)); im.len = in[16]; im.r = in[17];
+      cm_part_place(&im, in + 2, in[1] != 0 ? in + 4 : 0, in[6], in[7], in[8] != 0, &o);
+      got[0] = o.x; got[1] = o.y; got[2] = o.rot; got[3] = o.fx; got[4] = o.fy; got[5] = o.dx; got[6] = o.dy; got[7] = o.dw; got[8] = o.dh; ng = 9;
+    }
     else if (!strcmp(name, "reachChain")) {
       int n = (int)in[0];
       if (n < 1 || n > 15) return 2;

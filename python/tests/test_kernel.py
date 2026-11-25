@@ -56,7 +56,16 @@ def ik(a):
     return mid + end
 
 
+def place(a):
+    im = {"axis": ("ball", "up", "down", "right")[int(a[0])], "w": int(a[9]), "h": int(a[10])}
+    if a[11]:
+        im.update(box=a[12:16], len=a[16], r=a[17])
+    o = cm.rig.part_place(im, a[2:4], a[4:6] if a[1] else None, a[6], a[7], bool(a[8]))
+    return [o[k] for k in ("x", "y", "rot", "fx", "fy", "dx", "dy", "dw", "dh")]
+
+
 CASES = {
+    "partPlace": place,
     "smooth": lambda a: [cm.smooth(*a)], "decay": lambda a: [cm.decay(*a)], "ease": lambda a: [cm.ease(*a)],
     "wrapPi": lambda a: [cm.wrap_pi(*a)], "idleNoise": lambda a: [cm.idle_noise(*a)], "spring50": spring50,
     "ik2": ik, "lob": lambda a: cm.lob(a[0:3], a[3:6], a[6]), "reachChain": chain, "gait6": gait6,

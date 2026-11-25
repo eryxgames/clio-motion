@@ -40,11 +40,11 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 | `js/` | The reference implementation: `core.js` (motion), `rig.js` (looks), `bake.js` (clips and files), `drawing.js` (reads a drawn character), `cutout.js` (plays a 2D cutout), `fight.js` (example game code), tests. Guide: [`js/README.md`](js/README.md). |
 | `tools/` | `gaitbake.js`, the command-line baker (also puts the clips on a model of your own); `templates.js`, which writes the templates; `blender/`, the Blender add-on; `godot/`, a cutout player for Godot 4; `spec.js` and `golden.js`, which write what the other versions are checked against. |
 | `templates/` | For artists: a drawing template for Inkscape (`2d/`) and a skeleton with a stand-in model for Blender (`3d/`), per character. Guide: [`templates/README.md`](templates/README.md). |
-| `spec/` | The characters as data, test vectors for the numeric kernel, and recorded runs of whole characters. |
+| `spec/` | The characters and their rigs as data, test vectors for the numeric kernel, and recorded runs of whole characters with their skeletons. |
 | `c/` | The C99 library. |
 | `python/` | The pure-Python version (standard library only), for CLIo. |
 | `bench/` | Gait Bench's sources; `python bench/build.py` builds `docs/index.html`. |
-| `examples/` | Two pages to open in a browser: a drawn character run live in 2D, and a cutout played. |
+| `examples/` | Two pages to open in a browser: a drawn character run live in 2D, and a cutout played. (`c/examples/` and `python/examples/`: a character drawn live from C and from Python.) |
 | `docs/` | The built bench, for GitHub Pages. |
 | `notes/` | Design notes for work that has not started. |
 
@@ -61,18 +61,24 @@ the bottom, each stage checked against the reference before the next one starts.
 | 3b. Animals, arthropods and the octopus: bending spines, necks, jaws, claws, arms, tail chains, folded wings; bites, pinches, stings, grabs, ink | yes | yes | yes |
 | 4a. Swimming, flight, the ladder, the ledge grab | yes | yes | yes |
 | 4b. The ragdoll, riding | yes | yes | yes |
-| 5. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
+| 5a. The skeleton, live: every joint of a pose, the move that takes a model's bone from its template to where it is now, the parts the joints carry and their draw order, where a part's picture goes | yes | yes | yes |
+| 5b. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
 
-Stage 1 agrees with the reference to the last bit or two on 982 recorded cases, in both languages.
+Stage 1 agrees with the reference to the last bit or two on 1,142 recorded cases, in both languages
+(160 of them are stage 5a's rule for placing a part's picture).
 Stage 2 reproduces 25 recorded runs (870 sampled poses of every character) to the ten digits they are
 recorded with. Stages 3 and 4 reproduce 85 whole-body runs (3,462 poses of all
 twelve characters: every number of the pose, the count of each event, what the events carry, and
-the mode the body is in).
+the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,154:
+the joints, the parts they carry, the draw order and shading, the moves).
 
 So the C and Python versions now do everything the reference does: every character whole on the
 ground, with its weapons and every action; in the water, in the air, on a ladder and on a ledge;
 knocked down as a ragdoll from any of these; and a rider on the horse, the spider mech or the
-dragon (`cm_step`, `step`). What is left is the engine wrappers.
+dragon (`cm_step`, `step`). And from a pose they give what a game needs to show it while it
+runs: the skeleton for a 3D model built on `templates/3d`, or the parts back to front for 2D
+(`cm_skeleton_step`, `clio_motion.rig.skeleton`). What is left is the engine wrappers, which are
+now thin: they pass the engine's inputs in and copy the joints out.
 
 ## Use
 
@@ -119,10 +125,10 @@ A model of your own (built on `templates/3d`, see [`templates/README.md`](templa
 ## Tests
 
     node js/test/run.js                 # the reference: every test, then the recorded runs
-    make -C c test                      # C: the kernel's numbers, the ground replays, the whole-body replays
+    make -C c test                      # C: the kernel's numbers, the ground replays, the whole-body replays and skeletons
     python python/tests/test_kernel.py  # Python: the kernel's numbers
     python python/tests/test_ground.py  # Python: the ground replays
-    python python/tests/test_body.py    # Python: the whole-body replays
+    python python/tests/test_body.py    # Python: the whole-body replays and skeletons
     python tools/blender/test_addon.py  # the Blender add-on, the whole way round (needs pip install bpy; not in CI)
 
 After a change to `js/core.js` that is meant to change the motion, `npm run spec` records the
@@ -142,7 +148,11 @@ ten times a second. They are written to `spec/body/` as replays that need no JSO
 input step by step, the calls that change mode (take off, dive in, take hold of a ladder, mount),
 the whole pose, and the events; a run with a rider carries the mount's inputs too. The 25 of them
 that use only what the ground step reads are also written to `spec/ground/`, with what the ground
-step alone must leave behind. A port passes a stage when it reproduces those numbers.
+step alone must leave behind. For every third pose `spec/skeleton/` holds a digest of its live
+skeleton: every joint's place and axes, the parts carried, the draw order and shading from the
+side, and the joints' moves from the template. The rigs themselves (joints, template pose, parts)
+are written as data to `spec/rigs.json`, and again for C and Python. A port passes a stage when
+it reproduces those numbers.
 
 The ragdoll decides many times a step whether a point touches the ground. So that every language
 and every maths library decides alike, a point within a tenth of a micron of the ground counts as
@@ -150,7 +160,7 @@ touching.
 
 ## Planned
 
-- The engine wrappers (Unity, Godot, Unreal) and the CLIo hook.
+- The engine wrappers (Unity, Godot, Unreal) and the CLIo hook, on top of the live skeleton.
 - Groups: a steering layer for flocks, swarms, herds and squads that gives each member the inputs
   `step` already takes, and carries on when members are lost. Vehicles: hover craft and drones,
   then cars and buggies, then tanks, as a new kind of body with crew seats. See

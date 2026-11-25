@@ -68,6 +68,25 @@ Object.keys(M.CHARACTERS).forEach(function (id) {
     });
   });
   check(pictured > 0 && worstJoint < 3e-5 && worstEnd < 3e-5, id + ': a drawn part is held at its joint (' + worstJoint + ' m) and at its bone\'s end (' + worstEnd + ' m)');
+  // --- drawn live from what the file says alone: the pictures' data, each sprite's rig part, and the live skeleton
+  var liveOff = 0, liveSum = 0, liveN = 0, liveTurn = 0;
+  Object.keys(J2.clips).forEach(function (name) {
+    var clip = clips.filter(function (k) { return k.name === name; })[0], lift = clip.ladder ? clip.frames[0].root[1] - ch.rootHeight - 0.1 : 0, sk = null;
+    J2.clips[name].frames.forEach(function (row, f) {
+      sk = B.liveSkeleton(ch, clip.frames[f], sk);
+      var lp = B.liveParts(sk), sorted = R.order(lp, proj);
+      J2.sprites.forEach(function (sp, x) {
+        if (!sp.part || !row[x]) return;
+        var pic = J2.pictures[sp.part], q = lp[sp.rigPart], im = { w: pic.rect[2], h: pic.rect[3], axis: pic.axis, box: pic.box, len: pic.len, r: pic.r };
+        var at = R.partPlace(im, q.pa, q.pe || q.pb, q.r, 1, sorted.flip), lx = at.fx * (at.dx + sp.pivot[0] * at.dw / im.w), ly = at.fy * (at.dy + sp.pivot[1] * at.dh / im.h), cs = Math.cos(at.rot), sn = Math.sin(at.rot);
+        var d = far([at.x + cs * lx - sn * ly, at.y + sn * lx + cs * ly + lift], [row[x][0], row[x][1]]) / ch.L;
+        liveOff = Math.max(liveOff, d); liveSum += d; liveN++;
+        if (Math.sign(at.fx * at.dw) === Math.sign(row[x][3])) liveTurn = Math.max(liveTurn, turn(at.rot - row[x][2]));
+      });
+    });
+  });
+  check(liveN > 0 && Object.keys(J2.pictures).length === Object.keys(parts).length && liveSum / liveN < 0.002 && liveOff < 0.25, id + ': drawn live from the file\'s pictures and the skeleton, a part is where the clip has it (mean ' + liveSum / liveN + ', worst ' + liveOff + ' of leg length, turned by up to ' + liveTurn + ')');
+  console.log('      ' + id.padEnd(9) + 'live from the file: ' + liveN + ' pictures placed, mean ' + (liveSum / liveN * 100).toFixed(3) + '% of leg length off the clip, worst ' + (liveOff * 100).toFixed(1) + '%, turn ' + liveTurn.toFixed(3));
   // --- the player
   var ok = true, jump = 0;
   Object.keys(J.clips).forEach(function (name) {

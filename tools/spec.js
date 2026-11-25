@@ -4,10 +4,12 @@
      spec/characters.json      the built-in characters, as data
      spec/kernel_vectors.txt   inputs and expected outputs for the numeric kernel, one case a line:
                                name  n_in  in...  n_out  out...
+     spec/rigs.json            the rigs as data, for the live skeleton: joints and the parts they carry
+   and, from the same data, c/clio_motion_characters.c, c/clio_motion_rigs.c and the Python package's copies.
    The JavaScript version is the reference; the C and Python versions must reproduce these numbers.
      node tools/spec.js */
 const fs = require('fs'), path = require('path');
-const M = require('../js/core.js'), K = M.kernel;
+const M = require('../js/core.js'), K = M.kernel, R = require('../js/rig.js'), B = require('../js/bake.js')(M, R);
 const dir = path.join(__dirname, '..', 'spec');
 fs.writeFileSync(path.join(dir, 'characters.json'), JSON.stringify(M.CHARACTERS, null, 1) + '\n');
 fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'), JSON.stringify(M.CHARACTERS, null, 1) + '\n');   // the Python package carries its own copy
@@ -63,6 +65,41 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
   fs.writeFileSync(path.join(dir, '..', 'c', 'clio_motion_characters.c'), out.join('\n'));
 })();
 
+// the rigs: for each character (and each of the soldier's kits) its joints and the parts they carry
+(function () {
+  const rigs = {}, c = [], num = function (x) { const t = String(x); return /[.e]/.test(t) ? t : t + '.0'; }, v3 = function (a) { return a ? '{ ' + a.map(num).join(', ') + ' }' : '{ 0.0, 0.0, 0.0 }'; };
+  const str = function (t) { return t ? '"' + t + '"' : '0'; };
+  c.push('/* Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE).', '   SPDX-License-Identifier: Apache-2.0', '',
+    '   Written by tools/spec.js from js/rig.js and js/bake.js. Do not edit: change the reference and run the tool. */', '#include "clio_motion.h"', '#include <string.h>', '');
+  const names = [];
+  Object.keys(M.CHARACTERS).forEach(function (id) {
+    const ch = M.CHARACTERS[id];
+    (ch.mount.type === 'held' ? Object.keys(M.KITS) : [null]).forEach(function (kit) {
+      const d = B.rigData(ch, { kit: kit }), cid = d.name.replace(/[^A-Za-z0-9]/g, '_');
+      rigs[d.name] = { name: d.name, id: d.id, kit: d.kit, leg: d.leg, ears: d.ears, joints: d.joints, parts: d.parts };
+      names.push([d.name, cid, d]);
+      c.push('static const cm_rig_joint J_' + cid + '[] = {');
+      d.joints.forEach(function (j) { c.push('  { "' + j.name + '", ' + j.parent + ', ' + j.ref + ', ' + (j.carried ? 1 : 0) + ', ' + v3(j.o) + ', ' + v3(j.x) + ', ' + v3(j.y) + ', ' + v3(j.z) + ' },'); });
+      c.push('};', 'static const cm_rig_part P_' + cid + '[] = {');
+      d.parts.forEach(function (q) {
+        c.push('  { ' + q.joint + ', ' + (q.b ? 1 : 0) + ', ' + (q.end ? 1 : 0) + ', ' + (q.on ? 1 : 0) + ', ' + v3(q.a) + ', ' + v3(q.b) + ', ' + v3(q.end) + ', ' + v3(q.on) + ', ' + num(q.r) + ', 0x' + q.color.slice(1) + 'u, "' + q.group + '", '
+          + num(q.layer) + ', ' + q.shade + ', ' + str(q.part) + ', ' + str(q.of) + ', ' + (q.raw ? 1 : 0) + ', ' + (q.sq ? 1 : 0) + ' },');
+      });
+      c.push('};', '');
+    });
+  });
+  c.push('static const cm_rig RIGS[] = {');
+  const KITN = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD' };
+  names.forEach(function (n) { c.push('  { "' + n[0] + '", "' + n[2].id + '", ' + (KITN[n[2].kit] || 'CM_KIT_NONE') + ', ' + num(n[2].ears) + ', ' + n[2].joints.length + ', ' + n[2].parts.length + ', J_' + n[1] + ', P_' + n[1] + ' },'); });
+  c.push('};', '', 'int cm_rig_count(void) { return (int)(sizeof RIGS / sizeof RIGS[0]); }', 'const cm_rig *cm_rig_at(int i) { return i >= 0 && i < cm_rig_count() ? &RIGS[i] : 0; }',
+    'const cm_rig *cm_rig_find(const char *name) {', '  int i;', '  for (i = 0; i < cm_rig_count(); i++) if (!strcmp(RIGS[i].name, name)) return &RIGS[i];', '  return 0;', '}', '');
+  fs.writeFileSync(path.join(dir, '..', 'c', 'clio_motion_rigs.c'), c.join('\n'));
+  const text = JSON.stringify(rigs) + '\n';
+  fs.writeFileSync(path.join(dir, 'rigs.json'), text);
+  fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'rigs.json'), text);
+  process.stdout.write('spec/rigs.json ' + names.length + ' rigs, ' + Math.round(text.length / 1024) + ' KB | ');
+})();
+
 let seed = 12345;
 function rnd() { seed = (seed + 0x6D2B79F5) >>> 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 function r(a, b) { return a + (b - a) * rnd(); }
@@ -102,5 +139,14 @@ Object.keys(M.CHARACTERS).forEach(function (id) {
     put('gait6', ins, [gp.Leff, gp.Tn, gp.Fr, gp.run, gp.stride, gp.period, gp.duty, gp.moving, gp.Aw, gp.Ar, gp.gal, S.runWant, S.galWant].concat(gp.phases));
   }
 });
+// where a part's picture goes on its bone. In: axis (0 ball, 1 up, 2 down, 3 right), has b, a, b, radius on screen,
+// pixels to a metre, flipped, picture w h, has box, box, the bone's length and radius when drawn. Out: x y turn fx fy dx dy dw dh
+for (i = 0; i < 160; i++) {
+  const axis = i % 4, hasB = i % 9 ? 1 : 0, a = [r(-200, 200), r(-200, 200)], b = [r(-200, 200), r(-200, 200)], rs = r(1, 30), ppm = r(40, 300), flip = i % 3 === 0, w = Math.round(r(4, 200)), h = Math.round(r(4, 200));
+  const hasBox = i % 5 ? 1 : 0, x0 = r(-0.3, 0), y0 = r(-0.3, 0), box = [x0, y0, x0 + r(0.1, 0.9), y0 + r(0.1, 0.9)], len = i % 11 === 10 ? 4 : r(0.1, 0.8), rr = r(0.02, 0.15);
+  const im = { axis: ['ball', 'up', 'down', 'right'][axis], w: w, h: h }; if (hasBox) { im.box = box; im.len = len; im.r = rr; }
+  const o = R.partPlace(im, a, hasB ? b : null, rs, ppm, flip);
+  put('partPlace', [axis, hasB].concat(a, b, [rs, ppm, flip, w, h, hasBox], box, [len, rr]), [o.x, o.y, o.rot, o.fx, o.fy, o.dx, o.dy, o.dw, o.dh]);
+}
 fs.writeFileSync(path.join(dir, 'kernel_vectors.txt'), lines.join('\n') + '\n');
 console.log('spec/characters.json', Object.keys(M.CHARACTERS).length, 'characters | spec/kernel_vectors.txt', lines.length, 'cases');

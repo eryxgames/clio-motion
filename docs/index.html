@@ -3108,7 +3108,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
     return go(o, null);
   }
 
-  return { partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { LOOK: LOOK, partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });
 
@@ -3411,12 +3411,12 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
           im = parts[q.part]; key = 'p:' + q.part;
           if (imgOf[key] === undefined) { imgOf[key] = images.length; images.push({ part: q.part, w: im.w, h: im.h, src: im }); }
           var bx = im.box, pv = bx ? [-bx[0] * im.w / (bx[2] - bx[0]), -bx[1] * im.h / (bx[3] - bx[1])] : im.axis === 'ball' || !(q.end || q.b) ? [im.w / 2, im.h / 2] : im.axis === 'right' ? [0, im.h / 2] : [im.w / 2, 0];
-          sp = { name: q.g + '/' + q.part, part: q.part, joint: q.j, image: imgOf[key], pivot: pv };
+          sp = { name: q.g + '/' + q.part, part: q.part, joint: q.j, image: imgOf[key], pivot: pv, prim: k };
         } else {
           var d = q.b ? [q.b[0] - q.a[0], q.b[1] - q.a[1], q.b[2] - q.a[2]] : null, L = d ? Math.round(Math.sqrt(dot3(d, d)) * ppm) : 0, rp = Math.max(Math.round(q.r * ppm * 4) / 4, 0.75);
           key = 's:' + L + ':' + rp + ':' + q.col + (q.sq ? 'q' : '') + (q.b ? '' : 'o');
           if (imgOf[key] === undefined) { var cp = capsulePixels(L, rp, R.shade(q.col, -1).rgb, !!q.sq && !!q.b, M2); imgOf[key] = images.length; images.push({ w: cp.w, h: cp.h, rgba: cp.rgba, L: L, rp: rp }); }
-          sp = { name: q.g + '/' + (q.part || q.of || 'shape'), part: null, joint: q.j, image: imgOf[key], pivot: [M2 + rp, M2 + rp], capsule: [L, rp] };
+          sp = { name: q.g + '/' + (q.part || q.of || 'shape'), part: null, joint: q.j, image: imgOf[key], pivot: [M2 + rp, M2 + rp], capsule: [L, rp], prim: k };
         }
         spriteOf[k] = sprites.length; sprites.push(sp);
       });
@@ -3433,11 +3433,14 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         axes: 'x forward (to the right), y down, metres; the ground under the body is y = 0. Angles in radians, clockwise on the screen.',
         frame: ['x', 'y', 'angle', 'scaleX', 'scaleY', 'order', 'tint'],
         sprites: sprites.map(function (sp) {
-          var im = images[sp.image], at = pk.at[sp.image], o2 = { name: sp.name, part: sp.part, joint: sp.joint, rect: [at[0], at[1], im.w, im.h], pivot: [r5(sp.pivot[0]), r5(sp.pivot[1])] };
+          var im = images[sp.image], at = pk.at[sp.image], o2 = { name: sp.name, part: sp.part, joint: sp.joint, rigPart: sp.prim, rect: [at[0], at[1], im.w, im.h], pivot: [r5(sp.pivot[0]), r5(sp.pivot[1])] };
           if (sp.capsule) o2.capsule = sp.capsule;          // a plain shape: its length between the round ends and its radius, in picture pixels
           return o2;
         }),
         clips: {} };
+      // for drawing live instead of from the clips: each drawn part's picture, as partPlace wants it
+      json.pictures = {};
+      images.forEach(function (im, k) { if (im.part) { var s2 = im.src, at = pk.at[k]; json.pictures[im.part] = { rect: [at[0], at[1], im.w, im.h], axis: s2.axis }; if (s2.box) { json.pictures[im.part].box = s2.box.map(r5); json.pictures[im.part].len = r5(s2.len); json.pictures[im.part].r = r5(s2.r); } } });
       clips.forEach(function (c) {
         // a climb is in place: the body is brought down to where it would stand
         var frames = [], ok = true, lift = c.ladder ? c.frames[0].root[1] - ch.rootHeight - 0.1 : 0;
@@ -3672,7 +3675,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
           return { t: toLocal(P.B, d), B: [toLocal(P.B, w.B[0]), toLocal(P.B, w.B[1]), toLocal(P.B, w.B[2])] };
         });
       }
-      return { J: J, jIdx: jIdx, parent: parent, frames: frames, locals: locals };
+      return { J: J, jIdx: jIdx, parent: parent, refs: refs, frames: frames, locals: locals };
     }
     // o.bind: build the mesh and the skeleton in this pose instead of the first frame of the first clip.
     // o.clips === false: no animations (a rest-pose file).
@@ -3828,6 +3831,85 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       o = o || {};
       var kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null;
       return glbSkinned(ch, [], { bind: templatePose(ch, { kit: kit }), clips: false, name: o.name });
+    }
+
+    // ------------------------------------------------- the skeleton, live
+    // What a game needs to move a model, or to draw the parts, from a pose while it runs. This is the reference for
+    // the C and Python versions (clio_motion_rig.c, rig.py), which are checked against it.
+    //   rigData(ch, { kit })        the rig as data: joints (parent, which side reference, where they are in the
+    //                               template pose) and parts (the stand-in model's, each in its joint's own frame)
+    //   liveSkeleton(ch, pose, prev) where every joint is for this pose: { rig, frames: [{ o, x, y, z }] } in the
+    //                               pose's axes; y runs along the bone, x to its side. prev: what the last call
+    //                               returned for this character (a bone seen end on keeps the turn it had)
+    //   liveParts(sk, heading)      the parts carried by those joints, as buildPrims lists them (for R.sprites)
+    //   jointMove(sk, j)            the 4 x 4 matrix (glTF axes, column after column) that takes anything bound to
+    //                               joint j from the template pose to where it is now: world = move * rest
+    function unconv(g) { return [g[2], g[1], -g[0]]; }
+    function kitOf(ch, pose) {
+      if (ch.mount.type !== 'held' || !pose.props) return null;
+      var kinds = pose.props.map(function (w) { return w.kind; }), kit = kinds.indexOf('sword') >= 0 ? 'sword' : kinds.indexOf('pistol') >= 0 ? 'pistols' : 'rifle';
+      return kit === ch.mount.kit ? null : kit;
+    }
+    var rigs = {};
+    function rigData(ch, o) {
+      o = o || {};
+      var kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null, key = ch.id + (kit ? '_' + kit : '');
+      if (rigs[key]) return rigs[key];
+      var base = rig(ch, { kit: kit }), tp = R.buildPrims(templatePose(ch, { kit: kit }), ch, { flash: false, model: true });
+      var std = R.buildPrims(record(ch, 'idle', { frames: 8, kit: kit }).frames[0], ch, { flash: false, model: true }), sk = skeleton(std), F0 = sk.frames(std, null), Fr = sk.frames(tp, F0);
+      function local(F, pt) { var c = conv(pt), d = [c[0] - F.o[0], c[1] - F.o[1], c[2] - F.o[2]]; return r6([dot3(F.B[0], d), dot3(F.B[1], d), dot3(F.B[2], d)]); }
+      var K2 = R.LOOK && R.LOOK[ch.id], data = { name: base.name, id: ch.id, kit: base.kit, leg: ch.L, ears: K2 && K2.ears ? Math.round(K2.head / 0.088 * 1e6) / 1e6 : 0, sk: sk,
+        joints: sk.J.map(function (j, k) { return { name: j.name, parent: sk.parent[k], ref: sk.refs[k] === 'fwd' ? 1 : 0, own: j.side ? 1 : 0, carried: !!base.joints[k].carried,
+          o: r6(unconv(Fr[k].o)), x: r6(unconv(Fr[k].B[0])), y: r6(unconv(Fr[k].B[1])), z: r6(unconv(Fr[k].B[2])) }; }),
+        parts: tp.map(function (q) {
+          var k = sk.jIdx[q.j], F = Fr[k];
+          return { joint: k, a: local(F, q.a), b: q.b ? local(F, q.b) : null, end: q.end ? local(F, q.end) : null, on: q.on ? local(F, q.on) : null, r: q.r, color: q.col, group: q.g, layer: q.ly, shade: q.sh,
+            part: q.part || null, of: q.of || null, raw: !!q.raw, sq: !!q.sq };
+        }) };
+      // the template pose as the data has it (rounded), in glTF axes: what a bone seen end on falls back to, and what moves are measured from
+      data.tpl = data.joints.map(function (j) { return { o: conv(j.o), B: [conv(j.x), conv(j.y), conv(j.z)] }; });
+      rigs[key] = data;
+      return data;
+    }
+    // Things in the hands change their place in the draw order with what the hands are doing: a weapon in the hand is
+    // in front of the body, put away it is behind or at the hip; a grenade in the hand is in front of the arm.
+    // By group name: [layer, shade].
+    function heldLayers(pose) {
+      var o = {};
+      (pose.props || []).forEach(function (w, k) {
+        var st = w.stow > 0.5;
+        o['prop' + k] = w.kind === 'pistol' ? [k === 0 ? (st ? 2.1 : 3.1) : (st ? -2.1 : -2.9), k === 0 ? 3 : 1] : w.kind === 'sword' ? [st ? -2.3 : 3.1, 3] : w.kind === 'shield' ? [st ? -0.6 : -2.6, 1] : [st ? -0.5 : 0.5, 2];
+      });
+      if (pose.kind === 'biped') o.grenade = [pose.grenade && pose.grenade.held ? 3.05 : 2.2, 3];
+      return o;
+    }
+    function liveSkeleton(ch, pose, prev) {
+      var data = rigData(ch, { kit: kitOf(ch, pose) }), prims = R.buildPrims(pose, ch, { flash: false, model: true });
+      if (prims.joints.length !== data.joints.length) throw new Error('The pose has ' + prims.joints.length + ' joints; the rig ' + data.name + ' has ' + data.joints.length + '.');
+      var G2 = data.sk.frames(prims, prev && prev.rig === data ? prev.g : data.tpl);          // (with nothing before it, a bone seen end on is turned as in the template pose)
+      return { rig: data, g: G2, heading: prims.heading, held: heldLayers(pose), frames: G2.map(function (F) { return { o: unconv(F.o), x: unconv(F.B[0]), y: unconv(F.B[1]), z: unconv(F.B[2]) }; }) };
+    }
+    function liveParts(sk) {
+      var F = sk.frames, out = sk.rig.parts.map(function (q) {
+        var f = F[q.joint];
+        function at(l) { return l ? [f.o[0] + f.x[0] * l[0] + f.y[0] * l[1] + f.z[0] * l[2], f.o[1] + f.x[1] * l[0] + f.y[1] * l[1] + f.z[1] * l[2], f.o[2] + f.x[2] * l[0] + f.y[2] * l[1] + f.z[2] * l[2]] : null; }
+        var hl = sk.held[q.group], o2 = { a: at(q.a), b: at(q.b), r: q.r, col: q.color, g: q.group, ly: hl ? hl[0] : q.layer, sh: hl ? hl[1] : q.shade, j: sk.rig.joints[q.joint].name };
+        if (q.end) o2.end = at(q.end);
+        if (q.on) o2.on = at(q.on);
+        if (q.part) o2.part = q.part;
+        if (q.of) o2.of = q.of;
+        if (q.raw) o2.raw = true;
+        if (q.sq) o2.sq = true;
+        return o2;
+      });
+      out.heading = sk.heading;
+      return out;
+    }
+    function jointMove(sk, j) {
+      var A = sk.g[j].B, Bq = sk.rig.tpl[j].B, R3 = [], c, r, o0 = sk.rig.tpl[j].o, o1 = sk.g[j].o;
+      for (c = 0; c < 3; c++) for (r = 0; r < 3; r++) R3[c * 3 + r] = A[0][r] * Bq[0][c] + A[1][r] * Bq[1][c] + A[2][r] * Bq[2][c];
+      return [R3[0], R3[1], R3[2], 0, R3[3], R3[4], R3[5], 0, R3[6], R3[7], R3[8], 0,
+        o1[0] - (R3[0] * o0[0] + R3[3] * o0[1] + R3[6] * o0[2]), o1[1] - (R3[1] * o0[0] + R3[4] * o0[1] + R3[7] * o0[2]), o1[2] - (R3[2] * o0[0] + R3[5] * o0[1] + R3[8] * o0[2]), 1];
     }
 
     // A drawing template for Inkscape: the figure seen from its right side in the template pose (a biped's arms
@@ -4161,7 +4243,8 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
 
     return { record: record, recordAll: recordAll, clipNames: clipNames, walkSpeed: walkSpeed, runSpeed: runSpeed, newPalette: newPalette, rasterize: rasterize,
       framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned,
-      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, cutout: cutout, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
+      templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, cutout: cutout,
+      rigData: rigData, liveSkeleton: liveSkeleton, liveParts: liveParts, jointMove: jointMove, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
   };
 });
 

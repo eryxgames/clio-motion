@@ -129,15 +129,43 @@ description and the atlas (the baker and Gait Bench write them as `<id>_cutout.j
   and tint from the earlier one; if a scale changes sign (the body has turned round), hold the
   earlier frame. A looping clip runs from its last frame into its first.
 
+- `pictures[part]`, for a drawn character: `rect` and how the picture lies on its bone (`axis`,
+  `box`, `len`, `r`), which is what `partPlace` wants; `sprites[i].rigPart` is the number of the
+  rig part the sprite shows. A game that runs the core live (in C or Python, below) draws from
+  these and never reads the clips.
+
 `js/cutout.js` is a complete player (`GaitCutout.sample`, `GaitCutout.draw`) and needs no other
 file. `tools/godot/clio_cutout.gd` is the same for Godot 4; it was written from Godot's
-documentation and has not been run. For Unity: y is up there, so use (x, -y), turn by -angle,
+documentation and has not been run. `tools/godot/check_cutout.gd` checks it against
+`js/cutout.js` on your machine (how: at the top of that file). For Unity: y is up there, so use (x, -y), turn by -angle,
 and measure the pivot from the picture's bottom left.
 
 The cutout shows the body from its right side, in place, like the sprite sheet; mirror the whole
 character to face left. A plain shape's picture is stretched along its length as the part
 foreshortens, so its round ends flatten a little. Muzzle flashes and the carried crate are not in
 it.
+
+## The skeleton, live
+
+`buildPrims` is the reference's own drawing: it places every part from the pose directly, and it
+squashes and stretches. For a model with bones, and for the C and Python versions, there is a
+second, stricter way that goes through joints:
+
+    const sk = B.liveSkeleton(ch, pose, prevSk);    // sk.frames[j]: { o, x, y, z }, the rig's joints for this pose
+    const m = B.jointMove(sk, j);                   // 4 x 4, glTF axes: world = m * rest, for a model on templates/3d
+    const parts = B.liveParts(sk);                  // the parts those joints carry; R.order and R.sprites take them
+
+`B.rigData(ch)` is the rig as data: joints (name, parent, the template pose) and parts in their
+joints' frames. `tools/spec.js` writes it for every character and kit to `spec/rigs.json`, and
+the C and Python versions (`cm_skeleton_step`, `clio_motion.rig.skeleton`) are checked against
+this one on 1,154 recorded poses. `node js/test/skeleton_test.js` (part of the usual run) checks
+this one against `buildPrims`: the same draw order and shading from three sides in every frame of
+every clip, parts within a few hundredths of a percent of leg length on average, and every
+joint's move bringing the template joint to where it is now. Where the two differ, a body is
+squashing (the octopus's mantle while it swims, by up to 19% of leg length; a body rolling as a
+ragdoll, a few percent) or a one-picture foot is bending at the toes (up to 8 degrees).
+`js/test/cutout_test.js` also places a drawn character live from nothing but the cutout file's
+`pictures` and the skeleton, and finds each part where the clip has it.
 
 ## Engines
 

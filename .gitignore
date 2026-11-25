@@ -11,3 +11,5 @@ __pycache__/
 build/
 dist/
 .DS_Store
+c/examples/live2d_svg
+*_live.svg

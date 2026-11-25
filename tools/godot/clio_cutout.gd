@@ -12,7 +12,8 @@
 # The node's origin is the point on the ground under the body. Pixels Per Metre sets its size.
 #
 # NOT YET RUN IN GODOT. It was written from the Godot 4 documentation and follows js/cutout.js line
-# for line; js/cutout.js is the player that has been tested. Tell us what breaks.
+# for line; js/cutout.js is the player that has been tested. tools/godot/check_cutout.gd compares the
+# two on your machine: see the top of that file.
 class_name ClioCutout
 extends Node2D
 
@@ -41,7 +42,15 @@ func load_pack(path: String) -> bool:
 	if typeof(parsed) != TYPE_DICTIONARY or parsed.get("format", "") != "clio-motion-cutout":
 		push_error("ClioCutout: %s is not a cutout file" % path)
 		return false
-	var texture := load(path.get_base_dir().path_join(parsed["image"])) as Texture2D
+	var picture: String = path.get_base_dir().path_join(parsed["image"])
+	var texture: Texture2D = null
+	if ResourceLoader.exists(picture):
+		texture = load(picture) as Texture2D
+	if texture == null:
+		# not a picture the project has imported: read the file as it is
+		var raw := Image.load_from_file(picture)
+		if raw != null:
+			texture = ImageTexture.create_from_image(raw)
 	if texture == null:
 		push_error("ClioCutout: the picture %s is not next to %s" % [parsed["image"], path])
 		return false

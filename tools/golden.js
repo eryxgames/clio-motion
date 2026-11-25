@@ -30,6 +30,13 @@
 
    The ground:  { "waves": [[height, kx, kz, phase], ...], "wall": { "x": 3, "h": 2.3 } }
    height(x, z) = sum of height * sin(kx * x + kz * z + phase), plus h beyond the wall.  No waves: flat.
+   For every third sample of a whole-body run, spec/skeleton/<id>.txt has what the live skeleton makes of that pose
+   (B.liveSkeleton, B.liveParts, B.jointMove), boiled down so that the files stay small:
+     k sample rig n  a b  a b ...  parts order shade move
+   for each of the n joints, a = its place and b = its three axes, each weighed into one number (see skeletonLine);
+   then the parts those joints carry, their draw order and shading seen from the side, and the joints' moves from
+   the template pose, each as one number.
+
    A run with "style": { ... } is played with those style settings over the usual ones; its replay has an s line:
    bounce stride arm lean step snap still.
 
@@ -42,7 +49,7 @@
    in front is given for one step only ("!jump": true).  [time, "call", name, ...arguments] calls one of
    enterSwim, leaveSwim, enterFly, leaveFly, enterLadder, leaveLadder, grabLedge, place. */
 const fs = require('fs'), path = require('path');
-const M = require('../js/core.js');
+const M = require('../js/core.js'), R = require('../js/rig.js'), B = require('../js/bake.js')(M, R);
 const dir = path.join(__dirname, '..', 'spec'), out = path.join(dir, 'golden');
 const STYLE0 = { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3, still: 0 };
 
@@ -110,6 +117,22 @@ function groundLine(S, ch, lands, jumps) {
 }
 function fmt(x) { return Number.isFinite(x) ? Number(x.toPrecision(10)).toString() : 'nan'; }
 
+/* The live skeleton of a pose as a few numbers. sk: B.liveSkeleton's answer. */
+const SIDE = R.projector({ cx: 0, cy: 0, cz: 0, yaw: 0, pit: 0, ppm: 1, ox: 0, oy: 0 });
+function skeletonLine(sk) {
+  const v = [];
+  sk.frames.forEach(function (f) {
+    v.push(f.o[0] + 0.7 * f.o[1] + 0.3 * f.o[2]);
+    v.push(0.9 * f.x[0] + 0.5 * f.x[1] + 0.2 * f.x[2] + 0.4 * f.y[0] + f.y[1] + 0.6 * f.y[2] + 0.3 * f.z[0] + 0.8 * f.z[1] + 1.1 * f.z[2]);
+  });
+  const parts = B.liveParts(sk); let p1 = 0, ok = 0, ol = 0, mv = 0;
+  parts.forEach(function (q, i) { p1 += ((i % 7) + 1) * (q.a[0] + 0.7 * q.a[1] + 0.3 * q.a[2] + (q.b ? 0.5 * q.b[0] + 0.9 * q.b[1] + 0.4 * q.b[2] : 0)); });
+  R.order(parts, SIDE);
+  parts.forEach(function (q, i) { ok += q.k * ((i % 5) + 1); ol += q.lv * ((i % 3) + 1); });
+  sk.frames.forEach(function (f, j) { B.jointMove(sk, j).forEach(function (x, e) { mv += x * ((e % 4) + 1); }); });
+  return sk.rig.name + ' ' + sk.frames.length + ' ' + v.concat([p1 / parts.length, ok, ol, mv / sk.frames.length]).map(fmt).join(' ');
+}
+
 function play(sc) {
   const STYLE = Object.assign({}, STYLE0, sc.style || {});
   const ch = M.CHARACTERS[sc.character], env = { terrain: ground(sc.ground) };
@@ -135,6 +158,8 @@ function play(sc) {
   const tally = TALLY.map(function () { return 0; });
   let lastIn3 = null, evsum = 0;
   play.body = B3;
+  const K3 = whole ? ['# ' + sc.id + ' ' + sc.character] : null; let skPrev = null, nSample = 0;
+  play.skeleton = K3;
   const seen = play.events = [];
   for (let i = 0; i < n; i++) {
     const t = i * dt, once = [], onceM = [];
@@ -164,7 +189,11 @@ function play(sc) {
     S.events.length = 0;
     once.forEach(function (k) { delete inp[k]; });
     if (G2 && i % every === every - 1) G2.push('p ' + groundLine(S, ch, lands, jumps));
-    if (B3 && i % every === every - 1) { const v3 = flat(S.pose, []).concat(tally, [evsum, MODES.indexOf(S.mode)]); B3.push('p ' + v3.length + ' ' + v3.map(fmt).join(' ')); }
+    if (B3 && i % every === every - 1) {
+      const v3 = flat(S.pose, []).concat(tally, [evsum, MODES.indexOf(S.mode)]); B3.push('p ' + v3.length + ' ' + v3.map(fmt).join(' '));
+      if (nSample % 3 === 0) { skPrev = B.liveSkeleton(ch, S.pose, skPrev); K3.push('k ' + nSample + ' ' + skeletonLine(skPrev)); }
+      nSample++;
+    }
     if (i % every === every - 1) { const v = flat(S.pose, []); lines.push(fmt((i + 1) * dt) + ' ' + S.mode + ' ' + v.length + ' ' + v.map(fmt).join(' ')); }
   }
   return lines.join('\n') + '\n';
@@ -189,6 +218,12 @@ scenarios.forEach(function (sc) {
     if (/ nan/.test(bt)) { bad++; console.log(sc.id + ': a body value is not a number'); }
     if (check) { if (!fs.existsSync(bf) || fs.readFileSync(bf, 'utf8') !== bt) { bad++; console.log(sc.id + ': body replay differs from the recorded one'); } }
     else { fs.mkdirSync(path.join(dir, 'body'), { recursive: true }); fs.writeFileSync(bf, bt); }
+  }
+  if (play.skeleton) {
+    const kt = play.skeleton.join('\n') + '\n', kf = path.join(dir, 'skeleton', sc.id + '.txt');
+    if (/ nan/.test(kt)) { bad++; console.log(sc.id + ': a skeleton value is not a number'); }
+    if (check) { if (!fs.existsSync(kf) || fs.readFileSync(kf, 'utf8') !== kt) { bad++; console.log(sc.id + ': skeleton differs from the recorded one'); } }
+    else { fs.mkdirSync(path.join(dir, 'skeleton'), { recursive: true }); fs.writeFileSync(kf, kt); }
   }
   if (play.body) return;                                    // the whole-body replay holds the same poses
   if (check) { if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) { bad++; console.log(sc.id + ': differs from the recorded run'); } }

@@ -15,14 +15,15 @@ import json
 import os
 
 from .body import KITS, PROPS, start_reload, upper_body
+from . import rig
 from .ground import STYLE, State, create_state, pose_to_world, step_ground
 from .modes import (Ladder, dismount, enter_fly, enter_ladder, enter_swim, grab_ledge, leave_fly, leave_ladder, leave_swim, mount_up, place, stand, step, step_fly,
                     step_ladder, step_ledge, step_swim)
 from .kernel import (G, TAU, GaitState, Spring, clamp, decay, ease, frac, gait_params, idle_noise, idle_period,
                      ik2, lerp, lob, reach_chain, smooth, wrap_pi)
 
-__version__ = "0.21.0"
-__all__ = ["G", "TAU", "GaitState", "STYLE", "Spring", "State", "characters", "create_state", "step_ground", "step", "upper_body", "start_reload", "pose_to_world", "KITS", "PROPS", "Ladder", "enter_fly", "enter_ladder", "enter_swim", "grab_ledge", "leave_fly", "leave_ladder", "leave_swim", "place", "stand", "mount_up", "dismount",
+__version__ = "0.22.0"
+__all__ = ["rig", "G", "TAU", "GaitState", "STYLE", "Spring", "State", "characters", "create_state", "step_ground", "step", "upper_body", "start_reload", "pose_to_world", "KITS", "PROPS", "Ladder", "enter_fly", "enter_ladder", "enter_swim", "grab_ledge", "leave_fly", "leave_ladder", "leave_swim", "place", "stand", "mount_up", "dismount",
            "step_fly", "step_ladder", "step_ledge", "step_swim", "clamp", "decay", "ease", "frac", "gait_params",
            "idle_noise", "idle_period", "ik2", "lerp", "lob", "reach_chain", "smooth", "wrap_pi"]
 

@@ -85,6 +85,25 @@ def flat(v, acc):
     return acc
 
 
+def skeleton_numbers(sk):
+    """The live skeleton of a pose boiled down to a few numbers, as tools/golden.js does it (skeletonLine)."""
+    v = []
+    for f in sk["frames"]:
+        o, x, y, z = f["o"], f["x"], f["y"], f["z"]
+        v.append(o[0] + 0.7 * o[1] + 0.3 * o[2])
+        v.append(0.9 * x[0] + 0.5 * x[1] + 0.2 * x[2] + 0.4 * y[0] + y[1] + 0.6 * y[2] + 0.3 * z[0] + 0.8 * z[1] + 1.1 * z[2])
+    P = cm.rig.parts(sk)
+    p1 = sum(((i % 7) + 1) * (q["a"][0] + 0.7 * q["a"][1] + 0.3 * q["a"][2] + (0.5 * q["b"][0] + 0.9 * q["b"][1] + 0.4 * q["b"][2] if q["b"] else 0)) for i, q in enumerate(P))
+    cm.rig.order(P, sk["heading"], 0.0)
+    ok = sum(q["key"] * ((i % 5) + 1) for i, q in enumerate(P))
+    ol = sum(q["level"] * ((i % 3) + 1) for i, q in enumerate(P))
+    mv = sum(x * ((e % 4) + 1) for j in range(len(sk["frames"])) for e, x in enumerate(cm.rig.joint_move(sk, j)))
+    return v + [p1 / len(P), ok, ol, mv / len(sk["frames"])]
+
+
+SKEL = {"samples": 0, "bad": 0, "worst": 0.0, "first": None}
+
+
 def play(path):
     with open(path, encoding="utf-8") as f:
         lines = f.read().split("\n")
@@ -118,6 +137,15 @@ def play(path):
             ladder = cm.Ladder(lx, y0, spacing, lambda k, y0=y0, spacing=spacing, amp=amp, freq=freq, phase=phase: y0 + k * spacing + amp * math.sin(freq * k + phase))
         else:
             wants.append([float(x) for x in w[2:]])
+    # what the live skeleton must make of every third sample
+    skel, sk = {}, None
+    spath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(path))), "skeleton", os.path.basename(path))
+    if os.path.exists(spath):
+        with open(spath, encoding="utf-8") as f:
+            for ln in f:
+                w = ln.split()
+                if w and w[0] == "k":
+                    skel[int(w[1])] = (w[2], int(w[3]), [float(x) for x in w[4:]])
     S = cm.create_state(ch, terrain)
     Sm = cm.create_state(mch, terrain) if mch else None
     mount = (Sm, mch) if mch else None
@@ -167,6 +195,24 @@ def play(path):
         S.events.clear()
         if i % every == every - 1:
             got, want = flat(pose, []) + tally + [evsum, MODES.index(S.mode)], wants[k]
+            if k in skel:
+                sk = cm.rig.skeleton(ch, pose, sk)
+                name, nj, nums = skel[k]
+                mine = skeleton_numbers(sk)
+                SKEL["samples"] += 1
+                if sk["rig"]["name"] != name or len(mine) != len(nums):
+                    SKEL["bad"] += 1
+                    SKEL["first"] = SKEL["first"] or "%s sample %d: rig %s with %d numbers, expected %s with %d" % (os.path.basename(path), k, sk["rig"]["name"], len(mine), name, len(nums))
+                else:
+                    e2 = max(abs(a - b) / (1 + abs(b)) for a, b in zip(mine, nums))
+                    if not e2 <= TOL:
+                        SKEL["bad"] += 1
+                        if SKEL["first"] is None:
+                            j = max(range(len(mine)), key=lambda q: abs(mine[q] - nums[q]))
+                            what = "joint %s (%s)" % (sk["rig"]["joints"][j // 2]["name"], "place" if j % 2 == 0 else "axes") if j < 2 * nj else ("parts", "draw order", "shade", "moves")[j - 2 * nj]
+                            SKEL["first"] = "%s sample %d, %s: got %r, expected %r" % (os.path.basename(path), k, what, mine[j], nums[j])
+                    else:
+                        SKEL["worst"] = max(SKEL["worst"], e2)
             k += 1
             if len(got) != len(want):
                 bad += 1
@@ -198,7 +244,10 @@ def main(prefix=""):
             wrong += 1
             print("%-24s %d of %d samples differ; first: %s" % (name[:-4], bad, n, first))
     print("Python whole body: %d replays, %d samples, %d replays wrong, largest difference %.3g" % (runs, total, wrong, worst))
-    return 1 if wrong or not runs else 0
+    if SKEL["first"]:
+        print("first skeleton difference: " + SKEL["first"])
+    print("Python live skeleton: %d samples, %d wrong, largest difference %.3g" % (SKEL["samples"], SKEL["bad"], SKEL["worst"]))
+    return 1 if wrong or not runs or SKEL["bad"] or not SKEL["samples"] else 0
 
 
 if __name__ == "__main__":

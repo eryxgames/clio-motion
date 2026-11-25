@@ -4,7 +4,8 @@ Pure Python, standard library only, so CLIo can carry it without a compiler.
 
 Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
 (stage 2), whole bodies on the ground (stage 3) for all twelve characters, and off the ground
-(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding.
+(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; and the skeleton of a
+pose for showing it (stage 5a, below).
 
     import clio_motion as cm
 
@@ -60,12 +61,45 @@ Riding: step the mount first, then the rider with the mount as the last argument
     pose = cm.step(S, ch, {"armed": True, "aim": [30, 2, 6]}, cm.STYLE, ground, 1 / 60, (Sh, horse))
     cm.dismount(S, ch, ground)           # stands him beside the mount, on its left
 
+## Showing a pose: the skeleton, live
+
+A pose is points in the world. A game showing a model, or drawing the parts in 2D, wants joints:
+where each is and how it is turned. `clio_motion.rig` gives them.
+
+    sk = None                                           # keep one for each character
+    # every frame, after cm.step:
+    sk = cm.rig.skeleton(ch, pose, sk)
+    for joint, f in zip(sk["rig"]["joints"], sk["frames"]):
+        joint["name"], joint["parent"], f["o"], f["x"], f["y"], f["z"]      # place; side, along the bone, third axis
+
+    m = cm.rig.joint_move(sk, j)                        # 3D: 16 numbers, glTF axes, column after column: world = m * rest
+
+    for q in cm.rig.order(cm.rig.parts(sk), sk["heading"], camera_yaw):     # 2D: the parts, back to front
+        q["a"], q["b"], q["r"], q["color"], q["level"]  # a capsule a..b (b None: a ball); shade 0 dark .. 4 light, -1 as it is
+
+The joints are those of the character's rig file (`templates/3d/<name>.rig.json`), in the same
+order and with the same names; `cm.rig.rigs()` holds the rigs as data. A soldier's rig follows
+the kit in his hands. A bone seen exactly end on keeps the turn it had the frame before, which is
+why the last skeleton is passed back in.
+
+For a drawn character, `cm.rig.part_place(picture, a, b, rs, ppm, flip)` says where a part's
+picture goes on the screen (`picture`: `w`, `h`, `axis`, and `box`, `len`, `r` for one cut from a
+drawing; the cutout file lists them under `pictures`). It returns `x`, `y`, `rot`, `fx`, `fy` and
+the box `dx`, `dy`, `dw`, `dh`.
+
+`examples/live2d_svg.py` is a complete program: `python python/examples/live2d_svg.py horse`
+writes a strip of a horse walking over rolling ground and knocked down. It writes the same file
+as `c/examples/live2d_svg.c`, byte for byte, for all twelve characters.
+
+## Speed, and the check
+
 Speed on one core, whole steps a second: about 5,000 for the soldier, 7,000 for the hyena and
 the dragon, 6,000 for the scorpion, 2,800 for the octopus; a galloping horse and its rider
-together about 3,000 pairs.
+together about 3,000 pairs. The skeleton with its parts in order: about 9,000 a second for the
+soldier, 6,000 for the scorpion.
 
 Check it against the JavaScript reference:
 
     python python/tests/test_kernel.py
     python python/tests/test_ground.py
-    python python/tests/test_body.py
+    python python/tests/test_body.py      # also the skeletons, against spec/skeleton/

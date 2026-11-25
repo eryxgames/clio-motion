@@ -137,6 +137,26 @@ static double carried(const cm_event *e) {
   return s3;
 }
 
+/* The live skeleton of a pose boiled down to a few numbers, as tools/golden.js does it (skeletonLine). */
+static int skeleton_numbers(cm_skeleton *sk, double *v) {
+  static cm_part parts[CM_MAX_PARTS];
+  int n = 0, i, e, np = cm_skeleton_parts(sk, parts);
+  double p1 = 0, ok = 0, ol = 0, mv = 0, m[16];
+  for (i = 0; i < sk->n; i++) {
+    const cm_joint *f = &sk->joint[i];
+    v[n++] = f->o[0] + 0.7 * f->o[1] + 0.3 * f->o[2];
+    v[n++] = 0.9 * f->x[0] + 0.5 * f->x[1] + 0.2 * f->x[2] + 0.4 * f->y[0] + f->y[1] + 0.6 * f->y[2] + 0.3 * f->z[0] + 0.8 * f->z[1] + 1.1 * f->z[2];
+  }
+  for (i = 0; i < np; i++) p1 += ((i % 7) + 1) * (parts[i].a[0] + 0.7 * parts[i].a[1] + 0.3 * parts[i].a[2] + (parts[i].def->has_b ? 0.5 * parts[i].b[0] + 0.9 * parts[i].b[1] + 0.4 * parts[i].b[2] : 0));
+  cm_parts_order(parts, np, sk->heading, 0.0, 0);
+  for (i = 0; i < np; i++) { ok += parts[i].key * ((i % 5) + 1); ol += parts[i].level * ((i % 3) + 1); }
+  for (i = 0; i < sk->n; i++) { cm_joint_move(sk, i, m); for (e = 0; e < 16; e++) mv += m[e] * ((e % 4) + 1); }
+  v[n++] = p1 / np; v[n++] = ok; v[n++] = ol; v[n++] = mv / sk->n;
+  return n;
+}
+static int sk_samples = 0, sk_bad = 0, sk_shown = 0;
+static double sk_worst = 0;
+
 /* a ladder as the replay gives it: rung k is at y0 + k * spacing + amp * sin(freq * k + phase) */
 typedef struct { double y0, spacing, amp, freq, phase; } rungs;
 static double rung(int k, void *user) { const rungs *r = (const rungs *)user; return r->y0 + k * r->spacing + r->amp * sin(r->freq * k + r->phase); }
@@ -146,6 +166,12 @@ static int play(const char *path, int *samples, double *worst) {
   static double v[MAXV], got[MAXV];
   static cm_state S, Sm;                        /* Sm: the mount, in a run with a rider */
   static cm_pose P, Pm;
+  static cm_skeleton SK;
+  static char kline[MAXLINE], spath[1024];
+  static double kv[MAXV], kgot[MAXV];
+  FILE *kf = 0;
+  int ksample = -1, kn = 0, nsample = 0;
+  char krig[64];
   FILE *f = fopen(path, "r");
   char id[64], name[64];
   int hz, steps, every, i = 0, k, n, bad = 0, shown = 0, tally[22], pend = 0;
@@ -168,6 +194,18 @@ static int play(const char *path, int *samples, double *worst) {
   for (k = 0; k < g.n; k++) memcpy(g.w[k], v + 1 + 4 * k, 4 * sizeof(double));
   g.wall = v[1 + 4 * g.n] != 0; g.wx = v[2 + 4 * g.n]; g.wh = v[3 + 4 * g.n];
   cm_state_init(&S, ch, height, &g);
+  /* what the live skeleton must make of every third sample: ../skeleton/<the same name> */
+  memset(&SK, 0, sizeof SK);
+  {
+    const char *slash = strrchr(path, '/'), *base = slash ? slash + 1 : path;
+    int dl = slash ? (int)(slash - path) : 0;
+    if (dl >= 5 && !strncmp(path + dl - 5, "/body", 5) && dl + strlen(base) + 16 < sizeof spath) {
+      sprintf(spath, "%.*s/skeleton/%s", dl - 5, path, base);
+      kf = fopen(spath, "r");
+    }
+  }
+#define NEXT_K() do { ksample = -1; while (kf && fgets(kline, MAXLINE, kf)) { int used = 0; if (kline[0] == 'k' && sscanf(kline + 1, "%d %63s %d%n", &ksample, krig, &kn, &used) == 3) { kn = numbers(kline + 1 + used, kv, MAXV); break; } ksample = -1; } } while (0)
+  NEXT_K();
   memset(&in, 0, sizeof in); memset(&min, 0, sizeof min);
   while (i < steps) {
     if (next_step < 0 && fgets(line, MAXLINE, f)) {
@@ -213,11 +251,25 @@ static int play(const char *path, int *samples, double *worst) {
         if (!(err <= 1e-6)) { bad++; if (!shown++) printf("%s: step %d value %d of %d: got %.12g, expected %.12g\n", id, i + 1, at, ng, got[at], v[at + 1]); }
         else if (err > *worst) *worst = err;
       }
+      if (ksample == nsample) {
+        int nj = cm_skeleton_step(ch, &P, &SK), ng2 = nj > 0 ? skeleton_numbers(&SK, kgot) : 0, at = 0;
+        double e2 = 0;
+        sk_samples++;
+        if (nj <= 0 || strcmp(SK.rig->name, krig) || ng2 != kn) { sk_bad++; if (!sk_shown++) printf("%s: skeleton sample %d: rig %s with %d numbers, expected %s with %d\n", id, nsample, nj > 0 ? SK.rig->name : "none", ng2, krig, kn); }
+        else {
+          for (k = 0; k < kn; k++) { double e = fabs(kgot[k] - kv[k]) / (1 + fabs(kv[k])); if (!(e <= e2)) { e2 = e; at = k; } }
+          if (!(e2 <= 1e-6)) { sk_bad++; if (!sk_shown++) printf("%s: skeleton sample %d, %s %s: got %.12g, expected %.12g\n", id, nsample, at < 2 * nj ? SK.rig->joints[at / 2].name : "", at < 2 * nj ? (at % 2 ? "(axes)" : "(place)") : at == 2 * nj ? "parts" : at == 2 * nj + 1 ? "draw order" : at == 2 * nj + 2 ? "shade" : "moves", kgot[at], kv[at]); }
+          else if (e2 > sk_worst) sk_worst = e2;
+        }
+        NEXT_K();
+      }
+      nsample++;
       next_step = -1;
     }
     i++;
   }
   fclose(f);
+  if (kf) fclose(kf);
   return bad;
 }
 
@@ -231,5 +283,7 @@ int main(int argc, char **argv) {
     else if (bad) wrong++;
   }
   printf("C whole body: %d replays, %d samples, %d replays wrong, largest difference %.3g\n", runs, samples, wrong, worst);
+  printf("C live skeleton: %d samples, %d wrong, largest difference %.3g\n", sk_samples, sk_bad, sk_worst);
+  if (sk_bad || !sk_samples) wrong++;
   return wrong || !runs ? 1 : 0;
 }

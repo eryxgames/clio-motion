@@ -283,6 +283,64 @@ int cm_leave_fly(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, voi
 int cm_enter_ladder(cm_state *s, const cm_character *ch, const cm_ladder *ladder);      /* bipeds; speed climbs */
 void cm_leave_ladder(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
 int cm_grab_ledge(cm_state *s, const cm_character *ch, const double edge[3]);  /* bipeds; in.climb pulls up, in.drop lets go */
+/* ------------------------------------------------------------------------------------------------ the skeleton, live
+   Stage 5a. What a game needs to move a model, or to draw a character's parts, from a pose while it runs.
+   The rigs are data (clio_motion_rigs.c, written by tools/spec.js): for each character, and each of the soldier's
+   kits, its joints (with the template pose, the pose models are built in) and the parts those joints carry. */
+#define CM_MAX_JOINTS 56
+#define CM_MAX_PARTS 64
+/* o, x, y, z: where the joint is in the template pose and how it is turned (y along its bone, x to its side).
+   ref: which way its side is taken from (0 the body's left, 1 forwards). carried: a joint for something the body
+   carries (weapon, magazine, pack, load). */
+typedef struct { const char *name; int parent, ref, carried; double o[3], x[3], y[3], z[3]; } cm_rig_joint;
+/* A part of the stand-in model, in its joint's own frame: a capsule from a to b of radius r (has_b 0: a ball).
+   end: where a picture laid along the part ends, if not at b. on: the centre of the rounder part this one sits on
+   (an eye on a head). color: 0xRRGGBB. layer: its place in the draw order of a side view (low is behind).
+   shade: 0 dark to 4 light. part: the image part it is the bone of; of: the image part it belongs to. */
+typedef struct {
+  int joint, has_b, has_end, has_on; double a[3], b[3], end[3], on[3], r; unsigned color; const char *group; double layer; int shade;
+  const char *part, *of; int raw, sq;
+} cm_rig_part;
+typedef struct { const char *name, *id; int kit; double ears; int n_joints, n_parts; const cm_rig_joint *joints; const cm_rig_part *parts; } cm_rig;
+int cm_rig_count(void);
+const cm_rig *cm_rig_at(int i);
+const cm_rig *cm_rig_find(const char *name);     /* "soldier", "soldier_pistols", "horse", ... */
+/* The rig a pose belongs to: the character's, or for a soldier the one of the kit in the pose. */
+const cm_rig *cm_rig_for(const cm_character *ch, const cm_pose *pose);
+
+/* Where a joint is and how it is turned, in the pose's axes (x forward, y up, z to the right). */
+typedef struct { double o[3], x[3], y[3], z[3]; } cm_joint;
+/* Keep one for each character and set it to zero before its first use: a bone seen end on keeps the turn it had. */
+typedef struct {
+  const cm_rig *rig; int n; cm_joint joint[CM_MAX_JOINTS]; double heading;
+  struct { int on, shade; double layer; } held[3];           /* props 0 and 1 and the grenade: their draw layer now */
+} cm_skeleton;
+/* Every joint of the rig for this pose, in the rig's order. Returns the number of joints, or -1 if the pose does not
+   fit any rig. */
+int cm_skeleton_step(const cm_character *ch, const cm_pose *pose, cm_skeleton *sk);
+/* The 4 x 4 matrix, in glTF axes (+Y up, +Z forward) and written column after column, that takes anything bound to
+   joint j from the template pose to where it is now. For a model built on templates/3d: world = move * rest. */
+void cm_joint_move(const cm_skeleton *sk, int j, double m[16]);
+/* A part where its joint has carried it. key and level are filled by cm_parts_order. */
+typedef struct { const cm_rig_part *def; double a[3], b[3], end[3], on[3], layer, key; int shade, level; } cm_part;
+/* The parts the joints carry, in the rig's order: out must hold sk->rig->n_parts of them. Returns how many. */
+int cm_skeleton_parts(const cm_skeleton *sk, cm_part *out);
+/* Back to front for a view turned by yaw (0: from the body's right side when its heading is 0). Sets key and level
+   (the shade, 0 dark to 4 light, -1 for a part that glows) on each part and writes the parts' numbers in drawing
+   order. The body seen from its other side has its near and far parts change places. */
+void cm_parts_order(cm_part *parts, int n, double heading, double yaw, int *order);
+
+/* Where a part's picture goes on the screen. A picture: its size in pixels, how it is laid along its bone (CM_AXIS_...,
+   as in js/rig.js, SLOTS), and, for a picture cut from a drawing, its box in the bone's frame in metres with the
+   bone's length and radius as they were drawn (has_box). a, b: the bone's ends on the screen (b 0 for a part with
+   no length); rs: the part's radius there; ppm: pixels to a metre; flip: the body is seen from its other side.
+   Out: move to (x, y), turn by rot (radians, clockwise on a screen whose y runs down), scale by (fx, fy), then draw
+   the picture into the box (dx, dy, dw, dh). */
+enum { CM_AXIS_BALL, CM_AXIS_UP, CM_AXIS_DOWN, CM_AXIS_RIGHT };
+typedef struct { int axis, w, h, has_box; double box[4], len, r; } cm_picture;
+typedef struct { double x, y, rot, fx, fy, dx, dy, dw, dh; } cm_placing;
+void cm_part_place(const cm_picture *im, const double a[2], const double *b, double rs, double ppm, int flip, cm_placing *out);
+
 /* Riding. cm_mount_up puts a biped on a body that has a saddle (0 if it cannot be ridden); from then on step the mount
    first with cm_step, then the rider with cm_step. The rider's hips are held to the seat by a spring, the feet stay in
    the stirrups, the hands hold the reins until a weapon is drawn; aiming, firing, reloading, the sword and throwing all
