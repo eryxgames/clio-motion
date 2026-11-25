@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.19.0
+
+- C99 and Python, stage 4b: the ragdoll and riding. With this both do everything the JavaScript
+  reference does.
+  - The ragdoll: `in.die` / `"die"` hands the body to it from the ground, the air, the water, a
+    ladder or a ledge, for every character (limp tails and claws, weapons let go, wings folded);
+    `cm_stand` / `stand`.
+  - Riding: `cm_mount_up` / `mount_up`, `cm_dismount` / `dismount`; the rider is stepped after
+    the mount. The seat spring, stirrups, reins and weapons from the saddle as in the reference.
+- Reference: a ragdoll point within a tenth of a micron of the ground counts as touching it, so
+  that every language and maths library decides contact alike. Motion is unchanged to the eye;
+  the earlier regression outputs are unchanged.
+- `spec/body/`: 82 replays (3,360 poses). 15 new runs knock down every character; 5 have a rider
+  (the mount's character, inputs and calls are in the replay: `m`, `j` and `d` lines). The input
+  line has grown to 82 numbers (`die` and its push) and the event tally to 22 (`die`, `mount`,
+  `dismount`). `spec/golden/` is no longer used.
+- C: the state keeps the last pose and the ragdoll (about 24 KB). The whole-body test runs clean
+  under the address and undefined-behaviour sanitizers and valgrind.
+- `notes/groups-and-vehicles.md`: design notes on flocks and swarms that lose members, on what a
+  game's squad AI can be offered, and on vehicles.
+
 ## 0.18.0
 
 - C99 and Python, stage 4a: off the ground. Swimming (the octopus: jets, depth, arms as chains),

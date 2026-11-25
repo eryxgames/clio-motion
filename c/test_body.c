@@ -13,7 +13,7 @@
 #define MAXW 8
 #define MAXV 900
 #define MAXLINE 20000
-#define NIN 78
+#define NIN 82
 
 typedef struct { int n; double w[MAXW][4]; int wall; double wx, wh; } ground;
 
@@ -50,6 +50,7 @@ static void inputs(const double *v, cm_input *in) {
   in->bite = (int)w[36]; c3(in->bite_target, w + 37); in->pinch = (int)w[40]; c3(in->pinch_target, w + 41);
   in->sting = (int)w[44]; c3(in->sting_target, w + 45); in->grab = (int)w[48]; c3(in->grab_target, w + 49); in->ink = w[52] != 0;
   in->has_depth = w[53] != 0; in->depth = w[54]; in->has_height = w[55] != 0; in->height = w[56]; in->climb = w[57] != 0; in->drop = w[58] != 0;
+  in->die = (int)w[59]; c3(in->die_impulse, w + 60);
 }
 static void put3(double *v, int *n, const double *p) { v[(*n)++] = p[0]; v[(*n)++] = p[1]; v[(*n)++] = p[2]; }
 
@@ -73,7 +74,7 @@ static int flatten(const cm_pose *P, double *v) {
   if (P->flying) v[n++] = 1;
   if (!up) put3(v, &n, P->front);
   if (hd) put3(v, &n, P->gaze);
-  if (b == CM_BODY_BIPED && !P->climbing) { v[n++] = P->grenade_held; put3(v, &n, P->grenade); }
+  if (b == CM_BODY_BIPED && !P->climbing && !P->down) { v[n++] = P->grenade_held; put3(v, &n, P->grenade); }
   if (hd) put3(v, &n, P->head);
   v[n++] = P->base.heading;
   if (b == CM_BODY_BEAST) v[n++] = P->jaw;
@@ -94,10 +95,11 @@ static int flatten(const cm_pose *P, double *v) {
     put3(v, &n, w->body); put3(v, &n, w->dir); v[n++] = w->flash; if (w->has_fore) put3(v, &n, w->fore);
     put3(v, &n, w->grip); put3(v, &n, w->grip_low); put3(v, &n, w->mag_a); put3(v, &n, w->mag_b); put3(v, &n, w->muzzle); put3(v, &n, w->o); v[n++] = w->stow; put3(v, &n, w->up);
   }
+  for (i = 0; i < P->n_reins; i++) { put3(v, &n, P->reins[i][0]); put3(v, &n, P->reins[i][1]); }
   put3(v, &n, P->base.root);
   if ((up || hd) && !P->climbing) put3(v, &n, P->side);
   if (P->swimming) v[n++] = 1;
-  if (!up && b != CM_BODY_SPIDER) put3(v, &n, P->tail);
+  if (!up && b != CM_BODY_SPIDER && !P->no_tail) put3(v, &n, P->tail);
   for (i = 0; i < P->n_tail_pts; i++) put3(v, &n, P->tail_pts[i]);
   if (P->has_thorax) { put3(v, &n, P->thorax[0]); put3(v, &n, P->thorax[1]); }
   if (up) put3(v, &n, P->u); else put3(v, &n, P->up);
@@ -109,7 +111,7 @@ static int tally_slot(int type) {
     case CM_EV_FIRE: return 0; case CM_EV_RELOAD: return 1; case CM_EV_LOADED: return 2; case CM_EV_THROW: return 3; case CM_EV_GRAB: return 4; case CM_EV_PUTDOWN: return 5;
     case CM_EV_PUNCH: return 6; case CM_EV_STRIKE: return 7; case CM_EV_LAND: return 8; case CM_EV_JUMP: return 9; case CM_EV_HIT: return 10; case CM_EV_DROP: return 11;
     case CM_EV_BITE: return 12; case CM_EV_POUNCE: return 13; case CM_EV_PINCH: return 14; case CM_EV_STING: return 15; case CM_EV_INK: return 16;
-    case CM_EV_GRIP: return 17; case CM_EV_TOP: return 18;
+    case CM_EV_GRIP: return 17; case CM_EV_TOP: return 18; case CM_EV_DIE: return 19; case CM_EV_MOUNT: return 20; case CM_EV_DISMOUNT: return 21;
   }
   return -1;
 }
@@ -142,16 +144,16 @@ static double rung(int k, void *user) { const rungs *r = (const rungs *)user; re
 static int play(const char *path, int *samples, double *worst) {
   static char line[MAXLINE];
   static double v[MAXV], got[MAXV];
-  static cm_state S;
-  static cm_pose P;
+  static cm_state S, Sm;                        /* Sm: the mount, in a run with a rider */
+  static cm_pose P, Pm;
   FILE *f = fopen(path, "r");
   char id[64], name[64];
-  int hz, steps, every, i = 0, k, n, bad = 0, shown = 0, tally[19], pend = 0;
+  int hz, steps, every, i = 0, k, n, bad = 0, shown = 0, tally[22], pend = 0;
   rungs lr;
   cm_ladder ladder;
   ground g;
-  const cm_character *ch;
-  cm_input in;
+  const cm_character *ch, *mch = 0;
+  cm_input in, min;
   long next_step = -1;
   double pending[NIN] = { 0 }, evsum = 0;
   if (!f) return -1;
@@ -165,23 +167,31 @@ static int play(const char *path, int *samples, double *worst) {
   for (k = 0; k < g.n; k++) memcpy(g.w[k], v + 1 + 4 * k, 4 * sizeof(double));
   g.wall = v[1 + 4 * g.n] != 0; g.wx = v[2 + 4 * g.n]; g.wh = v[3 + 4 * g.n];
   cm_state_init(&S, ch, height, &g);
-  memset(&in, 0, sizeof in);
+  memset(&in, 0, sizeof in); memset(&min, 0, sizeof min);
   while (i < steps) {
     if (next_step < 0 && fgets(line, MAXLINE, f)) {
       if (line[0] == 'i') { n = numbers(line + 1, v, MAXV); if (n < NIN + 1) { fclose(f); return -1; } next_step = (long)v[0]; memcpy(pending, v + 1, NIN * sizeof(double)); pend = 'i'; }
       else if (line[0] == 'c') { n = numbers(line + 1, v, MAXV); if (n < 2) { fclose(f); return -1; } next_step = (long)v[0]; memset(pending, 0, sizeof pending); memcpy(pending, v + 1, (size_t)(n - 1) * sizeof(double)); pend = 'c'; }
       else if (line[0] == 'l') { n = numbers(line + 1, v, MAXV); if (n < 6) { fclose(f); return -1; } ladder.x = v[0]; ladder.y0 = v[1]; ladder.spacing = v[2]; ladder.rung = rung; ladder.user = &lr; lr.y0 = v[1]; lr.spacing = v[2]; lr.amp = v[3]; lr.freq = v[4]; lr.phase = v[5]; continue; }
+      else if (line[0] == 'm') { if (sscanf(line + 1, "%63s", name) != 1 || !(mch = cm_character_find(name))) { fclose(f); return -1; } cm_state_init(&Sm, mch, height, &g); continue; }
+      else if (line[0] == 'j') { n = numbers(line + 1, v, MAXV); if (n < NIN + 1) { fclose(f); return -1; } next_step = (long)v[0]; memcpy(pending, v + 1, NIN * sizeof(double)); pend = 'j'; }
+      else if (line[0] == 'd') { n = numbers(line + 1, v, MAXV); if (n < 2) { fclose(f); return -1; } next_step = (long)v[0]; memset(pending, 0, sizeof pending); memcpy(pending, v + 1, (size_t)(n - 1) * sizeof(double)); pend = 'd'; }
       else if (line[0] == 'p') next_step = steps + 1;
     }
-    if (next_step == i && pend == 'c') {
+    if (next_step == i && (pend == 'c' || pend == 'd')) {
+      cm_state *T = pend == 'd' ? &Sm : &S;         /* d: a call on the mount */
+      const cm_character *tc = pend == 'd' ? mch : ch;
       switch ((int)pending[0]) {
-        case 1: cm_enter_swim(&S, ch); break; case 2: cm_leave_swim(&S, ch, height, &g); break; case 3: cm_enter_fly(&S, ch); break; case 4: cm_leave_fly(&S, ch, height, &g); break;
-        case 5: cm_enter_ladder(&S, ch, &ladder); break; case 6: cm_leave_ladder(&S, ch, height, &g); break; case 7: cm_grab_ledge(&S, ch, pending + 1); break;
-        case 8: cm_place(&S, ch, height, &g, pending[1], pending[2], pending[3]); break;
+        case 1: cm_enter_swim(T, tc); break; case 2: cm_leave_swim(T, tc, height, &g); break; case 3: cm_enter_fly(T, tc); break; case 4: cm_leave_fly(T, tc, height, &g); break;
+        case 5: cm_enter_ladder(T, tc, &ladder); break; case 6: cm_leave_ladder(T, tc, height, &g); break; case 7: cm_grab_ledge(T, tc, pending + 1); break;
+        case 8: cm_place(T, tc, height, &g, pending[1], pending[2], pending[3]); break; case 9: cm_stand(T, tc, height, &g); break;
+        case 10: cm_mount_up(&S, ch, &Sm, mch); break; case 11: cm_dismount(&S, ch, height, &g); break;
       }
       next_step = -1; continue;
     }
-    if (next_step == i) { inputs(pending, &in); next_step = -1; continue; }
+    if (next_step == i) { inputs(pending, pend == 'j' ? &min : &in); next_step = -1; continue; }
+    /* the mount is stepped first, then its rider */
+    if (mch) { if (cm_step(&Sm, mch, &min, &CM_STYLE, height, &g, 1.0 / hz, &Pm) != 0) { fclose(f); return -1; } Sm.n_events = 0; }
     if (cm_step(&S, ch, &in, &CM_STYLE, height, &g, 1.0 / hz, &P) != 0) { fclose(f); return -1; }
     for (k = 0; k < S.n_events; k++) { int t = tally_slot(S.events[k].type); if (t >= 0) tally[t]++; evsum += carried(&S.events[k]); }
     S.n_events = 0;
@@ -191,7 +201,7 @@ static int play(const char *path, int *samples, double *worst) {
       if (line[0] != 'p') { fclose(f); return -1; }
       nw = numbers(line + 1, v, MAXV) - 1;
       ng = flatten(&P, got);
-      for (k = 0; k < 19; k++) got[ng++] = tally[k];
+      for (k = 0; k < 22; k++) got[ng++] = tally[k];
       got[ng++] = evsum; got[ng++] = S.mode;
       (*samples)++;
       if (ng != nw || ng != (int)v[0]) { bad++; if (!shown++) printf("%s: sample at step %d has %d values, expected %d\n", id, i + 1, ng, nw); }

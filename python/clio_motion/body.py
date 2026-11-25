@@ -125,7 +125,7 @@ def _mix_place(a, b, t):
 def start_reload(S, ch, asked=False):
     """asked: the player asked for it, so full weapons are reloaded too; otherwise only those that are short."""
     kit = held_kit(S, ch)
-    if not kit or kit.get("melee") or S.act or S.armed.x < 0.8 or S.mode != "ground":
+    if not kit or kit.get("melee") or S.act or S.armed.x < 0.8 or S.mode not in ("ground", "ride"):
         return False
     q = [i for i in range(len(kit["props"])) if S.ammo[i] < PROPS[kit["props"][i]]["rounds"]]
     if not q and asked:
@@ -149,7 +149,7 @@ def _fire_control(S, ch, inp, dt):
         S.flash[i] = max(0, S.flash[i] - dt / 0.06)
         S.kick[i].step(0, m["omega"], 0.6, dt)
     S.rise.step(0, m["omega"] * 0.7, 0.7, dt)
-    if not inp.get("fire") or S.cool > 0 or S.mode != "ground" or (S.act and S.act["name"] != "reload") or m["type"] == "jaw":
+    if not inp.get("fire") or S.cool > 0 or S.mode not in ("ground", "ride") or (S.act and S.act["name"] != "reload") or m["type"] == "jaw":
         return
     g = -1
     if kit:
@@ -188,7 +188,7 @@ def _act_tick(S, ch, inp, dt, B):
     AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0, "wind": 0.0, "hit": 0.0}
     a = S.act
     k = math.sqrt(ch["L"] / 0.92)
-    ground = S.mode == "ground"
+    ground = S.mode in ("ground", "ride")
     idle = not a and ground and not S.jump
     S.guard.step(1 if inp.get("guard") and not S.carry and ground and not (a and a["name"] == "throw") else 0, 16, 1, dt)
     S.block.step(1 if inp.get("block") and (inp.get("guard") or (S.kit == "sword" and S.armed.x > 0.5)) else 0, 24, 1, dt)
@@ -611,6 +611,10 @@ def upper_body(S, ch, inp, st, dt, legs, B):
     else:
         pose["carry"] = None
 
+    if B.get("hands"):                                       # reins or handles, unless the hand is busy
+        for i in range(2):
+            if not HO[i] or not HO[i]["k"] > 0:
+                HO[i] = {"p": unturn(B["hands"][i]), "k": 1 - eH[i], "pole": [-0.2, -1, 0.5 if i == 0 else -0.5]}
     swing = st["arm"] * 0.2 * gp["moving"] * legs[0]["side"] * S.legs[0].fwd * (1 - 0.7 * e)
     arms = []
     for s in range(2):

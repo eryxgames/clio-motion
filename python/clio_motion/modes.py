@@ -4,7 +4,8 @@
 and the ledge (the soldier), and ``step``, which sends a character to whichever of these it is in.
 
 A port of ``stepSwim``, ``stepFly``, ``stepLadder``, ``stepLedge`` and their enter and leave functions in js/core.js,
-statement for statement; checked against the replays in spec/body/.  The ragdoll and riding are not ported yet.
+``mountUp``, ``dismount`` and ``stepRide``, statement for statement; checked against the replays in spec/body/.
+The ragdoll is in ragdoll.py.
 
     enter_fly(S, ch)                    # the dragon takes off
     pose = step(S, ch, {"speed": 12, "height": 8, "steer": 0.4}, STYLE, terrain, 1 / 60)
@@ -15,7 +16,8 @@ from __future__ import annotations
 import math
 
 from . import body as _b
-from .ground import Leg, Spring, pose_to_world, step_ground
+from . import ragdoll as _rag
+from .ground import DIR_KEYS, Leg, Spring, pose_to_world, step_ground
 from .kernel import G, TAU, clamp, decay, ease, frac, idle_period, ik2, lerp, smooth, wrap_pi
 
 LAD_PH = [0, 0.5, 0.55, 0.05]
@@ -77,6 +79,7 @@ def leave_ladder(S, ch, terrain):
     S.act_crouch = 0.0
     S.act_back = 0.0
     S.chains = {}
+    S.ride = None
     S.vl = None
     S.tv = [1.0, 0.0]
     S.guard.x = S.guard.v = 0.0
@@ -97,6 +100,12 @@ def place(S, ch, terrain, x, z=0.0, heading=0.0):
     S.px, S.pz, S.h = x, z or 0.0, heading or 0.0
     S.act = None
     S.carry = None
+    leave_ladder(S, ch, terrain)
+
+
+def stand(S, ch, terrain):
+    """Back on the feet where the body lies (a switch: it is not a get-up animation)."""
+    S.rag = None
     leave_ladder(S, ch, terrain)
 
 
@@ -561,12 +570,187 @@ def step_ledge(S, ch, inp, st, terrain, dt):
     return S.pose
 
 
-def step(S, ch, inp, st, terrain, dt):
-    """One step of a whole character in whatever mode it is in: on the ground, swimming, flying, on a ladder or
-    hanging from a ledge.  Returns the pose in world coordinates (the same keys as the JavaScript reference).
-    Read ``S.events``, then clear it."""
-    if inp.get("die") or S.mode in ("ragdoll", "ride"):
-        raise NotImplementedError("the ragdoll and riding are not ported yet")
+# ------------------------------------------------------------------------------------------------------- riding
+def mount_up(S, ch, mount):
+    """Put a rider on another character.  mount: (the mount's state, the mount's character).  False if that body
+    cannot be ridden (it has no saddle) or the rider is not a biped.  From then on step the mount first, then the
+    rider with ``step(..., mount=(mount_state, mount_character))``.
+
+    The rider's hips are held to the seat by a spring, so a trot or a gallop lifts him out of the saddle and the
+    knees take it up; the feet stay in the stirrups; the back leans with the pace and stays upright when the mount
+    pitches; in the air the whole rider rolls with the mount.  The hands hold the reins until a weapon is drawn."""
+    if ch["kind"] != "biped" or not mount or not mount[1] or not mount[1].get("saddle") or not mount[0] or S.mode == "ragdoll":
+        return False
+    let_go(S)
+    S.act = None
+    S.jump = None
+    S.lad = None
+    S.ledge = None
+    S.lad_frame = None
+    S.mode = "ride"
+    S.ride = {"d": Spring(0.0), "sy": None, "svy": 0.0, "acc": 0.0, "pv": 0.0}
+    S.v = 0.0
+    S.a = 0.0
+    S.om = 0.0
+    S.crouch = 0.0
+    S.air_b = 0.0
+    S.standing = False
+    S.guard.x = S.guard.v = 0.0
+    S.stance.x = S.stance.v = 0.0
+    S.vl = None
+    S.events.append({"type": "mount"})
+    return True
+
+
+def dismount(S, ch, terrain):
+    """Stand the rider beside the mount, on its left."""
+    if S.mode != "ride":
+        return False
+    S.px += 0.95 * math.sin(S.h)
+    S.pz -= 0.95 * math.cos(S.h)
+    let_go(S)
+    S.act = None
+    leave_ladder(S, ch, terrain)
+    S.events.append({"type": "dismount"})
+    return True
+
+
+def _frame_of(S):
+    """The frame a body's local pose is in, and the heading that goes with it."""
+    if S.mode in ("ladder", "ledge"):
+        return S.lad_frame, S.h
+    if S.mode == "ragdoll":
+        return S.rag["frame"], S.rag["h"]
+    return _frame_now(S), S.h
+
+
+def step_ride(S, ch, inp, st, terrain, dt, mount):
+    Sm, cm = mount if mount else (None, None)
+    Lm = Sm.local if Sm is not None else None
+    sd = cm.get("saddle") if cm else None
+    R = S.ride
+    if not Lm or not sd or not Lm.get("axis") or not Lm.get("up"):      # nothing to sit on
+        dismount(S, ch, terrain)
+        return step_ground(S, ch, inp, st, terrain, dt, _b._upper)
+    S.t += dt
+    # the rider's pose is worked out in the mount's own frame
+    fr, S.h = _frame_of(Sm)
+    S.x, S.px, S.pz = fr[0], fr[1], fr[2]
+    ax, up = Lm["axis"], Lm["up"]
+    sv = [ax[1] * up[2] - ax[2] * up[1], ax[2] * up[0] - ax[0] * up[2], ax[0] * up[1] - ax[1] * up[0]]
+    at = sd["at"]
+    seat = [Lm["root"][j] + ax[j] * at[0] + up[j] * at[1] for j in range(3)]
+
+    # from the seat's frame (forward along the mount, up from its back, to its right) to the mount's frame, and back
+    def to_m(p):
+        return [seat[j] + ax[j] * p[0] + up[j] * p[1] + sv[j] * p[2] for j in range(3)]
+
+    def dir_m(d):
+        return [ax[j] * d[0] + up[j] * d[1] + sv[j] * d[2] for j in range(3)]
+
+    def from_m(q):
+        d = [q[0] - seat[0], q[1] - seat[1], q[2] - seat[2]]
+        return [d[0] * ax[0] + d[1] * ax[1] + d[2] * ax[2], d[0] * up[0] + d[1] * up[1] + d[2] * up[2], d[0] * sv[0] + d[1] * sv[1] + d[2] * sv[2]]
+
+    def seat_pose(o, key=None):
+        if isinstance(o, list):
+            if len(o) == 3 and isinstance(o[0], (int, float)) and not isinstance(o[0], bool):
+                return dir_m(o) if key in DIR_KEYS else to_m(o)
+            return [seat_pose(v, key) for v in o]
+        if isinstance(o, dict):
+            return {k2: seat_pose(v, k2) for k2, v in o.items()}
+        return o
+
+    # the saddle's own rise and fall throws the rider: a spring holds him to it, and he cannot sink into it
+    k, Tn, wy = ch["L"] / 0.92, TAU * math.sqrt(ch["L"] / G), seat[1]
+    vy = 0.0 if R["sy"] is None else (wy - R["sy"]) / dt
+    R["acc"] += (clamp((vy - R["svy"]) / dt, -3 * G, 3 * G) - R["acc"]) * decay(30, dt)
+    R["sy"], R["svy"] = wy, vy
+    d = R["d"]
+    d.v -= 0.9 * R["acc"] * dt
+    d.step(0, 13 / math.sqrt(k), 0.45, dt)
+    if d.x < -0.012 * k:
+        d.x = -0.012 * k
+        d.v = max(d.v, 0)
+    if d.x > 0.11 * k:
+        d.x = 0.11 * k
+        d.v = min(d.v, 0)
+    hit = inp.get("hit")
+    if hit:
+        hi = hit["impulse"]
+        hz = hi[2] if len(hi) > 2 and hi[2] else 0
+        hm, hf = math.sqrt(hi[0] * hi[0] + hz * hz), hi[0] * fr[3] + hz * fr[4]
+        S.lean.v += 7 * hf / math.sqrt(k)
+        S.rise.v += 8 * hm
+        S.flinch.v += 16 * hm
+        S.flinch_dir = -1 if hf < 0 else 1
+        d.v += 0.6 * hm
+        S.events.append({"type": "hit"})
+    grounded = Sm.mode == "ground"
+    gal = (Sm.gal or 0) if grounded else 0
+    run = (Sm.run or 0) if grounded else 0
+    still = 1 if grounded and Sm.standing else 0
+    S.idle_t = S.idle_t + dt if still else 0
+    S.standing = False
+    S.v = Sm.v or 0
+    S.crouch = 0
+    S.air_b = 0
+    root, legs = [0, d.x, 0], []
+    for i in range(2):
+        ld = ch["legs"][i]
+        F, sg = ld["foot"], ld["side"]
+        hip = [root[0] + ld["attach"][0], root[1] + ld["attach"][1], ld["attach"][2]]
+        ball = [sd["stirrup"][0], sd["stirrup"][1], sg * sd["stirrup"][2]]
+        mid, end = ik2(hip, [ball[0] - F["fb"], ball[1] + F["ah"], ball[2]], ld["upper"], ld["lower"], [0.6, 0.15, sg])
+        legs.append({"hip": hip, "knee": mid, "ankle": end, "heel": [ball[0] - F["fb"] - F["hb"], ball[1], ball[2]], "toe": [ball[0] + F["toe"], ball[1], ball[2]],
+                     "ball": ball, "planted": True, "target": None, "side": sg})
+        S.legs[i].fwd = 0
+        S.legs[i].swing = None
+    pv = d.v - R["pv"]
+    R["pv"] = d.v
+    S.pack.v -= 0.6 * pv
+    S.pack.step(0, 60 / Tn, 0.35, dt)
+    pitch_seat = math.asin(clamp(ax[1], -1, 1))
+    aim = inp.get("aim")
+    hands = sd["hands"]
+    pose = _b.upper_body(S, ch, inp, st, dt, legs, {
+        "root": root, "pitch": 0, "gp": {"moving": 0, "run": 0, "gal": 0, "Fr": 0}, "Tn": Tn, "idle": still, "P": idle_period(ch["L"]),
+        "bank": math.tan(0.7 * Sm.bank.x) if grounded and Sm.bank else 0, "sway0": 0, "flex": 0, "drift": [0, 0], "prep": 0,
+        "aim": from_m(_w2l(fr, [aim[0], aim[1], aim[2] if len(aim) > 2 else S.pz])) if aim else None,
+        "to_l": lambda p: from_m(_w2l(fr, p)), "to_w": lambda p: _l2w(fr, to_m(p)), "terrain": lambda lx, lz=0.0: -1e9,
+        "hands": [[hands[0], hands[1], hands[2]], [hands[0], hands[1], -hands[2]]],
+        # forward with the pace, back against a climb or a dive, and up out of the saddle with the bounce
+        "leanBase": 0.04 + 0.10 * run + 0.22 * gal + (0 if grounded else 0.22) + math.atan((Sm.a or 0) / G) * 0.4 - 0.65 * pitch_seat + 1.2 * d.x / k})
+    S.local = seat_pose(pose)
+    S.local["heading"] = S.h
+    S.local["riding"] = cm["id"]
+    if sd.get("reins") and S.armed.x < 0.6 and Lm.get("mounts") and Lm.get("neck"):
+        bit = Lm["mounts"][0]["base"] if sd["reins"] == "bit" else [Lm["neck"][j] + 0.2 * up[j] for j in range(3)]
+        S.local["reins"] = [[S.local["arms"][0]["hand"], list(bit)], [S.local["arms"][1]["hand"], list(bit)]]
+    S.y = S.local["root"][1]
+    S.last_y = S.y
+    S.stats = {"Fr": 0, "stride": 0, "period": 0, "duty": 1, "run": 0, "phases": [0, 0.5], "v": S.v, "gait": "Riding", "steps": 0, "air": 0, "heading": S.h,
+               "turn": Sm.om or 0, "ammo": list(S.ammo) if S.ammo else None, "kit": S.kit, "action": S.act["name"] if S.act else None}
+    S.pose = pose_to_world(S.local, fr)
+    return S.pose
+
+
+def step(S, ch, inp, st, terrain, dt, mount=None):
+    """One step of a whole character in whatever mode it is in: on the ground, swimming, flying, on a ladder,
+    hanging from a ledge, lying as a ragdoll, or riding (then mount is (the mount's state, its character), and
+    the mount has been stepped already).  Returns the pose in world coordinates (the same keys as the
+    JavaScript reference).  Read ``S.events``, then clear it."""
+    die = inp.get("die")
+    if die is not None and die is not False:
+        if S.mode == "swim":
+            leave_swim(S, ch, terrain)
+        if S.mode != "ragdoll" and S.local and S.local.get("legs"):
+            let_go(S)
+            _rag.ragdoll_start(S, ch, S.lad_frame if S.mode in ("ladder", "ledge") else _frame_now(S), S.h, die)
+    if S.mode == "ragdoll":
+        return _rag.step_ragdoll(S, ch, terrain, dt)
+    if S.mode == "ride":
+        return step_ride(S, ch, inp, st, terrain, dt, mount)
     if S.mode == "swim":
         return step_swim(S, ch, inp, st, terrain, dt)
     if S.mode == "fly":

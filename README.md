@@ -54,18 +54,19 @@ the bottom, each stage checked against the reference before the next one starts.
 | 3a. Upright bodies whole: the soldier's spine, head, arms and aim, the three kits, firing and reloading, sword and shield, throwing, the crate, stance and punches; the mech's hull and guns | yes | yes | yes |
 | 3b. Animals, arthropods and the octopus: bending spines, necks, jaws, claws, arms, tail chains, folded wings; bites, pinches, stings, grabs, ink | yes | yes | yes |
 | 4a. Swimming, flight, the ladder, the ledge grab | yes | yes | yes |
-| 4b. The ragdoll, riding | yes | | |
+| 4b. The ragdoll, riding | yes | yes | yes |
 | 5. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
 
 Stage 1 agrees with the reference to the last bit or two on 982 recorded cases, in both languages.
-Stage 2 reproduces 24 recorded runs (828 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4a reproduce 61 whole-body runs (2,418 poses of all
+Stage 2 reproduces 25 recorded runs (870 sampled poses of every character) to the ten digits they are
+recorded with. Stages 3 and 4 reproduce 82 whole-body runs (3,360 poses of all
 twelve characters: every number of the pose, the count of each event, what the events carry, and
 the mode the body is in).
 
-So in C and Python today every character is whole on the ground, with its weapons and every
-action, and also in the water, in the air, on a ladder and on a ledge (`cm_step`, `step`). What is
-left is the ragdoll and riding.
+So the C and Python versions now do everything the reference does: every character whole on the
+ground, with its weapons and every action; in the water, in the air, on a ladder and on a ledge;
+knocked down as a ragdoll from any of these; and a rider on the horse, the spider mech or the
+dragon (`cm_step`, `step`). What is left is the engine wrappers.
 
 ## Use
 
@@ -92,6 +93,12 @@ C:
     in.speed = 1.4; in.steer = 0.5; in.armed = 1;
     cm_step(&S, ch, &in, &CM_STYLE, ground_height, NULL, 1.0 / 60, &pose);
 
+    /* a rider: step the mount first, then the rider */
+    cm_mount_up(&S, ch, &horse_state, cm_character_find("horse"));
+    cm_step(&horse_state, horse, &horse_in, &CM_STYLE, ground_height, NULL, 1.0 / 60, &horse_pose);
+    cm_step(&S, ch, &in, &CM_STYLE, ground_height, NULL, 1.0 / 60, &pose);
+    in.die = 1;          /* knocked down: the ragdoll takes the body from wherever it is */
+
 Python:
 
     import clio_motion as cm
@@ -114,19 +121,28 @@ reference again; the C and Python versions then have to follow.
 
 `tools/spec.js` writes the built-in characters as JSON and, for each function of the numeric
 kernel, a few dozen inputs with the outputs the reference gives, and the characters again as a C
-table. `tools/golden.js` plays 62 runs described as data in `spec/scenarios.json` (every character
+table. `tools/golden.js` plays 82 runs described as data in `spec/scenarios.json` (every character
 through its gaits on rolling ground; turns, sidesteps, drifting, blows, steps, jumps and pounces;
-the soldier aiming, fighting, carrying, climbing and knocked down; hunts, stings, a swim and two
-flights) and records the whole pose ten times a second. All but the one that falls as a ragdoll are
-written to `spec/body/` as replays that need no JSON reader: every input step by step, the calls
-that change mode (take off, dive in, take hold of a ladder), the whole pose, and the events. The 25 of them that use only what the ground step reads are also written
-to `spec/ground/`, with what the ground step alone must leave behind. The ragdoll run is in
-`spec/golden/`. A port passes a stage when it reproduces
-those numbers.
+the soldier aiming, fighting, carrying and climbing; hunts, stings, a swim and two flights; every
+character knocked down, from the ground, the air, the water, a ladder and a ledge; a rider on the
+horse, the spider mech and the dragon, thrown, and refused by a hyena) and records the whole pose
+ten times a second. They are written to `spec/body/` as replays that need no JSON reader: every
+input step by step, the calls that change mode (take off, dive in, take hold of a ladder, mount),
+the whole pose, and the events; a run with a rider carries the mount's inputs too. The 25 of them
+that use only what the ground step reads are also written to `spec/ground/`, with what the ground
+step alone must leave behind. A port passes a stage when it reproduces those numbers.
+
+The ragdoll decides many times a step whether a point touches the ground. So that every language
+and every maths library decides alike, a point within a tenth of a micron of the ground counts as
+touching.
 
 ## Planned
 
-- The ragdoll and riding in C and Python, then the engine wrappers and the CLIo hook.
+- The engine wrappers (Unity, Godot, Unreal) and the CLIo hook.
+- Groups: a steering layer for flocks, swarms, herds and squads that gives each member the inputs
+  `step` already takes, and carries on when members are lost. Vehicles: hover craft and drones,
+  then cars and buggies, then tanks, as a new kind of body with crew seats. See
+  [notes/groups-and-vehicles.md](notes/groups-and-vehicles.md).
 - A first-person arms view, with the FPS demo.
 - For artists, 3D: a rest-pose skeleton file per character (the `.glb` already carries the joints,
   names and clips) and a Blender add-on that imports it, checks a mesh skinned to it (bone names,

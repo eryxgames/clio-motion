@@ -155,6 +155,8 @@ class State:
         self.ladder = None
         self.lad_frame = None
         self.ledge = None
+        self.rag = None
+        self.ride = None
         self.local = None
         self.legs = [Leg([l["rest"][0], terrain(l["rest"][0], 0.0), l["rest"][1]], g0) for l in ch["legs"]]
 

@@ -1,6 +1,6 @@
 // Copyright 2026 Daniel Sandner. Licensed under the Apache License, Version 2.0 (see LICENSE). SPDX-License-Identifier: Apache-2.0
 /* Runs every test without a screen.  A test fails if it stops with an error, prints "nan true",
-   or prints fewer result lines than expected.  Then the recorded runs in spec/golden are played again
+   or prints fewer result lines than expected.  Then the recorded runs in spec/scenarios.json are played again
    and compared: any change in what the core computes shows up there.
      node js/test/run.js */
 const cp = require('child_process'), path = require('path');
@@ -17,6 +17,6 @@ function run(label, cmd, want) {
   else console.log('ok    ' + label + (want ? '  ' + good + ' results' : ''));
 }
 tests.forEach(function (t) { run(t[0], 'node js/test/' + t[0], t[1]); });
-run('recorded runs (spec/golden)', 'node tools/golden.js --check', 0);
+run('recorded runs (spec/body, spec/ground)', 'node tools/golden.js --check', 0);
 console.log(bad ? bad + ' failed' : 'all passed');
 process.exit(bad ? 1 : 0);

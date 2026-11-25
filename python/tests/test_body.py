@@ -23,7 +23,7 @@ KITS = (None, "rifle", "pistols", "sword")
 PUNCHES = (None, "jab", "cross", "hook")
 SWINGS = (None, "slash", "chop", "thrust")
 TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop", "bite", "pounce", "pinch", "sting", "ink",
-         "grip", "top")
+         "grip", "top", "die", "mount", "dismount")
 MODES = ("ground", "ladder", "ragdoll", "swim", "fly", "ledge", "ride")
 
 
@@ -65,6 +65,8 @@ def inputs(v):
     if w[55]:
         inp["height"] = w[56]
     inp["climb"], inp["drop"] = bool(w[57]), bool(w[58])
+    if w[59]:
+        inp["die"] = {"impulse": w[60:63]} if w[59] > 1 else {}
     return inp
 
 
@@ -93,6 +95,7 @@ def play(path):
     nw = int(g[0])
     terrain = ground([g[1 + 4 * k: 5 + 4 * k] for k in range(nw)], (g[2 + 4 * nw], g[3 + 4 * nw]) if g[1 + 4 * nw] else None)
     changes, calls, wants, ladder = {}, {}, [], None
+    mch, mchanges, mcalls = None, {}, {}                     # a run with a rider: the mount, its inputs and the calls on it
     for ln in lines[2:]:
         w = ln.split()
         if not w:
@@ -101,35 +104,59 @@ def play(path):
             changes[int(w[1])] = inputs([float(x) for x in w[2:]])
         elif w[0] == "c":
             calls.setdefault(int(w[1]), []).append([float(x) for x in w[2:]])
+        elif w[0] == "m":
+            mch = cm.characters()[w[1]]
+        elif w[0] == "j":
+            mchanges[int(w[1])] = inputs([float(x) for x in w[2:]])
+        elif w[0] == "d":
+            mcalls.setdefault(int(w[1]), []).append([float(x) for x in w[2:]])
         elif w[0] == "l":
             lx, y0, spacing, amp, freq, phase = [float(x) for x in w[1:7]]
             ladder = cm.Ladder(lx, y0, spacing, lambda k, y0=y0, spacing=spacing, amp=amp, freq=freq, phase=phase: y0 + k * spacing + amp * math.sin(freq * k + phase))
         else:
             wants.append([float(x) for x in w[2:]])
     S = cm.create_state(ch, terrain)
-    inp, dt, k, tally, evsum = {}, 1 / hz, 0, [0] * len(TALLY), 0.0
+    Sm = cm.create_state(mch, terrain) if mch else None
+    mount = (Sm, mch) if mch else None
+    inp, minp, dt, k, tally, evsum = {}, {}, 1 / hz, 0, [0] * len(TALLY), 0.0
     bad, worst, first = 0, 0.0, None
+
+    def call(S, ch, c):
+        code = int(c[0])
+        if code == 1:
+            cm.enter_swim(S, ch)
+        elif code == 2:
+            cm.leave_swim(S, ch, terrain)
+        elif code == 3:
+            cm.enter_fly(S, ch)
+        elif code == 4:
+            cm.leave_fly(S, ch, terrain)
+        elif code == 5:
+            cm.enter_ladder(S, ch, ladder)
+        elif code == 6:
+            cm.leave_ladder(S, ch, terrain)
+        elif code == 7:
+            cm.grab_ledge(S, ch, c[1:4])
+        elif code == 8:
+            cm.place(S, ch, terrain, c[1], c[2], c[3])
+        elif code == 9:
+            cm.stand(S, ch, terrain)
+        elif code == 10:
+            cm.mount_up(S, ch, mount)
+        elif code == 11:
+            cm.dismount(S, ch, terrain)
+
     for i in range(steps):
+        for c in mcalls.get(i, ()):
+            call(Sm, mch, c)
         for c in calls.get(i, ()):
-            code = int(c[0])
-            if code == 1:
-                cm.enter_swim(S, ch)
-            elif code == 2:
-                cm.leave_swim(S, ch, terrain)
-            elif code == 3:
-                cm.enter_fly(S, ch)
-            elif code == 4:
-                cm.leave_fly(S, ch, terrain)
-            elif code == 5:
-                cm.enter_ladder(S, ch, ladder)
-            elif code == 6:
-                cm.leave_ladder(S, ch, terrain)
-            elif code == 7:
-                cm.grab_ledge(S, ch, c[1:4])
-            elif code == 8:
-                cm.place(S, ch, terrain, c[1], c[2], c[3])
+            call(S, ch, c)
+        if mch:                                              # the mount is stepped first, then its rider
+            minp = mchanges.get(i, minp)
+            cm.step(Sm, mch, minp, cm.STYLE, terrain, dt)
+            Sm.events.clear()
         inp = changes.get(i, inp)
-        pose = cm.step(S, ch, inp, cm.STYLE, terrain, dt)
+        pose = cm.step(S, ch, inp, cm.STYLE, terrain, dt, mount)
         for e in S.events:
             if e["type"] in TALLY:
                 tally[TALLY.index(e["type"])] += 1

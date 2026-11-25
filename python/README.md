@@ -2,9 +2,9 @@
 
 Pure Python, standard library only, so CLIo can carry it without a compiler.
 
-Ported so far: the numeric kernel (stage 1), the ground step (stage 2), whole bodies on the
-ground (stage 3) for all twelve characters, and off the ground (stage 4a): swimming, flight, the
-ladder and the ledge.
+Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
+(stage 2), whole bodies on the ground (stage 3) for all twelve characters, and off the ground
+(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding.
 
     import clio_motion as cm
 
@@ -40,10 +40,24 @@ Off the ground, a call changes the mode and `step` carries on:
     cm.grab_ledge(S, ch, [x, y, z])                             # then climb or drop
     cm.place(S, ch, ground, x, z, heading)
 
-`step_ground` gives the legs and hips alone. The ragdoll (`die`) and riding are not ported yet.
+`step_ground` gives the legs and hips alone.
+
+Knocked down: give `"die": {}` (a blow from straight ahead) or `"die": {"impulse": [x, y, z]}` for
+one step. The body is handed to its ragdoll from wherever it is, a `die` event is given, and `step`
+goes on returning the falling, then lying, pose. `cm.stand(S, ch, ground)` puts it back on its feet.
+
+Riding: step the mount first, then the rider with the mount as the last argument.
+
+    horse = cm.characters()["horse"]
+    Sh = cm.create_state(horse, ground)
+    cm.mount_up(S, ch, (Sh, horse))      # False if that body has no saddle
+    cm.step(Sh, horse, {"speed": 9}, cm.STYLE, ground, 1 / 60)
+    pose = cm.step(S, ch, {"armed": True, "aim": [30, 2, 6]}, cm.STYLE, ground, 1 / 60, (Sh, horse))
+    cm.dismount(S, ch, ground)           # stands him beside the mount, on its left
 
 Speed on one core, whole steps a second: about 5,000 for the soldier, 7,000 for the hyena and
-the dragon, 6,000 for the scorpion, 2,800 for the octopus.
+the dragon, 6,000 for the scorpion, 2,800 for the octopus; a galloping horse and its rider
+together about 3,000 pairs.
 
 Check it against the JavaScript reference:
 

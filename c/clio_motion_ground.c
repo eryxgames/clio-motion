@@ -89,7 +89,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
   S->om += (om_t - S->om) * cm_decay(16 / Tn0, dt);
   S->h = cm_wrap_pi(S->h + S->om * dt);
   hc = cos(S->h); hs = sin(S->h);
-  fr.s = S; fr.hc = hc; fr.hs = hs; fr.fn = terrain; fr.user = user;
+  fr.s = S; fr.hc = hc; fr.hs = hs; fr.fn = terrain; fr.user = user; fr.seat = 0;
 
   /* a blow that does not floor the body: it slides, the torso snaps away, the knees give */
   if (inp->has_hit) {

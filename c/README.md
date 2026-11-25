@@ -9,9 +9,9 @@ interface.
     make            # libclio_motion.a, then the tests against the JavaScript reference
     make test
 
-Ported so far: the numeric kernel (stage 1), the ground step (stage 2), whole bodies on the
-ground (stage 3) for all twelve characters, and off the ground (stage 4a): swimming, flight, the
-ladder and the ledge.
+Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
+(stage 2), whole bodies on the ground (stage 3) for all twelve characters, and off the ground
+(stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding.
 
     static double ground(double x, double z, void *user) { return 0.0; }
 
@@ -38,15 +38,40 @@ octopus; `in.depth`, `in.ink`), `cm_enter_ladder` / `cm_leave_ladder` (a `cm_lad
 function; `in.speed` climbs), `cm_grab_ledge` (then `in.climb` or `in.drop`), `cm_place`.
 `cm_step_ground` gives the legs and hips alone.
 
-No allocation: the state is one struct of about 12 KB, the pose about 5.5 KB. Whole steps a second
+Knocked down: set `in.die` for one step (1: a blow from straight ahead; 2: with the push in
+`in.die_impulse`, in the world). The body is handed to its ragdoll from wherever it is (walking,
+in the air, in the water, on a ladder), a `CM_EV_DIE` event is given, and `cm_step` goes on
+returning the falling, then lying, pose (`pose.down`). After at most six seconds it lies still and
+a step costs almost nothing. `cm_stand` puts it back on its feet (a switch: there is no get-up
+animation). The ragdoll works in the body's forward-up plane and each joint keeps its sideways
+offset; for a full 3D ragdoll hand the skeleton to the engine's own.
+
+Riding: `cm_mount_up(&rider, soldier, &mount, horse)` puts a biped on a body with a saddle (the
+horse, the spider mech, the dragon; 0 if it cannot be ridden). Each frame step the mount first,
+then the rider, both with `cm_step`. The rider keeps a pointer to the mount's state, so that state
+must stay where it is until `cm_dismount`. `pose.riding` is set and `pose.reins` runs from each
+hand to the bit or the neck strap until a weapon is drawn. To throw a rider, give him `in.die`.
+
+    cm_state horse_s, rider_s; cm_pose horse_p, rider_p; cm_input horse_in = { 0 }, rider_in = { 0 };
+    const cm_character *horse = cm_character_find("horse"), *soldier = cm_character_find("soldier");
+    cm_state_init(&horse_s, horse, ground, NULL); cm_state_init(&rider_s, soldier, ground, NULL);
+    cm_mount_up(&rider_s, soldier, &horse_s, horse);
+    horse_in.speed = 9; rider_in.armed = 1;
+    cm_step(&horse_s, horse, &horse_in, &CM_STYLE, ground, NULL, 1.0 / 60, &horse_p);
+    cm_step(&rider_s, soldier, &rider_in, &CM_STYLE, ground, NULL, 1.0 / 60, &rider_p);
+
+No allocation: the state is one struct of about 24 KB (it keeps the last pose and the ragdoll), the
+pose about 5.5 KB. Whole steps a second
 on one core: about 490,000 for the soldier, 240,000 for the hyena, 170,000 for the scorpion,
-140,000 for the dragon, 90,000 for the octopus; in the air 240,000 for the wasp and 130,000 for
-the dragon; 70,000 for the octopus swimming.
+140,000 for the dragon, 80,000 for the octopus; in the air 240,000 for the wasp and 130,000 for
+the dragon; 70,000 for the octopus swimming; falling as a ragdoll about 100,000 for the soldier
+and 180,000 for the horse; a galloping horse and its rider together about 140,000 pairs.
 
 The Makefile turns fused multiply-add off (`-ffp-contract=off`) so that every platform rounds the
 way the JavaScript reference does. The kernel agrees with the reference to the last bit or two
-on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 61 recorded runs
+on 982 recorded cases; the ground step and the whole-body step reproduce 25 and 82 recorded runs
 to the ten digits they are recorded with (they also do with fused multiply-add on, on the machine
-they were tried on).
+they were tried on). The whole-body test also runs clean under the address and undefined-behaviour
+sanitizers and under valgrind, and gives the same result built with clang.
 
-Next: the ragdoll and riding (stage 4b); the Unity, Godot and Unreal wrappers sit on top of that.
+Next: the Unity, Godot and Unreal wrappers sit on top of this.

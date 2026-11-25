@@ -60,7 +60,7 @@ void cm_gait_params_step(const cm_gait_config *c, cm_gait_state *s, double v, do
 #define CM_MAX_CHAIN 12                        /* links in a tail */
 enum { CM_BIPED, CM_MECH, CM_QUAD, CM_HEX };
 enum { CM_EV_HIT = 1, CM_EV_JUMP, CM_EV_LAND, CM_EV_FIRE, CM_EV_RELOAD, CM_EV_LOADED, CM_EV_THROW, CM_EV_GRAB, CM_EV_PUTDOWN, CM_EV_PUNCH, CM_EV_STRIKE, CM_EV_DROP,
-       CM_EV_BITE, CM_EV_POUNCE, CM_EV_PINCH, CM_EV_STING, CM_EV_INK, CM_EV_GRIP, CM_EV_TOP };
+       CM_EV_BITE, CM_EV_POUNCE, CM_EV_PINCH, CM_EV_STING, CM_EV_INK, CM_EV_GRIP, CM_EV_TOP, CM_EV_DIE, CM_EV_MOUNT, CM_EV_DISMOUNT };
 enum { CM_MODE_GROUND, CM_MODE_LADDER, CM_MODE_RAGDOLL, CM_MODE_SWIM, CM_MODE_FLY, CM_MODE_LEDGE, CM_MODE_RIDE };
 enum { CM_MOUNT_HELD, CM_MOUNT_FIXED, CM_MOUNT_TURRET, CM_MOUNT_JAW };
 enum { CM_KIT_NONE, CM_KIT_RIFLE, CM_KIT_PISTOLS, CM_KIT_SWORD };
@@ -103,6 +103,9 @@ typedef struct {
   double octo_vswim; cm_chain_def octo_arm;
   int fly_hover, fly_glide;
   double fly_beat, fly_amp, fly_vmin, fly_vmax, fly_turn, fly_acc, fly_climb, fly_sink, fly_height, fly_low, fly_heave, fly_pitch0, fly_slow_pitch, fly_hang[2];
+  /* where a rider sits, if this body can be ridden: the seat from the body's root (along, up); the stirrups and the
+     place for the hands from the seat (along, up, to the side); reins: 0 none, 1 to the mouth, 2 to a strap round the neck */
+  int has_saddle, saddle_reins; double saddle_at[2], saddle_stirrup[3], saddle_hands[3];
 } cm_character;
 
 /* The built-in characters (clio_motion_characters.c, written by tools/spec.js from the reference). */
@@ -128,45 +131,6 @@ typedef struct { double at[3], size[3], yaw, ca, hk; int held; } cm_carry;      
 /* A tail's links: each has an angle up or down (th), an angle to the side (ps), and their turning speeds. */
 typedef struct { int n; double th[CM_MAX_CHAIN], ps[CM_MAX_CHAIN], vth[CM_MAX_CHAIN], vps[CM_MAX_CHAIN], by, vy, ay, dr[2], ax, az; } cm_chain;
 
-/* A ladder standing in front of the body: x is how far ahead it is (in the frame the body had when it took hold),
-   rung(k) the height of rung k, about y0 + k * spacing (the rungs need not be even). */
-typedef struct { double x, y0, spacing; double (*rung)(int k, void *user); void *user; } cm_ladder;
-
-/* Everything a character carries from one step to the next. */
-typedef struct {
-  double t, x, y, v, a, phase, crouch;
-  cm_gait_state gait;
-  int standing;
-  cm_spring g_ref, pitch, pack, hop, bank, side, lean, rise, flinch, guard, stance;
-  double reach_drop, pack_vy, last_y, air_b, idle_t;
-  double px, pz, h, om, kv[2];                 /* place in the world, heading, turn rate, slide after a blow */
-  int flinch_dir, has_vl;
-  double vl[2], tv[2], mv[2], lag;
-  int carry, act;                              /* a crate is in hand or being handled; the action in progress (CM_ACT_...) */
-  double act_crouch, act_back;
-  cm_action action;
-  cm_carry crate;
-  cm_spring aim, twist, armed, kick[2], block;
-  double flash[2], cool, ac_tw, ho_rel[2][3];
-  int gun, kit, ammo[2], has_ho_rel[2];
-  cm_spring jaw;
-  double ink_t;
-  cm_chain tail;
-  /* off the ground (stage 4) */
-  int mode;                                    /* CM_MODE_... */
-  double swim_vm, fly_vy, fly_effort;
-  cm_chain arm[CM_MAX_LEGS];                   /* the octopus's arms in the water */
-  const cm_ladder *ladder;                     /* the ladder being climbed (must outlive the climb) */
-  double lad_frame[5], lad_y;                  /* the frame the body had when it took hold: local x, px, pz, cos, sin */
-  struct { int k, swinging, from, to; double s, dur, psi; } limb[4];
-  struct { double ex, ey, t; int up; cm_spring sw; } ledge;
-  int has_crate_pos; double crate_pos[3];
-  cm_jump jump;
-  int legs;
-  cm_leg_state leg[CM_MAX_LEGS];
-  int n_events;                                /* read, then set to 0 */
-  cm_event events[CM_MAX_EVENTS];
-} cm_state;
 
 typedef struct {
   double speed, crouch, steer;                 /* m/s; 0..1; -1..1 */
@@ -190,6 +154,7 @@ typedef struct {
   int has_depth; double depth;                 /* swimming: metres above the bottom */
   int has_height; double height;               /* flying: metres above the ground */
   int climb, drop;                             /* hanging from a ledge: pull up; let go */
+  int die; double die_impulse[3];              /* knocked down: 1 from straight ahead, 2 with this push (world) */
 } cm_input;
 typedef struct { double bounce, stride, arm, lean, step, snap; } cm_style;
 extern const cm_style CM_STYLE;                /* 1, 1, 1, 1, 1, 0.3 */
@@ -232,14 +197,80 @@ typedef struct {
   int has_mantle; double mantle_c[3], mantle_tip[3], mantle_r;
   int n_wings; cm_wing_pose wing[2];
   int swimming, flying, climbing;              /* in the water; in the air; on a ladder or a ledge (then no carry, grenade or side) */
+  int down, no_tail;                           /* lying as a ragdoll (no carry or grenade); a body with no tail point */
+  int riding, n_reins; double reins[2][2][3];  /* in the saddle; the reins, each from a hand to the bit or the neck strap */
 } cm_pose;
+
+/* The ragdoll: the joints as point masses in the body's forward-up plane (each keeps its sideways offset), held
+   together by bone lengths, a few limits and the ground; tails and claws as limp chains. */
+#define CM_RAG_MAX 24
+typedef struct { double p[2], q[2], z, r, w; int hit; } cm_particle;
+typedef struct { int a, b, has_dz; double rest, dz; } cm_rag_link;
+typedef struct { int a, b, c, sign; } cm_rag_sign;
+typedef struct { int n, on; double p[CM_MAX_CHAIN + 1][3], q[CM_MAX_CHAIN + 1][3], seg[CM_MAX_CHAIN], r; } cm_limp;
+typedef struct {
+  double frame[5], h, t, still, aim, tw, gaze_off, dt;
+  int asleep, n, n_bones, n_mins, n_maxs, n_signs, n_upper, n_center, upper[2], center[2];
+  cm_particle P[CM_RAG_MAX];
+  cm_rag_link bones[CM_RAG_MAX], mins[CM_RAG_MAX], maxs[4];
+  cm_rag_sign signs[CM_RAG_MAX];
+  int root, chest, head, back, front, mid, knee[CM_MAX_LEGS], ankle[CM_MAX_LEGS], toe[CM_MAX_LEGS], elbow[2], hand[2], prop_s[2], prop_m[2];
+  /* what is kept of the pose the body had when it went down */
+  int legs, arm_side[2], n_props, prop_kind[2], n_mounts, mount_side[2], n_claws, claw_side[2];
+  double arm_sh_z[2], mount_z[2];
+  cm_limp tail, claw[2];
+} cm_ragdoll;
+
+/* A ladder standing in front of the body: x is how far ahead it is (in the frame the body had when it took hold),
+   rung(k) the height of rung k, about y0 + k * spacing (the rungs need not be even). */
+typedef struct { double x, y0, spacing; double (*rung)(int k, void *user); void *user; } cm_ladder;
+
+/* Everything a character carries from one step to the next. */
+typedef struct cm_state {
+  double t, x, y, v, a, phase, crouch;
+  cm_gait_state gait;
+  int standing;
+  cm_spring g_ref, pitch, pack, hop, bank, side, lean, rise, flinch, guard, stance;
+  double reach_drop, pack_vy, last_y, air_b, idle_t;
+  double px, pz, h, om, kv[2];                 /* place in the world, heading, turn rate, slide after a blow */
+  int flinch_dir, has_vl;
+  double vl[2], tv[2], mv[2], lag;
+  int carry, act;                              /* a crate is in hand or being handled; the action in progress (CM_ACT_...) */
+  double act_crouch, act_back;
+  cm_action action;
+  cm_carry crate;
+  cm_spring aim, twist, armed, kick[2], block;
+  double flash[2], cool, ac_tw, ho_rel[2][3];
+  int gun, kit, ammo[2], has_ho_rel[2];
+  cm_spring jaw;
+  double ink_t;
+  cm_chain tail;
+  /* off the ground (stage 4) */
+  int mode;                                    /* CM_MODE_... */
+  double swim_vm, fly_vy, fly_effort;
+  cm_chain arm[CM_MAX_LEGS];                   /* the octopus's arms in the water */
+  const cm_ladder *ladder;                     /* the ladder being climbed (must outlive the climb) */
+  double lad_frame[5], lad_y;                  /* the frame the body had when it took hold: local x, px, pz, cos, sin */
+  struct { int k, swinging, from, to; double s, dur, psi; } limb[4];
+  struct { double ex, ey, t; int up; cm_spring sw; } ledge;
+  int has_crate_pos; double crate_pos[3];
+  int has_last; cm_pose last;                  /* the pose of the last step: what a ragdoll starts from */
+  cm_ragdoll rag;
+  const struct cm_state *mount; const cm_character *mount_ch;       /* riding: the body ridden (must outlive the ride) */
+  struct { cm_spring d; int has_sy; double sy, svy, acc, pv; } ride;
+  cm_jump jump;
+  int legs;
+  cm_leg_state leg[CM_MAX_LEGS];
+  int n_events;                                /* read, then set to 0 */
+  cm_event events[CM_MAX_EVENTS];
+} cm_state;
 
 void cm_state_init(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
 void cm_step_ground(cm_state *s, const cm_character *ch, const cm_input *in, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_ground_pose *out);
 
 /* Stage 3: one step of a whole character on the ground: legs and hips, then the upper body, weapons and actions,
    for every built-in character, and from stage 4 in the water, in the air, on a ladder and on a ledge. Returns 0
-   (-1 for the ragdoll and riding, which are not ported yet). */
+   lying as a ragdoll or riding. in->die hands the body to its ragdoll from wherever it is. */
 int cm_step(cm_state *s, const cm_character *ch, const cm_input *in, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_pose *out);
 /* Stage 4: off the ground. cm_step goes on stepping a character in whatever mode these put it in. Each returns 1 if
    it took effect. Leaving a mode stands the body on the ground where it is. */
@@ -250,6 +281,14 @@ int cm_leave_fly(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, voi
 int cm_enter_ladder(cm_state *s, const cm_character *ch, const cm_ladder *ladder);      /* bipeds; speed climbs */
 void cm_leave_ladder(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
 int cm_grab_ledge(cm_state *s, const cm_character *ch, const double edge[3]);  /* bipeds; in.climb pulls up, in.drop lets go */
+/* Riding. cm_mount_up puts a biped on a body that has a saddle (0 if it cannot be ridden); from then on step the mount
+   first with cm_step, then the rider with cm_step. The rider's hips are held to the seat by a spring, the feet stay in
+   the stirrups, the hands hold the reins until a weapon is drawn; aiming, firing, reloading, the sword and throwing all
+   work from the saddle. cm_dismount stands the rider beside the mount, on its left. */
+int cm_mount_up(cm_state *s, const cm_character *ch, const cm_state *mount, const cm_character *mount_ch);
+int cm_dismount(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
+/* Back on the feet where the body lies, after a fall (a switch: it is not a get-up animation). */
+void cm_stand(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user);
 /* Stand a character somewhere in the world, facing a given way, feet on the ground there. */
 void cm_place(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *user, double x, double z, double heading);
 

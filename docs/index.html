@@ -1216,7 +1216,9 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       var a = Lc.p[i - 1], b = Lc.p[i], d = sub(b, a), l = len(d) || 1;
       for (j = 0; j < 3; j++) b[j] = a[j] + d[j] / l * Lc.seg[i - 1];
       var gy = ground(b[0], b[2]) + Lc.r;
-      if (b[1] < gy) { b[1] = gy; Lc.q[i][0] += (b[0] - Lc.q[i][0]) * 0.5; Lc.q[i][2] += (b[2] - Lc.q[i][2]) * 0.5; }      // it drags on the ground
+      // it drags on the ground. (Touching counts as on the ground, to a tenth of a micron: a point that rests exactly on it
+      // would otherwise drag or not by the last bit of a sum, and no two machines would agree.)
+      if (b[1] < gy + 1e-7) { if (b[1] < gy) b[1] = gy; Lc.q[i][0] += (b[0] - Lc.q[i][0]) * 0.5; Lc.q[i][2] += (b[2] - Lc.q[i][2]) * 0.5; }
     }
     return Lc.p.map(function (x) { return x.slice(); });
   }
@@ -2310,7 +2312,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
             }
           }
         }
-        for (i = 0; i < P.length; i++) { q = P[i]; var gy = terrain(q) + q.r; if (q.p[1] < gy) { q.p[1] = gy; q.hit = true; } }
+        for (i = 0; i < P.length; i++) { q = P[i]; var gy = terrain(q) + q.r; if (q.p[1] < gy + 1e-7) { if (q.p[1] < gy) q.p[1] = gy; q.hit = true; } }      // (touching counts, as for limp chains)
       }
       for (i = 0; i < P.length; i++) {
         q = P[i];

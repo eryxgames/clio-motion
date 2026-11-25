@@ -3,6 +3,8 @@ out/
 *.o
 *.a
 c/test_kernel
+c/test_ground
+c/test_body
 __pycache__/
 *.pyc
 *.egg-info/
