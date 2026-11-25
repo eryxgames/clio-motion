@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.0
+
+- A horse: walk, trot and gallop, a tail of hair, a saddle. It runs in the C and Python versions
+  as it is (the characters are data).
+- Riding (JavaScript reference): `mountUp`, `dismount`, a `ride` mode. A soldier on the horse, the
+  spider mech or the dragon, on the ground and in the air; reins; weapons from the saddle.
+  In Gait Bench: a Horse tab, and "Put a rider on" for the horse, the spider mech and the dragon.
+- Drawing: eyes and visors go behind a head that is turned away (three-quarter view), on every
+  character.
+- `spec/`: two runs for the horse (55 in all).
+
 ## 0.16.0
 
 - C99 and Python, stage 3b: every character whole on the ground. Animals (hyena, raptor, dragon):

@@ -79,7 +79,7 @@ facing forwards), `run` (trot for the quadruped), `sneak`, `jump`, `attack`, `hi
 ## Checked
 
 - All twenty-six `.glb` files that `tools/gaitbake.js` writes for the built-in characters pass the Khronos glTF validator with no errors or warnings.
-- CLIo's own `engine/gltf.py` reads every clip of all eleven characters from them.
+- CLIo's own `engine/gltf.py` reads every clip of all twelve characters from them.
 - The skinned files were played back through their joint hierarchy and compared with the rig:
   parts land within 0.13% of leg length on average, also when aiming well off to the side. The worst
   cases are the quadruped's body in the death clip (about 7% of leg length) and the soldier's
@@ -120,6 +120,13 @@ facing forwards), `run` (trot for the quadruped), `sneak`, `jump`, `attack`, `hi
   240 steps a second, the hands stay on the lip to the millimetre while hanging, no knee goes
   into the wall, the pull-up takes 1.5 s with the hips never faster than 2 m/s, and the body
   stands on top and walks on.
+- Horse: walk, trot and gallop from 1 to 15 m/s at 30 and 120 steps a second with no foot sliding;
+  the same bite and jump as the other animals.
+- Riding: on the horse, the spider mech and the dragon, at 30, 60 and 120 steps a second, on
+  rolling ground, through a gallop, turns and a stop, and on the dragon in a banked turn in the
+  air: the feet stay exactly in the stirrups, the hips rise at most 7 cm from the seat, the hands
+  stay on the reins (within 2 cm in a banked turn), and the rifle fires from the saddle. A rider
+  thrown at 9 m/s falls and lies on the ground.
 - Fights: one-minute and 90-second fights at 30, 60 and 120 steps a second, on flat, rough and
   stepped ground. No planted foot slides or sinks into the ground, the two never stand inside each
   other, and each fight has knockdowns and recoveries.
@@ -167,6 +174,22 @@ cannot hang. Hanging, `climb: true` (or `jump`) pulls it up over the edge in abo
 half: chest to the lip, weight over the hands, one foot up, then the other, and it stands on top
 in ground mode (`top` event). `drop: true` lets go. The edge is taken to run across the way the
 body faces. Clips: `hang` and `climbup`; the atlas gives `metres` and `metresUp` for the climb.
+
+Riding: a soldier can sit on any character that has a `saddle` (the horse, the spider mech, the
+dragon). The game steps the mount first, then the rider with the mount handed to it:
+
+    M.mountUp(rider, soldier, env, { S: mount, ch: horse });          // false if it cannot be ridden
+    M.step(mount, horse, { speed: 9, steer: 0.3 }, style, env, dt);   // the game drives the mount
+    M.step(rider, soldier, { aim, armed, fire }, style, { terrain: env.terrain, mount: { S: mount, ch: horse } }, dt);
+    M.dismount(rider, soldier, env);                                  // stands beside it, on its left
+
+The rider's hips are held to the seat by a spring, so a trot or a gallop lifts him out of the
+saddle and the knees take it up; the feet stay in the stirrups; the back leans with the pace and
+stays upright when the mount pitches; in the air the rider rolls with the dragon. The hands hold
+the reins (`pose.reins`) or the handles until a weapon is drawn: aiming, firing, reloading, the
+sword and throwing all work from the saddle. `die` on the rider throws him from wherever he is.
+A saddle is data on the mount: `saddle: { at: [along, up], stirrup: [along, up, side],
+hands: [along, up, side], reins: 'bit' | 'neck' | null }`.
 
 Hands and fists (soldier):
 
@@ -295,9 +318,15 @@ when its health runs out, and gets up again after a few seconds.
 - Sideways aim has limits: the soldier's torso turns up to 57 degrees, the mech's hull 74, the
   quadruped's head 52; the spider's turret goes all the way round. A target behind the body is let go.
 - The pistol reload is one-handed at the belt, which is stylised. Both pistols aim at one point.
-- Draw order is authored for a side view. With the torso turned far towards the camera, arms and
-  weapons can layer wrongly.
+- Draw order is authored for a side view. With the torso turned far towards or away from the
+  camera, arms, the pack and weapons can layer wrongly. Eyes and visors are the exception: on the
+  side of a head that is turned away they go behind it.
 
+- Riding: there is no climbing on or getting down (both are switches); the rider does not grip
+  with his knees or lose his seat by himself; nothing but the seat joins him to the mount, so a
+  mount that rears or rolls takes him with it however steep. Riding is not baked into clips and is
+  not in the C and Python versions yet. Only the soldier rides.
+- The horse's legs have two bones each, like the hyena's. Its pounce is a jump with the head down.
 - Flight has no take-off run and no landing flare: entering and leaving the air are switches, and
   the bench cross-fades over them. Wings do not collide with the ground or the body.
 - The wasp's knocked-down body props itself on its legs and can twitch for some seconds before

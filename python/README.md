@@ -3,7 +3,7 @@
 Pure Python, standard library only, so CLIo can carry it without a compiler.
 
 Ported so far: the numeric kernel (stage 1), the ground step (stage 2), and whole bodies on the
-ground (stage 3) for all eleven characters: weapons, actions, spines, tails, claws, arms.
+ground (stage 3) for all twelve characters: weapons, actions, spines, tails, claws, arms.
 
     import clio_motion as cm
 

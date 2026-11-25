@@ -30,7 +30,8 @@
   // ------------------------------------------------------------- world
   var ch, env, S, yOff = 0, pose = null, footprints = [], trail = [], xf = null, held = null, keep = {};
   var cam = { y: 0, z: 0, look: 1, yaw: 0, pit: 0, fx: 0 }, aimScreen = null, firing = false, fireOnce = false, jumpOnce = false, dieOnce = null, hitOnce = null, reloadOnce = false, ladFrame = null, lastK = -1, simTick = 0;
-  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {} };      // image parts per character and slot
+  var rider = null, riderArmed = false;                          // a soldier on the back of the character on stage
+  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {} };      // image parts per character and slot
   // things in the world that the actions deal with, and the two-character fight
   var wall = null, baseTerrain = null, climbOnce = false, dropOnce = false, swingOnce = null, blockHeld = false, camView = 2, pounceOnce = null, stingOnce = null, inkOnce = false, swimDown = false, inks = [], grenades = [], sparks = [], crateObj = null, cratePending = null, wantPick = false, wantPut = false, throwOnce = null, guardOn = false, punchOnce = null;
   var FT = typeof GaitFight !== 'undefined' ? GaitFight : null, F = null, say = { text: '', t: 9 }, lastAim = null;
@@ -49,7 +50,7 @@
     ch = M.CHARACTERS[set.ch]; yOff = 0;
     wall = null; baseTerrain = makeTerrain(set.terrain, ch.L);
     env = { terrain: function (x, z) { return baseTerrain(x, z) + (wall && x > wall.x ? wall.h : 0); }, ladder: null };
-    S = M.createState(ch, env);
+    S = M.createState(ch, env); rider = null; riderArmed = false;
     footprints = []; trail = []; xf = null; held = null; lastK = -1; set.ladder = false; set.down = false; set.steer = 0; set.heading = null; set.dir = 0; ladFrame = null; keep = {};
     grenades = []; sparks = []; inks = []; swimDown = false; crateObj = null; cratePending = null; wantPick = false; wantPut = false; throwOnce = null; guardOn = false; punchOnce = null; F = null;
     cam.y = S.gRef.x; cam.z = 0; cam.look = 1;
@@ -134,7 +135,7 @@
     var inp = { speed: busy ? 0 : set.speed, crouch: set.crouch, aim: aimWorld(), fire: firing || fireOnce, armed: set.armed, kit: set.kit, reload: reloadOnce, jump: jumpOnce, die: dieOnce, hit: hitOnce,
       steer: set.steer, heading: set.steer ? null : set.heading, dir: set.dir * Math.PI / 180, climb: climbOnce || (S.mode === 'ledge' && jumpOnce), drop: dropOnce, guard: guardOn, punch: punchOnce, throw: throwOnce,
       swing: swingOnce || (S.kit === 'sword' && (firing || fireOnce) ? { kind: 'slash' } : null), block: S.kit === 'sword' && blockHeld,
-      bite: ch.beast && (firing || fireOnce) ? { target: aimWorld() } : null, pounce: pounceOnce,
+      bite: ch.beast && (firing || fireOnce) && !(rider && riderArmed) ? { target: aimWorld() } : null, pounce: pounceOnce,
       pinch: ch.arthro && ch.arthro.claw && (firing || fireOnce) ? { target: aimWorld() } : null,
       sting: stingOnce || (ch.arthro && !ch.arthro.claw && (firing || fireOnce) ? { target: aimWorld() } : null),
       grab: ch.octo && (firing || fireOnce) ? { target: aimWorld() } : null, ink: inkOnce, depth: swimDown ? 0.3 : 0.4 + 1.6 * (1 - set.crouch),
@@ -143,6 +144,12 @@
     if (wantPick && quiet && !S.carry && crateObj && !crateObj.fall) inp.pickup = { at: crateObj.pos, heading: crateObj.heading };
     if (wantPut && quiet && S.carry) inp.putdown = true;
     pose = M.step(S, ch, inp, set.style, env, dt);
+    if (rider) {
+      // the rider is stepped after its mount, with the mount handed to it
+      var rin = { aim: aimWorld(), armed: riderArmed, fire: riderArmed && (firing || fireOnce), kit: 'rifle', die: inp.die, hit: inp.hit };
+      M.step(rider.S, rider.ch, rin, set.style, { terrain: env.terrain, mount: { S: S, ch: ch } }, dt);
+      rider.S.events.length = 0;
+    }
     fireOnce = false; jumpOnce = false; dieOnce = null; hitOnce = null; reloadOnce = false; throwOnce = null; punchOnce = null; pounceOnce = null; stingOnce = null; inkOnce = false; swingOnce = null; climbOnce = false; dropOnce = false;
     // a wall ahead: on reaching it the soldier takes hold of the top and hangs; Space (or the button again) climbs up
     if (wall && !wall.done && S.mode === 'ground' && S.px > wall.x - 0.40 && S.px < wall.x) { xf = { from: pose, t: 0, dur: 0.3 }; M.grabLedge(S, ch, env, [wall.x, baseTerrain(wall.x) + wall.h, S.pz]); wall.done = true; set.speed = 0; syncUI(); }
@@ -192,7 +199,9 @@
   function getUp() {
     xf = { from: pose, t: 0, dur: 0.6 };
     env.ladder = null; ladFrame = null; set.ladder = false; set.down = false; set.heading = null;
-    M.stand(S, ch, env); footprints = []; trail = []; held = null; syncUI();
+    M.stand(S, ch, env); footprints = []; trail = []; held = null;
+    if (rider) { M.stand(rider.S, rider.ch, env); M.step(S, ch, { speed: 0 }, set.style, env, 1 / 120); S.events.length = 0; M.mountUp(rider.S, rider.ch, env, { S: S, ch: ch }); rider.S.events.length = 0; }
+    syncUI();
   }
 
   // a beast leaps at the ground under the place pointed at, if that is ahead of it; otherwise a standard leap
@@ -257,6 +266,14 @@
   }
 
   // put a wall 2.3 m high a few steps ahead (the soldier faces along the track to meet it), or, when hanging from it, climb up
+  function rideNow() {
+    if (!ch.saddle || F || set.down) return;
+    if (rider) { rider = null; riderArmed = false; syncUI(); return; }
+    var rc = M.CHARACTERS.soldier, rs = M.createState(rc, env);
+    if (!S.local) return;
+    if (M.mountUp(rs, rc, env, { S: S, ch: ch })) { rs.events.length = 0; rider = { S: rs, ch: rc }; }
+    syncUI();
+  }
   function ledgeNow() {
     if (ch.kind !== 'biped' || set.down || set.ladder || F) return;
     if (S.mode === 'ledge') { climbOnce = true; return; }
@@ -435,6 +452,7 @@
     var actors = F ? F.fighters.map(function (f, k) { var t2 = f.xf ? f.xf.t : 1; return { pose: f.xf ? M.blendPose(f.xf.from, f.S.pose, t2 * t2 * (3 - 2 * t2)) : f.S.pose, team: k, f: f }; }) : [{ pose: shown, team: 0 }];
     var lists = actors.map(function (a) {
       var pr = R.buildPrims(a.pose, ch, TEAM[a.team].pal ? { pal: TEAM[a.team].pal } : undefined);
+      if (!F && rider && rider.S.pose) { var dpt = proj(a.pose.root)[2]; pr = R.pair(pr, R.buildPrims(rider.S.pose, rider.ch)); pr.depth = dpt; return pr; }
       pr.depth = proj(a.pose.root)[2]; return pr;
     });
     if (!F) {
@@ -444,7 +462,7 @@
         R.cratePrims(lists[0], { c: crateObj.pos, f: [hc, 0, hs], u: [0, 1, 0], side: [-hs, 0, hc], size: M.CRATE });
       }
     }
-    lists.sort(function (m, n) { return m.depth - n.depth; }).forEach(function (pr) { drawPrims(ctx, proj, P.ppm, pr, R.SPRITE[ch.id].dz, 1.5, TOK.outline, keep, partsOf(ch.id)); });
+    lists.sort(function (m, n) { return m.depth - n.depth; }).forEach(function (pr) { drawPrims(ctx, proj, P.ppm, pr, R.SPRITE[ch.id].dz, 1.5, TOK.outline, keep, rider ? null : partsOf(ch.id)); });
 
     for (i = 0; i < inks.length; i++) {
       var nk2 = inks[i], np = proj(nk2.p); ctx.globalAlpha = 0.5 * (1 - nk2.t / 3); ctx.fillStyle = '#1d1a22';
@@ -730,6 +748,8 @@
     $('fire').disabled = set.ladder || set.down || (biped && !set.armed);
     $('reload').disabled = set.ladder || set.down || !set.armed;
     [].forEach.call($('dirSeg').children, function (b) { press(b, +b.dataset.dir === set.dir); b.disabled = set.ladder || set.down || !!F || (S && (S.mode === 'swim' || S.mode === 'fly')); });
+    $('ride').hidden = !ch.saddle; $('ride').disabled = set.down || !!F; press($('ride'), !!rider); $('ride').textContent = rider ? 'Take the rider off' : 'Put a rider on';
+    $('riderArmed').hidden = !rider; press($('riderArmed'), riderArmed); $('rideNote').hidden = !rider;
     $('ledge').hidden = !biped; $('ledge').disabled = set.down || set.ladder || !!F || (!!wall && S.mode !== 'ledge'); press($('ledge'), !!wall);
     $('ledge').textContent = S && S.mode === 'ledge' ? 'Climb up' : wall ? 'Walking to the wall' : 'Wall ahead';
     $('pounce').hidden = !ch.beast; $('pounce').disabled = set.down; $('gGallop').hidden = !ch.gait.gallop;
@@ -799,6 +819,8 @@
   $('gGallop').addEventListener('click', function () { setSpeed(0.75 * ch.vmax); });
   $('pounce').addEventListener('click', pounceNow);
   $('ledge').addEventListener('click', ledgeNow);
+  $('ride').addEventListener('click', rideNow);
+  $('riderArmed').addEventListener('click', function () { riderArmed = !riderArmed; syncUI(); });
   $('dirSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b || b.disabled) return; set.dir = +b.dataset.dir; if (set.speed < 0.1) set.speed = B.walkSpeed(ch); clearStrip(); syncUI(); });
   $('sting').addEventListener('click', stingNow);
   $('swim').addEventListener('click', swimNow);

@@ -113,6 +113,24 @@
       tail: { at: [-0.40, 0.01], n: 4, seg: 0.085, rest: 1.05, curl: 0.10, omega: 12, zeta: 0.35, soft: 0.5, sag: 0.15, lift: 0.9, wag: 0.35, alert: 1.0, sway: 0.3 },
       mount: { type: 'jaw', n: 1, rate: 2, kick: 0, rise: 0, omega: 30, aimOmega: 11, min: -0.7, max: 0.7, yaw: 1.0, bodyKick: 0 }
     },
+    horse: {
+      // a riding horse: long legs under a deep chest, a long neck, a tail of hair. Walk, trot, gallop; it can be ridden (saddle)
+      id: 'horse', label: 'Horse', kind: 'quad', L: 1.05, rootHeight: 1.12, crouchDrop: 0.30, runDrop: 0.03,
+      vmax: 16, viewH: 2.9, jumpH: 0.9, bob: 0.75, sway: 0.35, liftWalk: 0.10, liftRun: 0.17, runStride: 1.06,
+      legs: [
+        leg('RH', 1, [-0.52, -0.10, 0.15], [-0.56, 0.17], 0.52, 0.57, [-1, 0.25, 0]),
+        leg('RF', 1, [0.50, 0.04, 0.16], [0.54, 0.17], 0.57, 0.62, [1, 0.1, 0]),
+        leg('LH', -1, [-0.52, -0.10, -0.15], [-0.56, -0.17], 0.52, 0.57, [-1, 0.25, 0]),
+        leg('LF', -1, [0.50, 0.04, -0.16], [0.54, -0.17], 0.57, 0.62, [1, 0.1, 0])
+      ],
+      gait: { walk: { phases: [0, 0.75, 0.5, 0.25], duty: [0.70, 0.60] }, run: { phases: [0, 0.5, 0.5, 0], duty: [0.45, 0.36] }, frRun: 0.5, frMax: 2.4,
+        gallop: { phases: [0.88, 0.43, 0, 0.55], duty: [0.32, 0.22], fr: 2.4, frMax: 16 } },
+      beast: { half: 0.55, neck: 0.62, neckUp: 0.78, skull: 0.44, jaw: 0.30, flex: 0.06, rock: 0.05, look: 'horse' },
+      tail: { at: [-0.60, 0.12], n: 5, seg: 0.15, rest: 1.25, curl: 0.05, omega: 9, zeta: 0.4, soft: 0.6, sag: 0.2, lift: 0.75, wag: 0.25, alert: 0.25, sway: 0.25 },
+      mount: { type: 'jaw', n: 1, rate: 2, kick: 0, rise: 0, omega: 30, aimOmega: 8, min: -0.7, max: 0.5, yaw: 0.9, bodyKick: 0 },
+      // where a rider sits: the seat from the body's root (along, up); stirrups and hands from the seat (along, up, to the side)
+      saddle: { at: [0.02, 0.33], stirrup: [0.10, -0.50, 0.33], hands: [0.34, 0.20, 0.10], reins: 'bit' }
+    },
     raptor: {
       // a dinosaur on two legs: the body lies level over the hips, with the neck and head out in front and a long tail behind to balance them
       id: 'raptor', label: 'Raptor', kind: 'quad', L: 0.95, rootHeight: 0.92, crouchDrop: 0.34, runDrop: 0.06,
@@ -128,6 +146,7 @@
     },
     spider: {
       id: 'spider', label: 'Spider mech', kind: 'hex', L: 1.0, rootHeight: 0.95, crouchDrop: 0.45, runDrop: 0,
+      saddle: { at: [-0.50, 0.40], stirrup: [0.22, -0.40, 0.30], hands: [0.32, 0.14, 0.17], reins: null },      // a seat behind the turret, footrests, two handles
       vmax: 2.6, viewH: 3.4, jumpH: 0.3, bob: 0.45, sway: 0.3, liftWalk: 0.26, liftRun: 0.26, runStride: 1,
       legs: [
         leg('R1', 1, [0.55, 0.05, 0.38], [1.05, 1.15], 1.0, 1.5, [0.2, 1, 0.3]),
@@ -684,7 +703,7 @@
   // asked: the player asked for it, so full weapons are reloaded too; otherwise only those that are short
   function startReload(S, ch, asked) {
     var kit = heldKit(S, ch), q = [], i;
-    if (!kit || kit.melee || S.act || S.armed.x < 0.8 || S.mode !== 'ground') return false;
+    if (!kit || kit.melee || S.act || S.armed.x < 0.8 || (S.mode !== 'ground' && S.mode !== 'ride')) return false;
     for (i = 0; i < kit.props.length; i++) if (S.ammo[i] < PROPS[kit.props[i]].rounds) q.push(i);
     if (!q.length && asked) for (i = 0; i < kit.props.length; i++) q.push(i);
     if (!q.length) return false;
@@ -699,7 +718,7 @@
     S.cool -= dt;
     for (i = 0; i < 2; i++) { S.flash[i] = Math.max(0, S.flash[i] - dt / 0.06); spring(S.kick[i], 0, m.omega, 0.6, dt); }
     spring(S.rise, 0, m.omega * 0.7, 0.7, dt);
-    if (!inp.fire || S.cool > 0 || S.mode !== 'ground' || (S.act && S.act.name !== 'reload') || m.type === 'jaw') return;
+    if (!inp.fire || S.cool > 0 || (S.mode !== 'ground' && S.mode !== 'ride') || (S.act && S.act.name !== 'reload') || m.type === 'jaw') return;
     if (kit) {
       if (S.armed.x < 0.8) return;
       // the next gun in turn that has rounds and is not being reloaded; with none left, fire starts a reload
@@ -736,7 +755,7 @@
   }
   function actTick(S, ch, inp, dt, B) {
     var AC = { lean: 0, tw: 0, ext: 0, load: 0 }, a = S.act, k = Math.sqrt(ch.L / 0.92), q, c, sz;
-    var ground = S.mode === 'ground', idle = !a && ground && !S.jump;
+    var ground = S.mode === 'ground' || S.mode === 'ride', idle = !a && ground && !S.jump;
     spring(S.guard, inp.guard && !S.carry && ground && !(a && a.name === 'throw') ? 1 : 0, 16, 1, dt);
     spring(S.block, inp.block && (inp.guard || (S.kit === 'sword' && S.armed.x > 0.5)) ? 1 : 0, 24, 1, dt);
     var g = clamp(S.guard.x, 0, 1);
@@ -1130,6 +1149,7 @@
         pose.carry = { c: cc, f: cf, u: cu, side: cs, size: cz, held: crate.held };
       } else pose.carry = null;
 
+      if (B.hands) for (i = 0; i < 2; i++) if (!HO[i] || !(HO[i].k > 0)) HO[i] = { p: unturn(B.hands[i]), k: 1 - eH[i], pole: [-0.2, -1, i === 0 ? 0.5 : -0.5] };      // reins or handles, unless the hand is busy
       var swing = st.arm * 0.2 * gp.moving * legs[0].side * S.legs[0].fwd * (1 - 0.7 * e);
       var arms = [];
       for (var s = 0; s < 2; s++) {
@@ -1391,6 +1411,7 @@
     ],
     gait: { walk: { phases: [0, 0.75, 0.5, 0.25], duty: [0.72, 0.60] }, run: { phases: [0, 0.5, 0.5, 0], duty: [0.48, 0.38] }, frRun: 0.5, frMax: 2.5 },
     beast: { half: 0.70, neck: 1.0, neckUp: 0.7, skull: 0.50, jaw: 0.42, flex: 0, rock: 0, tilt: 0.04, look: 'dragon' },
+    saddle: { at: [0.34, 0.44], stirrup: [0.12, -0.44, 0.40], hands: [0.36, 0.16, 0.10], reins: 'neck' },      // astride the shoulders, in front of the wings
     tail: { at: [-0.74, 0.0], n: 9, seg: 0.30, rest: 0.14, curl: 0.03, omega: 8, zeta: 0.45, soft: 0.55, sag: 0.06, bend: 0.3, lift: 0.12, wag: 0.07, alert: 0.2, sway: 0.16 },
     fly: { beat: 1.15, amp: 0.75, w1: 1.5, w2: 2.1, chord: 0.9, at: [0.30, 0.24, 0.26], vmin: 5, vmax: 16, hover: false, glide: true, turn: 0.8, acc: 4, climb: 3.5, sink: 4, height: 4.2, low: 1.7, heave: 0.16, pitch0: 0.04, slowPitch: 0.45, hang: [-0.30, -0.50], view: 2.1 },
     mount: { type: 'jaw', n: 1, rate: 2, kick: 0, rise: 0, omega: 30, aimOmega: 8, min: -0.8, max: 0.6, yaw: 0.9, bodyKick: 0 }
@@ -1608,7 +1629,7 @@
   function leaveLadder(S, ch, env) {
     S.mode = 'ground'; S.lad = null; S.v = 0; S.standing = true; S.reachDrop = 0; S.jump = null; S.hop.x = S.hop.v = 0; S.airB = 0;
     S.om = 0; S.kv = [0, 0]; S.bank.x = S.bank.v = 0; S.side.x = S.side.v = 0; S.ladFrame = null;
-    S.mv = [0, 0]; S.actCrouch = 0; S.actBack = 0; S.chains = {}; S.vl = null; S.tv = [1, 0]; S.guard.x = S.guard.v = 0; S.stance.x = S.stance.v = 0;
+    S.mv = [0, 0]; S.actCrouch = 0; S.actBack = 0; S.chains = {}; S.ride = null; S.vl = null; S.tv = [1, 0]; S.guard.x = S.guard.v = 0; S.stance.x = S.stance.v = 0;
     var hc = Math.cos(S.h), hs = Math.sin(S.h);
     S.gRef.x = env.terrain(S.px, S.pz); S.gRef.v = 0; S.y = S.lastY = S.gRef.x + ch.rootHeight;
     for (var i = 0; i < S.legs.length; i++) {
@@ -1775,6 +1796,96 @@
      forward-up plane and keeps its sideways offset, which is what a side-view game needs.
      (A 3D engine would hand the skinned skeleton to its own ragdoll instead.) */
   // true length; z never changes. dz, when given, replaces the particles' own sideways gap
+  // ----------------------------------------------------------------- riding
+  /* A rider on another character. The game steps the mount first, then the rider with env.mount = { S, ch } set
+     to the mount's state and character. The mount says where a rider sits (ch.saddle): the seat, measured from
+     its body's root along the body and up from it; the stirrups and the place for the hands, measured from the
+     seat; and whether there are reins ('bit': to the mouth, 'neck': to a strap round the neck).
+     The rider's hips are held to the seat by a spring, so a trot or a gallop lifts him out of the saddle and the
+     knees take it up; the feet stay in the stirrups; the back leans with the pace and stays upright when the mount
+     pitches; in the air the whole rider rolls with the mount. The hands hold the reins until a weapon is drawn:
+     aiming, firing, reloading, the sword and throwing all work from the saddle.
+       M.mountUp(S, ch, env, { S: mountState, ch: mountCharacter })   false if that body cannot be ridden
+       M.dismount(S, ch, env)                                          stands the rider beside the mount */
+  function mountUp(S, ch, env, mount) {
+    if (ch.kind !== 'biped' || !mount || !mount.ch || !mount.ch.saddle || !mount.S || S.mode === 'ragdoll') return false;
+    letGo(S); S.act = null; S.jump = null; S.lad = null; S.ledge = null; S.ladFrame = null;
+    S.mode = 'ride'; S.ride = { d: sp(0), sy: null, svy: 0, acc: 0 };
+    S.v = 0; S.a = 0; S.om = 0; S.crouch = 0; S.airB = 0; S.standing = false; S.guard.x = S.guard.v = 0; S.stance.x = S.stance.v = 0; S.vl = null;
+    S.events.push({ type: 'mount' });
+    return true;
+  }
+  function dismount(S, ch, env) {
+    if (S.mode !== 'ride') return false;
+    S.px += 0.95 * Math.sin(S.h); S.pz -= 0.95 * Math.cos(S.h);       // down on the mount's left side
+    letGo(S); S.act = null; leaveLadder(S, ch, env);
+    S.events.push({ type: 'dismount' });
+    return true;
+  }
+  function stepRide(S, ch, inp, st, env, dt) {
+    var Mt = env.mount, Sm = Mt && Mt.S, cm = Mt && Mt.ch, Lm = Sm && Sm.local, sd = cm && cm.saddle, R = S.ride, i;
+    if (!Lm || !sd || !Lm.axis || !Lm.up) { dismount(S, ch, env); return stepGround(S, ch, inp, st, env, dt); }      // nothing to sit on
+    S.t += dt;
+    // the rider's pose is worked out in the mount's own frame
+    var fr = frameOf(Sm);
+    S.x = fr.ox; S.px = fr.px; S.pz = fr.pz; S.h = fr.h === undefined ? Sm.h : fr.h;
+    var ax = Lm.axis, up = Lm.up, sv = [ax[1] * up[2] - ax[2] * up[1], ax[2] * up[0] - ax[0] * up[2], ax[0] * up[1] - ax[1] * up[0]];
+    var seat = [Lm.root[0] + ax[0] * sd.at[0] + up[0] * sd.at[1], Lm.root[1] + ax[1] * sd.at[0] + up[1] * sd.at[1], Lm.root[2] + ax[2] * sd.at[0] + up[2] * sd.at[1]];
+    // from the seat's frame (forward along the mount, up from its back, to its right) to the mount's frame, and back
+    function toM(p) { return [seat[0] + ax[0] * p[0] + up[0] * p[1] + sv[0] * p[2], seat[1] + ax[1] * p[0] + up[1] * p[1] + sv[1] * p[2], seat[2] + ax[2] * p[0] + up[2] * p[1] + sv[2] * p[2]]; }
+    function dirM(d) { return [ax[0] * d[0] + up[0] * d[1] + sv[0] * d[2], ax[1] * d[0] + up[1] * d[1] + sv[1] * d[2], ax[2] * d[0] + up[2] * d[1] + sv[2] * d[2]]; }
+    function fromM(q) { var d = sub(q, seat); return [dot(d, ax), dot(d, up), dot(d, sv)]; }
+    function seatPose(o, key) {
+      if (Array.isArray(o)) {
+        if (o.length === 3 && typeof o[0] === 'number') return DIR_KEYS[key] ? dirM(o) : toM(o);
+        return o.map(function (v) { return seatPose(v, key); });
+      }
+      if (o && typeof o === 'object') { var r = {}; for (var k2 in o) r[k2] = seatPose(o[k2], k2); return r; }
+      return o;
+    }
+    // the saddle's own rise and fall throws the rider: a spring holds him to it, and he cannot sink into it
+    var k = ch.L / 0.92, Tn = TAU * Math.sqrt(ch.L / G), wy = seat[1], vy = R.sy === null ? 0 : (wy - R.sy) / dt;
+    R.acc += (clamp((vy - R.svy) / dt, -3 * G, 3 * G) - R.acc) * decay(30, dt); R.sy = wy; R.svy = vy;
+    R.d.v -= 0.9 * R.acc * dt; spring(R.d, 0, 13 / Math.sqrt(k), 0.45, dt);
+    if (R.d.x < -0.012 * k) { R.d.x = -0.012 * k; R.d.v = Math.max(R.d.v, 0); }
+    if (R.d.x > 0.11 * k) { R.d.x = 0.11 * k; R.d.v = Math.min(R.d.v, 0); }
+    if (inp.hit) {
+      var hi = inp.hit.impulse, hm = Math.sqrt(hi[0] * hi[0] + (hi[2] || 0) * (hi[2] || 0)), hf = hi[0] * fr.c + (hi[2] || 0) * fr.s;
+      S.lean.v += 7 * hf / Math.sqrt(k); S.rise.v += 8 * hm; S.flinch.v += 16 * hm; S.flinchDir = hf < 0 ? -1 : 1; R.d.v += 0.6 * hm;
+      S.events.push({ type: 'hit' });
+    }
+    var grounded = Sm.mode === 'ground', gal = grounded ? Sm.gal || 0 : 0, run = grounded ? Sm.run || 0 : 0, still = grounded && Sm.standing ? 1 : 0;
+    S.idleT = still ? S.idleT + dt : 0; S.standing = false; S.v = Sm.v || 0; S.crouch = 0; S.airB = 0;
+    var root = [0, R.d.x, 0], legs = [];
+    for (i = 0; i < 2; i++) {
+      var ld = ch.legs[i], F = ld.foot, sg = ld.side, hip = [root[0] + ld.attach[0], root[1] + ld.attach[1], ld.attach[2]];
+      var ball = [sd.stirrup[0], sd.stirrup[1], sg * sd.stirrup[2]];
+      var kj = ik2(hip, [ball[0] - F.fb, ball[1] + F.ah, ball[2]], ld.upper, ld.lower, [0.6, 0.15, sg]);
+      legs.push({ hip: hip, knee: kj.mid, ankle: kj.end, heel: [ball[0] - F.fb - F.hb, ball[1], ball[2]], toe: [ball[0] + F.toe, ball[1], ball[2]], ball: ball, planted: true, target: null, side: sg });
+      S.legs[i].fwd = 0; S.legs[i].swing = null;
+    }
+    var pv = (R.d.v - (R.pv || 0)); R.pv = R.d.v; S.pack.v -= 0.6 * pv; spring(S.pack, 0, 60 / Tn, 0.35, dt);
+    var pitchSeat = Math.asin(clamp(ax[1], -1, 1));
+    var pose = upperBody(S, ch, inp, st, dt, legs, {
+      root: root, pitch: 0, gp: { moving: 0, run: 0, gal: 0, Fr: 0 }, Tn: Tn, idle: still, P: idlePeriod(ch),
+      bank: grounded && Sm.bank ? Math.tan(0.7 * Sm.bank.x) : 0, sway0: 0, flex: 0, drift: [0, 0], prep: 0,
+      aim: inp.aim ? fromM(w2l(fr, [inp.aim[0], inp.aim[1], inp.aim.length > 2 ? inp.aim[2] : S.pz])) : null,
+      toL: function (p) { return fromM(w2l(fr, p)); }, toW: function (p) { return l2w(fr, toM(p)); }, terrain: function () { return -1e9; },
+      hands: [[sd.hands[0], sd.hands[1], sd.hands[2]], [sd.hands[0], sd.hands[1], -sd.hands[2]]],
+      // forward with the pace, back against a climb or a dive, and up out of the saddle with the bounce
+      leanBase: 0.04 + 0.10 * run + 0.22 * gal + (grounded ? 0 : 0.22) + Math.atan((Sm.a || 0) / G) * 0.4 - 0.65 * pitchSeat + 1.2 * R.d.x / k
+    });
+    S.local = seatPose(pose); S.local.heading = S.h; S.local.riding = cm.id;
+    if (sd.reins && S.armed.x < 0.6 && Lm.mounts && Lm.neck) {
+      var bit = sd.reins === 'bit' ? Lm.mounts[0].base : [Lm.neck[0] + 0.2 * up[0], Lm.neck[1] + 0.2 * up[1], Lm.neck[2] + 0.2 * up[2]];
+      S.local.reins = [[S.local.arms[0].hand, bit.slice()], [S.local.arms[1].hand, bit.slice()]];
+    }
+    S.y = S.local.root[1]; S.lastY = S.y;
+    S.stats = { Fr: 0, stride: 0, period: 0, duty: 1, run: 0, phases: [0, 0.5], v: S.v, gait: 'Riding', steps: 0, air: 0, heading: S.h, turn: Sm.om || 0,
+      ammo: S.ammo ? S.ammo.slice() : null, kit: S.kit, action: S.act ? S.act.name : null };
+    S.pose = poseToWorld(S.local, fr);
+  }
+
   function d2(a, b, dz) { var x = a.p[0] - b.p[0], y = a.p[1] - b.p[1], z = dz === undefined ? a.z - b.z : dz; return Math.sqrt(x * x + y * y + z * z); }
   function crossAt(a, b, c) { return (b.p[0] - a.p[0]) * (c.p[1] - b.p[1]) - (b.p[1] - a.p[1]) * (c.p[0] - b.p[0]); }
   function ragdollStart(S, ch, env, hit) {
@@ -2026,6 +2137,7 @@
     else if (S.mode === 'swim') stepSwim(S, ch, inp, st, env, dt);
     else if (S.mode === 'fly') stepFly(S, ch, inp, st, env, dt);
     else if (S.mode === 'ledge') stepLedge(S, ch, inp, st, env, dt);
+    else if (S.mode === 'ride') stepRide(S, ch, inp, st, env, dt);
     else if (S.mode === 'ladder') stepLadder(S, ch, inp, st, env, dt);
     else stepGround(S, ch, inp, st, env, dt);
     return S.pose;
@@ -2044,7 +2156,7 @@
   }
 
   return {
-    G: G, CHARACTERS: CHARACTERS, createState: createState, step: step, enterLadder: enterLadder, leaveLadder: leaveLadder, stand: stand, place: place, enterSwim: enterSwim, leaveSwim: leaveSwim, enterFly: enterFly, leaveFly: leaveFly, grabLedge: grabLedge,
+    G: G, CHARACTERS: CHARACTERS, createState: createState, step: step, enterLadder: enterLadder, leaveLadder: leaveLadder, stand: stand, place: place, enterSwim: enterSwim, leaveSwim: leaveSwim, enterFly: enterFly, leaveFly: leaveFly, grabLedge: grabLedge, mountUp: mountUp, dismount: dismount,
     // the numeric kernel on its own, for the ports in other languages to be checked against
     kernel: { clamp: clamp, lerp: lerp, frac: frac, smooth: smooth, decay: decay, spring: spring, ease: ease, idleNoise: idleNoise, idlePeriod: idlePeriod, gaitParams: gaitParams, reachChain: reachChain }, frameOf: frameOf, l2w: l2w, w2l: w2l, wrapPi: wrapPi,
     blendPose: blendPose, ik2: ik2, PROPS: PROPS, KITS: KITS, CRATE: CRATE, PUNCH: PUNCH, SWINGS: SWINGS, lob: lob, startReload: startReload, LAD_PH: LAD_PH, LAD_DUTY: LAD_DUTY, idlePeriod: idlePeriod

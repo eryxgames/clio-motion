@@ -576,6 +576,209 @@
    "bodyKick": 0
   }
  },
+ "horse": {
+  "id": "horse",
+  "label": "Horse",
+  "kind": "quad",
+  "L": 1.05,
+  "rootHeight": 1.12,
+  "crouchDrop": 0.3,
+  "runDrop": 0.03,
+  "vmax": 16,
+  "viewH": 2.9,
+  "jumpH": 0.9,
+  "bob": 0.75,
+  "sway": 0.35,
+  "liftWalk": 0.1,
+  "liftRun": 0.17,
+  "runStride": 1.06,
+  "legs": [
+   {
+    "name": "RH",
+    "side": 1,
+    "attach": [
+     -0.52,
+     -0.1,
+     0.15
+    ],
+    "rest": [
+     -0.56,
+     0.17
+    ],
+    "upper": 0.52,
+    "lower": 0.57,
+    "pole": [
+     -1,
+     0.25,
+     0
+    ],
+    "foot": null
+   },
+   {
+    "name": "RF",
+    "side": 1,
+    "attach": [
+     0.5,
+     0.04,
+     0.16
+    ],
+    "rest": [
+     0.54,
+     0.17
+    ],
+    "upper": 0.57,
+    "lower": 0.62,
+    "pole": [
+     1,
+     0.1,
+     0
+    ],
+    "foot": null
+   },
+   {
+    "name": "LH",
+    "side": -1,
+    "attach": [
+     -0.52,
+     -0.1,
+     -0.15
+    ],
+    "rest": [
+     -0.56,
+     -0.17
+    ],
+    "upper": 0.52,
+    "lower": 0.57,
+    "pole": [
+     -1,
+     0.25,
+     0
+    ],
+    "foot": null
+   },
+   {
+    "name": "LF",
+    "side": -1,
+    "attach": [
+     0.5,
+     0.04,
+     -0.16
+    ],
+    "rest": [
+     0.54,
+     -0.17
+    ],
+    "upper": 0.57,
+    "lower": 0.62,
+    "pole": [
+     1,
+     0.1,
+     0
+    ],
+    "foot": null
+   }
+  ],
+  "gait": {
+   "walk": {
+    "phases": [
+     0,
+     0.75,
+     0.5,
+     0.25
+    ],
+    "duty": [
+     0.7,
+     0.6
+    ]
+   },
+   "run": {
+    "phases": [
+     0,
+     0.5,
+     0.5,
+     0
+    ],
+    "duty": [
+     0.45,
+     0.36
+    ]
+   },
+   "frRun": 0.5,
+   "frMax": 2.4,
+   "gallop": {
+    "phases": [
+     0.88,
+     0.43,
+     0,
+     0.55
+    ],
+    "duty": [
+     0.32,
+     0.22
+    ],
+    "fr": 2.4,
+    "frMax": 16
+   }
+  },
+  "beast": {
+   "half": 0.55,
+   "neck": 0.62,
+   "neckUp": 0.78,
+   "skull": 0.44,
+   "jaw": 0.3,
+   "flex": 0.06,
+   "rock": 0.05,
+   "look": "horse"
+  },
+  "tail": {
+   "at": [
+    -0.6,
+    0.12
+   ],
+   "n": 5,
+   "seg": 0.15,
+   "rest": 1.25,
+   "curl": 0.05,
+   "omega": 9,
+   "zeta": 0.4,
+   "soft": 0.6,
+   "sag": 0.2,
+   "lift": 0.75,
+   "wag": 0.25,
+   "alert": 0.25,
+   "sway": 0.25
+  },
+  "mount": {
+   "type": "jaw",
+   "n": 1,
+   "rate": 2,
+   "kick": 0,
+   "rise": 0,
+   "omega": 30,
+   "aimOmega": 8,
+   "min": -0.7,
+   "max": 0.5,
+   "yaw": 0.9,
+   "bodyKick": 0
+  },
+  "saddle": {
+   "at": [
+    0.02,
+    0.33
+   ],
+   "stirrup": [
+    0.1,
+    -0.5,
+    0.33
+   ],
+   "hands": [
+    0.34,
+    0.2,
+    0.1
+   ],
+   "reins": "bit"
+  }
+ },
  "raptor": {
   "id": "raptor",
   "label": "Raptor",
@@ -728,6 +931,23 @@
   "rootHeight": 0.95,
   "crouchDrop": 0.45,
   "runDrop": 0,
+  "saddle": {
+   "at": [
+    -0.5,
+    0.4
+   ],
+   "stirrup": [
+    0.22,
+    -0.4,
+    0.3
+   ],
+   "hands": [
+    0.32,
+    0.14,
+    0.17
+   ],
+   "reins": null
+  },
   "vmax": 2.6,
   "viewH": 3.4,
   "jumpH": 0.3,
@@ -1704,6 +1924,23 @@
    "rock": 0,
    "tilt": 0.04,
    "look": "dragon"
+  },
+  "saddle": {
+   "at": [
+    0.34,
+    0.44
+   ],
+   "stirrup": [
+    0.12,
+    -0.44,
+    0.4
+   ],
+   "hands": [
+    0.36,
+    0.16,
+    0.1
+   ],
+   "reins": "neck"
   },
   "tail": {
    "at": [

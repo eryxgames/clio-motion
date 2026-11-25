@@ -3,8 +3,9 @@
 Characters that move by rule, not by keyframe. Give a character's proportions and what it should
 do (go this fast, face that way, aim there, jump, climb, strike) and CLIo Motion works out the
 pose, every step, on any ground: where the feet land, how the hips rise and fall, how the spine,
-arms, tail or wings follow. The same rules drive a soldier, a heavy mech, a hyena, a raptor, a
-scorpion, an octopus, a wasp and a dragon.
+arms, tail or wings follow. The same rules drive a soldier, a heavy mech, a hyena, a horse, a
+raptor, a scorpion, an octopus, a wasp and a dragon, and a soldier riding the horse, the spider
+mech or the dragon.
 
 It runs live inside a game loop, in 2D or 3D, or bakes to sprite sheets and glTF files that Unity,
 Godot, Unreal and CLIo load as ordinary animation.
@@ -23,6 +24,8 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Tails, tentacles and stings as chains with follow-through; bites, pinches and grabs that reach
   a target.
 - Swimming (octopus) and flight (wasp, dragon).
+- Riding: a rider sprung to the saddle, feet in the stirrups, hands on the reins, who can aim and
+  fire from the back of a horse, a spider mech or a dragon in the air.
 - Hit reactions and a ragdoll the body can be handed to at any moment.
 - Baking: looping clips to a sprite sheet with an atlas, a skinned `.glb`, a `.glb` of rigid
   parts, and CLIo sprite frames.
@@ -50,16 +53,17 @@ the bottom, each stage checked against the reference before the next one starts.
 | 2. Ground stepping: speed and turning, any direction, foot planning, jump and pounce, hips, leg IK | yes | yes | yes |
 | 3a. Upright bodies whole: the soldier's spine, head, arms and aim, the three kits, firing and reloading, sword and shield, throwing, the crate, stance and punches; the mech's hull and guns | yes | yes | yes |
 | 3b. Animals, arthropods and the octopus: bending spines, necks, jaws, claws, arms, tail chains, folded wings; bites, pinches, stings, grabs, ink | yes | yes | yes |
-| 4. Swimming, flight, ladder, ledge, ragdoll | yes | | |
+| 4. Swimming, flight, ladder, ledge, ragdoll, riding | yes | | |
 | 5. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
 
 Stage 1 agrees with the reference to the last bit or two on 921 recorded cases, in both languages.
 Stage 2 reproduces 24 recorded runs (828 sampled poses of every character) to the ten digits they are
-recorded with. Stage 3 reproduces 48 whole-body runs (1,854 poses of all eleven
+recorded with. Stage 3 reproduces 50 whole-body runs (1,938 poses of all twelve
 characters: every number of the pose, the count of each event, and what the events carry).
 
 So in C and Python today every character is whole on the ground, with its weapons and every
-action (`cm_step`, `step`). Swimming, flight, the ladder, the ledge and the ragdoll are stage 4.
+action (`cm_step`, `step`). Swimming, flight, the ladder, the ledge, the ragdoll and riding are
+stage 4.
 
 ## Use
 
@@ -108,12 +112,12 @@ reference again; the C and Python versions then have to follow.
 
 `tools/spec.js` writes the built-in characters as JSON and, for each function of the numeric
 kernel, a few dozen inputs with the outputs the reference gives, and the characters again as a C
-table. `tools/golden.js` plays 53 runs described as data in `spec/scenarios.json` (every character
+table. `tools/golden.js` plays 55 runs described as data in `spec/scenarios.json` (every character
 through its gaits on rolling ground; turns, sidesteps, drifting, blows, steps, jumps and pounces;
 the soldier aiming, fighting, carrying, climbing and knocked down; hunts, stings, a swim and two
-flights) and records the whole pose ten times a second. The 48 runs that stay on the ground are
+flights) and records the whole pose ten times a second. The 50 runs that stay on the ground are
 written to `spec/body/` as replays that need no JSON reader: every input step by step, the whole
-pose, and the events. The 24 of them that use only what the ground step reads are also written
+pose, and the events. The 25 of them that use only what the ground step reads are also written
 to `spec/ground/`, with what the ground step alone must leave behind. The five runs that swim,
 fly, climb or fall (stage 4) are in `spec/golden/`. A port passes a stage when it reproduces
 those numbers.
@@ -122,6 +126,14 @@ those numbers.
 
 - Stage 4 in C and Python, then the engine wrappers and the CLIo hook.
 - A first-person arms view, with the FPS demo.
+- For artists, 3D: a rest-pose skeleton file per character (the `.glb` already carries the joints,
+  names and clips) and a Blender add-on that imports it, checks a mesh skinned to it (bone names,
+  rest lengths, no extra roots) and exports a `.glb` the engines and the baker can use; a
+  description of the rig as data (`spec/rigs/<id>.json`: joints, parents, rest positions, which
+  part hangs on which joint) so other tools can do the same.
+- For artists, 2D: an SVG template per character for Inkscape, one named layer per part at its
+  rest size with its pivots marked; the baker and the bench cut the painted layers into the image
+  parts they already use, so a drawn character moves without any further rigging.
 - Flight that a game can use as behaviour, not only as a pose: take-off run and landing flare,
   banking turns with a turn radius that follows from speed, soaring and stooping (birds of prey),
   perching; a bat (erratic, flapping, roosting upside down); hovering insects with darting moves;

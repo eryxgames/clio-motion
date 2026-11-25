@@ -26,13 +26,14 @@
     wasp: { shell: '#2a2421', shell2: '#e0a81c', limb: '#3b2f26', dark: '#17120f', sting: '#17120f', eye: '#6a2014', wing: '#c3d8e8', wingBone: '#8ea8bc' },
     octopus: { skin: '#b9483d', skin2: '#9b3a33', pale: '#ecc7ad', dark: '#2c1513' },
     scorpion: { shell: '#4a3327', shell2: '#6a4630', limb: '#8a5a2c', dark: '#211712', sting: '#c9402b', eye: '#ffd23f' },
+    horse: { coat: '#8a5a34', mane: '#2a1d16', spot: '#2a1d16', leg: '#3a2a20', muzzle: '#4a3426', dark: '#1c1512', eye: '#16100c', tack: '#5a3a22' },
     hyena: { coat: '#b3935c', mane: '#6f5636', spot: '#5a4429', leg: '#7a6040', muzzle: '#3a2d22', dark: '#2a211a', eye: '#ffd23f' },
     spider: { hull: '#8b957b', hull2: '#a3ad92', dark: '#3a3d38', metal: '#55585a', eye: '#3fb8ff' }
   };
   // sprite framing: pixels per metre in a 64-pixel frame, forward offset of the frame centre, depth range for shading, standing height
   var SPRITE = {
     soldier: { ppm: 24.4, cx: 0.25, dz: 0.3, tall: 1.95 }, mech: { ppm: 8.9, cx: 0.45, dz: 1.3, tall: 5.1 },
-    quad: { ppm: 31, cx: 0.12, dz: 0.25, tall: 0.95 }, hyena: { ppm: 26, cx: 0.10, dz: 0.25, tall: 1.1 }, raptor: { ppm: 15.5, cx: -0.15, dz: 0.3, tall: 1.85 }, scorpion: { ppm: 22, cx: 0.15, dz: 0.8, tall: 1.4 }, octopus: { ppm: 24, cx: -0.1, dz: 0.7, tall: 1.0 }, mantis: { ppm: 22, cx: 0.0, dz: 0.5, tall: 1.2 }, wasp: { ppm: 34, cx: 0.0, dz: 0.4, tall: 0.75 }, dragon: { ppm: 6.6, cx: -0.4, dz: 0.5, tall: 3.2 }, spider: { ppm: 13.4, cx: 0.25, dz: 1.5, tall: 2.0 }
+    quad: { ppm: 31, cx: 0.12, dz: 0.25, tall: 0.95 }, hyena: { ppm: 26, cx: 0.10, dz: 0.25, tall: 1.1 }, horse: { ppm: 14.5, cx: 0.2, dz: 0.35, tall: 2.05 }, raptor: { ppm: 15.5, cx: -0.15, dz: 0.3, tall: 1.85 }, scorpion: { ppm: 22, cx: 0.15, dz: 0.8, tall: 1.4 }, octopus: { ppm: 24, cx: -0.1, dz: 0.7, tall: 1.0 }, mantis: { ppm: 22, cx: 0.0, dz: 0.5, tall: 1.2 }, wasp: { ppm: 34, cx: 0.0, dz: 0.4, tall: 0.75 }, dragon: { ppm: 6.6, cx: -0.4, dz: 0.5, tall: 3.2 }, spider: { ppm: 13.4, cx: 0.25, dz: 1.5, tall: 2.0 }
   };
   // Image slots. axis says how a part's picture is laid along its bone:
   // down = top of the picture at the parent joint, up = bottom at the parent joint,
@@ -49,11 +50,13 @@
     octopus: [['mantle', 'Mantle', 'right'], ['head', 'Head', 'ball']],
     scorpion: [['body', 'Carapace', 'right'], ['claw', 'Claw', 'right'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']],
     hyena: [['body', 'Body', 'right'], ['head', 'Head', 'ball'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']],
+    horse: [['body', 'Body', 'right'], ['head', 'Head', 'ball'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']],
     spider: [['body', 'Body', 'right'], ['turret', 'Turret', 'right'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']]
   };
 
   // the build of each animal: radii of tail (root, tip), hindquarters, chest, neck (base, top), head, muzzle, legs (fore, hind, lower), and its markings
   var LOOK = {
+    horse: { tail: [0.07, 0.03], tailDark: true, tailCol: 'mane', hind: 0.27, chest: 0.29, crest: 0.055, neck: [0.17, 0.115], head: 0.105, muzzle: 0.075, nose: true, ears: true, leg: [0.085, 0.10, 0.045], saddle: true },
     hyena: { tail: [0.036, 0.024], tailDark: true, hind: 0.125, chest: 0.155, crest: 0.05, neck: [0.098, 0.09], head: 0.088, muzzle: 0.05, nose: true, ears: true, leg: [0.058, 0.066, 0.04],
       spots: [[-0.26, 0.05, 0.036], [-0.12, 0.09, 0.03], [-0.02, -0.02, 0.034], [0.12, 0.08, 0.03], [0.24, 0.0, 0.036], [-0.2, -0.06, 0.026]] },
     dragon: { tail: [0.21, 0.035], stripes: true, hind: 0.33, chest: 0.36, belly: true, crest: 0.08, neck: [0.21, 0.13], head: 0.15, muzzle: 0.10, nose: false, leg: [0.14, 0.16, 0.085], wing: [0.26, 0.05] },
@@ -171,10 +174,12 @@
       J('Head', 'Spine', p.head, add(p.head, perpU(p.gaze)), rtU);
       ball(p.head, 0.115, C.armor, { part: 'head' });
       var gu = perpU(p.gaze);
-      ball(add(p.head, add(mul(p.gaze, 0.055), mul(gu, -0.022))), 0.076, C.dark, { of: 'head' });
+      ball(add(p.head, add(mul(p.gaze, 0.055), mul(gu, -0.022))), 0.076, C.dark, { of: 'head', on: p.head });
       var eye = add(p.head, add(mul(p.gaze, 0.105), mul(gu, 0.012)));
-      ball(asideU(eye, -0.04), 0.024, C.glow, { of: 'head', raw: true });
-      ball(asideU(eye, 0.04), 0.024, C.glow, { of: 'head', raw: true });
+      ball(asideU(eye, -0.04), 0.024, C.glow, { of: 'head', raw: true, on: p.head });
+      ball(asideU(eye, 0.04), 0.024, C.glow, { of: 'head', raw: true, on: p.head });
+      // a rider's reins, from the hands to the mount's mouth or neck
+      if (p.reins) p.reins.forEach(function (r) { cap(r[0], r[1], 0.007, '#2a211a', { of: 'torso', raw: true }); });
       // props: whatever the character carries, in the hands or stowed. Each has its own joint, and its magazine another.
       (p.props || []).forEach(function (w, k) {
         var stowed = w.stow > 0.5, pistol = w.kind === 'pistol', nm = pistol ? sideName('Weapon', k) : w.kind === 'shield' ? 'Shield' : 'Weapon';
@@ -272,7 +277,7 @@
       for (i = 0; i < tn; i++) {
         var tr = lerp(K.tail[0], K.tail[1], i / Math.max(tn - 1, 1)), tdv = unit(sub(tp[i + 1], tp[i]));
         J('Tail' + (i + 1), i ? 'Tail' + i : 'Hips', tp[i], tp[i + 1]);
-        cap(tp[i], tp[i + 1], tr, K.tailDark && i >= tn - 2 ? C.dark : C.coat, { of: 'body' });
+        cap(tp[i], tp[i + 1], tr, K.tailCol ? C[K.tailCol] : K.tailDark && i >= tn - 2 ? C.dark : C.coat, { of: 'body' });
         if (K.stripes) cap(add(tp[i], mul(perp(tdv), -tr * 0.55)), add(mix(tp[i], tp[i + 1], 0.45), mul(perp(tdv), -tr * 0.55)), tr * 0.62, C.mane, { of: 'body' });
       }
       G('body', 0, 2);
@@ -289,6 +294,13 @@
       cap(add(p.neck, mul(nu, K.neck[0] * 0.7)), add(p.neck, add(mul(nd, 0.6 * bz.neck), mul(nu, K.neck[0] * 0.7))), K.crest * 0.8, C.mane, { of: 'body' });
       J('NeckTop', 'Neck', p.head, add(p.head, nd));
       cap(add(p.head, mul(nd, -0.6 * bz.neck)), p.head, K.neck[1], C.coat, { of: 'body' });
+      if (K.saddle) {
+        // tack: a saddle on the back, and its girth
+        useJ('Chest');
+        var sdl = add(p.root, mul(bu, K.chest * 0.93));
+        cap(add(sdl, mul(axF, -0.15)), add(sdl, mul(axF, 0.17)), 0.06, C.tack, { of: 'body' });
+        cap(add(p.root, add(mul(axF, 0.10), mul(bu, K.chest * 0.8))), add(p.root, add(mul(axF, 0.10), mul(bu, -K.chest * 0.8))), 0.025, C.tack, { of: 'body' });
+      }
       if (K.spots) K.spots.forEach(function (sp) {
         for (s = -1; s <= 1; s += 2) {
           var ax2 = sp[0] < 0 ? axB : axF, n2 = sp[0] < 0 ? buB : bu;
@@ -307,12 +319,12 @@
       ball(p.head, K.head, C.coat, { part: 'head' });
       cap(add(p.head, mul(p.gaze, K.head * 0.7)), add(p.head, add(mul(p.gaze, bz.skull - K.muzzle), mul(hup, -0.004))), K.muzzle, C.muzzle, { of: 'head' });
       if (K.nose) ball(add(p.head, mul(p.gaze, bz.skull - 0.02)), 0.03, C.dark, { of: 'head' });
-      for (s = -1; s <= 1; s += 2) ball(asideU(add(p.head, add(mul(p.gaze, K.head * 0.8), mul(hup, K.head * 0.35))), s * K.head * 0.57), 0.017, C.eye, { of: 'head', raw: true });
+      for (s = -1; s <= 1; s += 2) ball(asideU(add(p.head, add(mul(p.gaze, K.head * 0.8), mul(hup, K.head * 0.35))), s * K.head * 0.57), 0.017, C.eye, { of: 'head', raw: true, on: p.head });
       if (K.ears) {
         // ears: they go back when the animal is roused
-        var earAt = add(p.head, add(mul(hup, 0.085), mul(p.gaze, -0.03 - 0.05 * (p.alert || 0))));
+        var es = K.head / 0.088, earAt = add(p.head, add(mul(hup, 0.085 * es), mul(p.gaze, (-0.03 - 0.05 * (p.alert || 0)) * es)));
         J('Ears', 'Head', earAt, add(earAt, p.gaze), rtU);
-        for (s = -1; s <= 1; s += 2) ball(asideU(earAt, s * 0.062), 0.04, C.mane, { of: 'head' });
+        for (s = -1; s <= 1; s += 2) ball(asideU(earAt, s * 0.062 * es), 0.04 * es, C.mane, { of: 'head' });
       }
       var jw = p.mounts[0];
       G('jaw', 0.4, 1);
@@ -352,7 +364,7 @@
       useJ('Body');
       ball(p.root, c.octo.head, C.skin, { part: 'head' });
       J('Eyes', 'Body', p.eye, add(p.eye, p.axis));              // the eyes sit between mantle and arms, wherever those are
-      for (s = -1; s <= 1; s += 2) { ball(aside(p.eye, s * 0.085), 0.042, C.pale, { of: 'head' }); ball(aside(add(p.eye, mul(p.mounts[0].dir, 0.012)), s * 0.105), 0.02, C.dark, { of: 'head', raw: true }); }
+      for (s = -1; s <= 1; s += 2) { ball(aside(p.eye, s * 0.085), 0.042, C.pale, { of: 'head', on: p.eye }); ball(aside(add(p.eye, mul(p.mounts[0].dir, 0.012)), s * 0.105), 0.02, C.dark, { of: 'head', raw: true, on: p.eye }); }
       p.arms.forEach(function (arm, k) {
         var near = k < on4, lyr2 = (near ? 1 : -1) * (2 + 0.2 * (k % on4)), an = arm.length - 1;
         G('arm' + k, lyr2, near ? 3 : 1);
@@ -389,7 +401,7 @@
         J('Head', 'Thorax', p.eye, add(p.eye, sax));
         ball(p.eye, 0.07, C.shell, { part: 'head' });
         for (s = -1; s <= 1; s += 2) {
-          ball(aside(add(p.eye, add(mul(sax, 0.02), mul(sup, 0.03))), s * 0.065), 0.04, C.eye, { of: 'head', raw: true });
+          ball(aside(add(p.eye, add(mul(sax, 0.02), mul(sup, 0.03))), s * 0.065), 0.04, C.eye, { of: 'head', raw: true, on: p.eye });
           cap(aside(add(p.eye, mul(sup, 0.06)), s * 0.02), aside(add(p.eye, add(mul(sax, 0.16), mul(sup, 0.26))), s * 0.07), 0.008, C.dark, { of: 'head' });
         }
       } else {
@@ -398,7 +410,7 @@
         J('Head', 'Body', p.eye, add(p.eye, sax));
         ball(p.eye, 0.085, C.shell2, { part: 'head' });
         for (s = -1; s <= 1; s += 2) {
-          ball(aside(add(p.eye, add(mul(sax, 0.03), mul(sup, 0.02))), s * 0.06), 0.045, C.eye, { of: 'head', raw: true });
+          ball(aside(add(p.eye, add(mul(sax, 0.03), mul(sup, 0.02))), s * 0.06), 0.045, C.eye, { of: 'head', raw: true, on: p.eye });
           cap(aside(add(p.eye, mul(sup, 0.06)), s * 0.03), aside(add(p.eye, add(mul(sax, 0.14), mul(sup, 0.12))), s * 0.06), 0.008, C.dark, { of: 'head' });
         }
       }
@@ -438,7 +450,7 @@
       cap(p.mounts[0].base, p.mounts[0].tip, 0.028, C.dark, { of: 'head' });
       cap(p.head, add(p.head, mul(p.gaze, 0.2)), 0.085, C.armor, { part: 'head' });
       var qu = perpU(p.gaze);
-      ball(asideU(add(p.head, add(mul(p.gaze, 0.21), mul(qu, 0.03))), 0.05), 0.03, C.eye, { of: 'head', raw: true });
+      ball(asideU(add(p.head, add(mul(p.gaze, 0.21), mul(qu, 0.03))), 0.05), 0.03, C.eye, { of: 'head', raw: true, on: add(p.head, mul(p.gaze, 0.21)) });
       flash(p.mounts[0], 0.07);
       for (i = 0; i < p.legs.length; i++) {
         l = p.legs[i]; G('leg' + i, QL[i][0], QL[i][1]);
@@ -501,7 +513,9 @@
       // mid: something on the centre line that is in front whichever side it is seen from (a box in the arms);
       // only its own slabs swap over
       var side = Math.abs(q.ly) >= 1 && !q.mid;
-      q.k = (fl && side ? -q.ly : q.ly) + (q.mid ? (fl ? -0.01 : 0.01) * (q.zs || 0) : 0);
+      q.k = (fl && side ? -q.ly : q.ly) + (q.mid ? (fl ? -0.01 : 0.01) * (q.zs || 0) : 0) + (q.kb || 0);
+      // something on the surface of a rounder part (an eye on a head): on the side turned away from the viewer it goes behind that part
+      if (q.on && q.pa[2] < proj(q.on)[2] - 0.004) q.k -= 0.005;
       q.lv = q.raw ? -1 : fl && (side || q.mid) ? 4 - q.sh : q.sh;
     }
     var res = prims.slice().sort(function (m, n) { return (m.k - n.k) || (m.i - n.i); });
@@ -509,6 +523,13 @@
     return res;
   }
   function level(q) { return q.lv === undefined ? q.sh : q.lv; }
+  // A rider's parts and its mount's as one list to draw: the rider's far side goes behind the whole mount, the rest in front of it.
+  function pair(mount, rider) {
+    var out = mount.slice(), i, q;
+    for (i = 0; i < rider.length; i++) { q = rider[i]; if (Math.abs(q.ly) >= 1 && !q.mid) q.ly += q.ly < 0 ? -10 : 10; else q.kb = 10; out.push(q); }
+    out.joints = mount.joints; out.heading = mount.heading;
+    return out;
+  }
 
   var DIRS = { gaze: 1, u: 1, f: 1, dir: 1, axis: 1, up: 1, side: 1, t1: 1, t2: 1 };
   function shiftPose(o, dx, dy, dz) {
@@ -525,5 +546,5 @@
   }
 
   return { PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
-    ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose };
+    ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });

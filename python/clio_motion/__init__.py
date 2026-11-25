@@ -18,7 +18,7 @@ from .ground import STYLE, State, create_state, pose_to_world, step_ground
 from .kernel import (G, TAU, GaitState, Spring, clamp, decay, ease, frac, gait_params, idle_noise, idle_period,
                      ik2, lerp, lob, reach_chain, smooth, wrap_pi)
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"
 __all__ = ["G", "TAU", "GaitState", "STYLE", "Spring", "State", "characters", "create_state", "step_ground", "step", "upper_body", "start_reload", "pose_to_world", "KITS", "PROPS", "clamp", "decay", "ease", "frac", "gait_params",
            "idle_noise", "idle_period", "ik2", "lerp", "lob", "reach_chain", "smooth", "wrap_pi"]
 

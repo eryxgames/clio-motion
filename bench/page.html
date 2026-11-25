@@ -142,6 +142,7 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
       <button class="tab" data-ch="mech" aria-pressed="false">Heavy mech<small>reverse knee, 2.6 m leg</small></button>
       <button class="tab" data-ch="quad" aria-pressed="false">Quadruped<small>walk and trot</small></button>
       <button class="tab" data-ch="hyena" aria-pressed="false">Hyena<small>gallops, bites, has a tail</small></button>
+      <button class="tab" data-ch="horse" aria-pressed="false">Horse<small>walk, trot, gallop; can be ridden</small></button>
       <button class="tab" data-ch="raptor" aria-pressed="false">Raptor<small>two legs, balanced by its tail</small></button>
       <button class="tab" data-ch="scorpion" aria-pressed="false">Scorpion<small>eight legs, claws, a sting</small></button>
       <button class="tab" data-ch="octopus" aria-pressed="false">Octopus<small>crawls on eight arms, swims by jets</small></button>
@@ -222,8 +223,11 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 18px; background: va
         <button class="btn" id="knock" aria-pressed="false">Knock down</button>
         <button class="btn" id="ladder" aria-pressed="false">Climb a ladder</button>
         <button class="btn" id="ledge" aria-pressed="false">Wall ahead</button>
+        <button class="btn" id="ride" aria-pressed="false" hidden>Put a rider on</button>
+        <button class="btn" id="riderArmed" aria-pressed="false" hidden>Rider draws the rifle</button>
       </div>
       <p class="note">Hit staggers the body and it recovers. Knock down lets it fall as a ragdoll. Both push away from the pointer.</p>
+      <p class="note" id="rideNote" hidden>The rider is a second character, stepped after its mount: hips sprung to the saddle, feet in the stirrups, hands on the reins until the rifle is drawn. Then it aims at the pointer and the mouse fires.</p>
       <p class="note" id="ladderNote">Rungs are unevenly spaced on purpose. Each hand and foot finds a real one.</p>
     </div>
 
