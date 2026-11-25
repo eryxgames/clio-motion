@@ -63,7 +63,7 @@ the bottom, each stage checked against the reference before the next one starts.
 | 4b. The ragdoll, riding | yes | yes | yes |
 | 5a. The skeleton, live: every joint of a pose, the move that takes a model's bone from its template to where it is now, the parts the joints carry and their draw order, where a part's picture goes | yes | yes | yes |
 | 5b. Clips recorded from the core at run time; a stand-in model in triangles that follows the skeleton | yes | | yes |
-| 5c. In an engine: CLIo (models moved by the library, carried in CLIo as `engine/motion`) | | | yes |
+| 5c. In an engine: CLIo (models moved by the library, carried in CLIo as `engine/motion`: clips for a game by beats, bodies run live, fliers and swimmers, a model of your own on the skeleton, lines) | | | yes |
 | 5d. In an engine: Unity, Godot, Unreal | | | |
 
 Stage 1 agrees with the reference to the last bit or two on 1,142 recorded cases, in both languages
@@ -172,9 +172,10 @@ a pose; the Python recorder has to give the same.
 
 ## Planned
 
-- Unity, Godot and Unreal, on top of the live skeleton. In CLIo: a model built on `templates/3d`
-  moved by the skeleton instead of the stand-in; monsters that fly and swim; the core run live
-  for the kinds that play in real time.
+- Unity, Godot and Unreal, on top of the live skeleton.
+- The C core under Python (a shared library loaded as CLIo loads CLIo Picture), for crowds of
+  bodies run live: in Python a live body costs about 0.12 ms a step, so a hundred or two are a
+  frame's worth; in C a step is thirty to a hundred times cheaper.
 - Groups: a steering layer for flocks, swarms, herds and squads that gives each member the inputs
   `step` already takes, and carries on when members are lost. Vehicles: hover craft and drones,
   then cars and buggies, then tanks, as a new kind of body with crew seats. See

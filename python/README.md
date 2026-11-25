@@ -120,13 +120,21 @@ with no skinning.
     for (a, b, c), part in zip(model["faces"], model["face_part"]):
         model["parts"][part]["color"], model["parts"][part]["group"]       # "#rrggbb"; leg0, torso, head, ...
 
+`cm.mesh.lines(rig)` is the same body for a display that draws lines (a vector display, a
+plotter): the outlines of its thick parts and one line for each thin one, 30 to 150 lines a
+body. It is what `build` returns, with `"edges"`, and `place` takes it.
+
 `examples/clip_obj.py` writes a clip as `.obj` files, one a pose, that any 3D program opens.
 
 ## In CLIo
 
 [CLIo](https://github.com/eryxgames/CLIo) carries this package as `engine/motion/clio_motion/`
-and draws its models with it: `"hound": {"motion": "hyena"}` in a game's `models.json`. See "3D
-models" in CLIo's authoring guide. `python tools/clio/carry.py PATH/TO/CLIo` puts this version
+and draws its models with it: `"hound": {"motion": "hyena"}` in a game's `models.json`. A
+monster with such a model walks, runs, flies or swims, attacks, staggers, falls and lies; a
+model of your own built on `templates/3d` comes in with `--import-model FILE --motion
+SKELETON` and is moved by `rig.joint_move`; a level drawn in lines shows the body as
+`mesh.lines`; and CLIo's `Actor` runs a body live, step by step (its tech demo shows crowds of
+them). See "3D models" in CLIo's authoring guide. `python tools/clio/carry.py PATH/TO/CLIo` puts this version
 there; `--check` says whether CLIo's copy is this one.
 
 ## Speed, and the check

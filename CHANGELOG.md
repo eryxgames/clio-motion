@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.24.0
+
+For CLIo's second step with the library: bodies in lines.
+
+- Python, `clio_motion.mesh.lines(rig)`: the stand-in model for a display that draws lines - the
+  outlines of its thick parts, one line for each thin one (30 to 150 lines a body). `place` and
+  `rest` take it.
+- `mesh.build`: a ball is a double pyramid unless it is one of the body's big ones (a head, a
+  hull), which keeps two rings at every number of sides.
+- In CLIo (its own repository): fliers and swimmers, a model of your own on a skeleton
+  (`--import-model FILE --motion SKELETON`), models in a level's lines, bodies run live
+  (`Actor`) and a demo clip of a crowd of them.
+
 ## 0.23.0
 
 In CLIo: models that walk, attack and fall by rule. Clips and a model in triangles, in Python.

@@ -69,6 +69,15 @@ def main():
             check(ok_closed, "%s, %d sides: every part is a closed shape" % (name, sides))
             check(ok_out, "%s, %d sides: every part is wound outwards and fills a fair share of its capsule" % (name, sides))
             check(ok_near, "%s, %d sides: no corner lies outside its part" % (name, sides))
+        # in lines: every line joins two corners of one part, no corner is unused, and a body is a few dozen lines
+        ln = mesh.lines(rig)
+        used = {k for e in ln["edges"] for k in e}
+        owner = {k: i for i, part in enumerate(ln["parts"]) for k in range(part["first"], part["first"] + part["count"])}
+        check(len(ln["edges"]) == len(set(ln["edges"])) and all(owner[a] == owner[b] and a != b for a, b in ln["edges"]), name + ": in lines, each joins two corners of one part")
+        used |= {k for f in ln["faces"] for k in f}
+        check(used == set(range(len(ln["local"]))), name + ": in lines, every corner is on a line or a face")
+        check(len(rig["parts"]) * 0.4 < len(ln["edges"]) < 400, "%s: in lines, a body is a few dozen lines (%d)" % (name, len(ln["edges"])))
+        check(max(math.dist(a, b) for a, b in zip(mesh.place(ln, {"rig": rig, "frames": rig["joints"]}), mesh.rest(ln))) < 1e-12, name + ": in lines, at rest in the template pose")
         # the model follows the skeleton: in the template pose it is at rest, and through a clip every corner stays on its part
         m = mesh.build(rig)
         kit = rig["kit"] if rig["name"] != rig["id"] else None
@@ -84,8 +93,8 @@ def main():
                     for k in range(part["first"], part["first"] + part["count"]):
                         worst = max(worst, to_segment(pts[k], q["a"], q["b"]) - q["r"])
         check(worst < 1e-9, "%s: through walk and die every corner stays on its part (%.3g m outside)" % (name, worst))
-        print("%s %-16s %3d parts: %4d corners, %4d faces (%d with 4 sides)" % ("ok   " if not bad else "     ", name, len(m["parts"]), len(m["local"]), len(m["faces"]),
-                                                                              len(mesh.build(rig, sides=4, thin=3)["faces"])))
+        print("%s %-16s %3d parts: %4d corners, %4d faces (%d with 4 sides); in lines %d" % ("ok   " if not bad else "     ", name, len(m["parts"]), len(m["local"]),
+                                                                                           len(m["faces"]), len(mesh.build(rig, sides=4, thin=3)["faces"]), len(ln["edges"])))
     print("%d failed" % bad if bad else "mesh: all passed")
     return 1 if bad else 0
 
