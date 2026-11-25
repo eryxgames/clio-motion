@@ -18,10 +18,11 @@
      i step  <19 input numbers>           the inputs from this step on (see inputLine below)
      p n v1 ... vn                        what the ground step left behind (see groundLine below)
 
-   A run of a biped or the mech marked "stage": 2 or 3 (no calls into other modes) is also written to
-   spec/body/<id>.txt, the same way: i lines with every input (see inputLine3 below), and p lines with the
+   A run marked "stage": 2 or 3 (it stays on the ground: no calls into other modes) is written to
+   spec/body/<id>.txt instead of spec/golden/, the same way: i lines with every input (see inputLine3 below), and p lines with the
    whole pose (every number, keys in alphabetical order at every level) followed by how many of each event
-   there have been so far (fire reload loaded throw grab putdown punch strike land jump hit drop), and the sum of
+   there have been so far (fire reload loaded throw grab putdown punch strike land jump hit drop bite pounce pinch
+   sting ink), and the sum of
    every number the events have carried (positions, velocities, which gun or hand).
 
    The ground:  { "waves": [[height, kx, kz, phase], ...], "wall": { "x": 3, "h": 2.3 } }
@@ -61,16 +62,19 @@ function inputLine(inp) {
 /* Everything a whole biped or mech reads: the 19 numbers of inputLine, then
    aim (0 none, 2 or 3 numbers given) ax ay az, fire, armed, kit (0 unsaid, 1 rifle, 2 pistols, 3 sword), reload,
    throw (0, 1 no target, 2 target) tx ty tz, pickup, hasAt ax ay az, hasHeading heading, hasSize d h w, putdown, guard, block,
-   punch (0, 1 jab, 2 cross, 3 hook), hasTarget tx ty tz, hasTrack tx ty tz, swing (0, 1 slash, 2 chop, 3 thrust) */
+   punch (0, 1 jab, 2 cross, 3 hook), hasTarget tx ty tz, hasTrack tx ty tz, swing (0, 1 slash, 2 chop, 3 thrust),
+   then bite, pinch, sting and grab, each as (0, 1 no target, 2 target) tx ty tz, and ink */
 const KITN = { rifle: 1, pistols: 2, sword: 3 }, PUNCHN = { jab: 1, cross: 2, hook: 3 }, SWINGN = { slash: 1, chop: 2, thrust: 3 };
-const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop'];
+const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop', 'bite', 'pounce', 'pinch', 'sting', 'ink'];
 function inputLine3(inp) {
   const v3 = function (a) { return a ? [a[0], a[1], a[2] || 0] : [0, 0, 0]; };
+  const aimed = function (x) { return [x ? (x.target ? 2 : 1) : 0].concat(v3(x && x.target)); };
   const a = inp.aim, th = inp.throw, pk = inp.pickup, pu = inp.punch, tr = inp.track, sw = inp.swing, sz = pk && pk.size;
   const v = [a ? a.length : 0].concat(v3(a), [inp.fire ? 1 : 0, inp.armed ? 1 : 0, KITN[inp.kit] || 0, inp.reload ? 1 : 0,
     th ? (th.target ? 2 : 1) : 0], v3(th && th.target), [pk ? 1 : 0, pk && pk.at ? 1 : 0], v3(pk && pk.at), [pk && pk.heading != null ? 1 : 0, pk && pk.heading || 0,
     sz ? 1 : 0, sz ? sz.d : 0, sz ? sz.h : 0, sz ? sz.w : 0, inp.putdown ? 1 : 0, inp.guard ? 1 : 0, inp.block ? 1 : 0,
-    pu ? PUNCHN[pu.kind] || 1 : 0, pu && pu.target ? 1 : 0], v3(pu && pu.target), [tr ? 1 : 0], v3(tr), [sw ? SWINGN[sw.kind] || 1 : 0]);
+    pu ? PUNCHN[pu.kind] || 1 : 0, pu && pu.target ? 1 : 0], v3(pu && pu.target), [tr ? 1 : 0], v3(tr), [sw ? SWINGN[sw.kind] || 1 : 0],
+    aimed(inp.bite), aimed(inp.pinch), aimed(inp.sting), aimed(inp.grab), [inp.ink ? 1 : 0]);
   return inputLine(inp) + ' ' + v.map(fmt17).join(' ');
 }
 /* What the ground step leaves behind: px pz h x y v a phase om crouch run gal ground pitch-state reach-drop hop bank side,
@@ -100,8 +104,8 @@ function play(sc) {
     G2.push('g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0'));
   }
   play.ground = G2;
-  // a whole-body replay for the bodies ported so far: bipeds and the mech, with no calls into other modes
-  const whole = (sc.stage === 2 || sc.stage === 3) && (ch.kind === 'biped' || ch.kind === 'mech');
+  // a whole-body replay for every run that stays on the ground (no calls into other modes)
+  const whole = sc.stage === 2 || sc.stage === 3;
   const B3 = whole ? ['# ' + sc.id + ' ' + sc.character + ' ' + hz + ' ' + n + ' ' + every, G2 ? G2[1] : 'g ' + gw.length + ' ' + [].concat.apply([], gw).map(fmt17).join(' ') + (gw.length ? ' ' : '') + (wl ? '1 ' + fmt17(wl.x) + ' ' + fmt17(wl.h) : '0 0 0')] : null;
   const tally = TALLY.map(function () { return 0; });
   let lastIn3 = null, evsum = 0;
@@ -149,6 +153,7 @@ scenarios.forEach(function (sc) {
     if (check) { if (!fs.existsSync(bf) || fs.readFileSync(bf, 'utf8') !== bt) { bad++; console.log(sc.id + ': body replay differs from the recorded one'); } }
     else { fs.mkdirSync(path.join(dir, 'body'), { recursive: true }); fs.writeFileSync(bf, bt); }
   }
+  if (play.body) return;                                    // the whole-body replay holds the same poses
   if (check) { if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) { bad++; console.log(sc.id + ': differs from the recorded run'); } }
   else fs.writeFileSync(file, text);
 });

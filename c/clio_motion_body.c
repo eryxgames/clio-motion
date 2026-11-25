@@ -32,7 +32,7 @@ static const double SWING_DUR[4] = { 0, 0.62, 0.70, 0.55 };
 static const struct { int hand; double dur, hit; } PUNCH[4] = { { 0, 0, 0 }, { 1, 0.34, 0.36 }, { 0, 0.50, 0.42 }, { 1, 0.56, 0.46 } };
 static const double CRATE[3] = { 0.44, 0.36, 0.50 };          /* depth, height, width */
 
-typedef struct { double lean, tw, ext, load, wind, hit; } act_out;
+typedef struct { double lean, tw, ext, load, wind, hit, jaw, alert, sting, rear, shut; int ink; } act_out;
 typedef struct { double o[2], th, z; } place_t;
 
 static void add3(const double a[3], const double b[3], double o[3]) { o[0] = a[0] + b[0]; o[1] = a[1] + b[1]; o[2] = a[2] + b[2]; }
@@ -248,6 +248,169 @@ static void act_tick(cm_state *S, const cm_character *ch, const cm_input *inp, d
   AC->tw += 0.35 * g; AC->lean += (0.05 - 0.10 * cm_clamp(S->block.x, 0, 1)) * g;
 }
 
+/* A beast's own actions. bite: the neck shoots out, the jaws snap. A pounce (handled with the jump) leaps onto a
+   target with the jaws open. */
+static void beast_tick(cm_state *S, const cm_character *ch, const cm_input *inp, double dt, act_out *AC) {
+  cm_action *a = &S->action;
+  const cm_jump *J = &S->jump;
+  double k = sqrt(ch->L / 0.7), q;
+  memset(AC, 0, sizeof *AC);
+  S->act_back = 0; S->act_crouch = 0;
+  if (inp->bite && !S->act && J->stage == CM_JUMP_NONE) { a = new_action(S, CM_ACT_BITE, 0.46 * k); if (inp->bite > 1) { a->has_target = 1; copy3(a->target, inp->bite_target); } }
+  if (S->act == CM_ACT_BITE) {
+    a->t += dt; q = fmin(a->t / a->dur, 1);
+    AC->ext = cm_smooth(0.05, 0.34, q) * (1 - cm_smooth(0.42, 1, q));
+    AC->jaw = 0.9 * cm_smooth(0, 0.22, q) * (1 - cm_smooth(0.33, 0.37, q));
+    AC->alert = 1; AC->lean = 0.10 * AC->ext; S->act_back = -0.12 * k * AC->ext; S->act_crouch = 0.2 * AC->ext;
+    if (a->t >= a->dur) S->act = CM_ACT_NONE;
+  }
+  if (J->stage != CM_JUMP_NONE && J->pounce) {
+    AC->alert = 1;
+    AC->jaw = J->stage == CM_JUMP_AIR ? 0.85 : J->stage == CM_JUMP_LAND ? 0.85 * (1 - cm_smooth(0, 0.07, J->t)) : 0.25;
+    AC->ext = J->stage == CM_JUMP_AIR ? 0.7 : J->stage == CM_JUMP_LAND ? 0.7 * (1 - cm_smooth(0, 0.3, J->t)) : 0;
+  }
+}
+/* An arthropod's own actions. pinch: the nearer claw shoots out and shuts. sting: the tail rears back, then whips
+   over the head onto the target. */
+static void arthro_tick(cm_state *S, const cm_character *ch, const cm_input *inp, double dt, act_out *AC) {
+  cm_action *a = &S->action;
+  int free_ = !S->act;
+  double q;
+  memset(AC, 0, sizeof *AC);
+  S->act_back = 0; S->act_crouch = 0;
+  if (ch->arthro_rock != 0 && S->standing) S->act_back = ch->arthro_rock * sin(TAU * S->t / 1.4);       /* a mantis rocks like a leaf in the wind */
+  if (inp->pinch && free_) { a = new_action(S, CM_ACT_PINCH, ch->arthro_strike); if (inp->pinch > 1) { a->has_target = 1; copy3(a->target, inp->pinch_target); } }
+  else if (inp->sting && free_ && ch->has_tail) { a = new_action(S, CM_ACT_STING, 0.72); if (inp->sting > 1) { a->has_target = 1; copy3(a->target, inp->sting_target); } }
+  if (S->act == CM_ACT_PINCH || S->act == CM_ACT_STING) {
+    a->t += dt; q = fmin(a->t / a->dur, 1); AC->alert = 1;
+    if (S->act == CM_ACT_PINCH) {
+      AC->ext = cm_smooth(0.05, 0.36, q) * (1 - cm_smooth(0.52, 1, q)); AC->jaw = cm_smooth(0, 0.2, q);
+      AC->shut = cm_smooth(0.36, 0.41, q) * (1 - cm_smooth(0.62, 0.92, q)); S->act_back = -0.06 * AC->ext;
+    } else {
+      AC->rear = cm_smooth(0, 0.20, q) * (1 - cm_smooth(0.22, 0.32, q));
+      AC->sting = cm_smooth(0.22, 0.40, q) * (1 - cm_smooth(0.52, 1, q)); S->act_back = -0.14 * AC->sting; AC->lean = 0.3 * AC->sting;
+    }
+    if (a->t >= a->dur) S->act = CM_ACT_NONE;
+  }
+}
+/* grab: the nearest arm lifts off the ground, shoots out and curls round the target. ink: a puff of ink. */
+static void octo_tick(cm_state *S, const cm_input *inp, double dt, act_out *AC) {
+  cm_action *a = &S->action;
+  double q;
+  memset(AC, 0, sizeof *AC);
+  S->act_back = 0; S->act_crouch = 0; S->ink_t = fmax(0, S->ink_t - dt);
+  if (inp->grab && !S->act) { a = new_action(S, CM_ACT_GRAB, 0.8); a->arm = -1; if (inp->grab > 1) { a->has_target = 1; copy3(a->target, inp->grab_target); } }
+  if (S->act == CM_ACT_GRAB) {
+    a->t += dt; q = fmin(a->t / a->dur, 1); AC->alert = 1;
+    AC->ext = cm_smooth(0.04, 0.40, q) * (1 - cm_smooth(0.62, 1, q)); AC->lean = 0.15 * AC->ext; S->act_back = -0.05 * AC->ext;
+    if (a->t >= a->dur) S->act = CM_ACT_NONE;
+  }
+  if (inp->ink && S->ink_t <= 0) { S->ink_t = 1.2; AC->ink = 1; S->jaw.v += 9; }
+  cm_spring_step(&S->jaw, 0, 14, 0.6, dt);                     /* the mantle's squeeze, shared by ink and jets */
+}
+
+typedef struct { double lift, yaw, curl, pull_k; double (*pull_pts)[3]; } chain_ctl;
+
+/* A tail as a row of links, each with its own direction and turning speed. A spring turns a link to carry on from
+   the one before it, bent by 'curl', so a movement at the root runs down the chain and reaches the tip late. Each
+   link is also a pendulum on a moving pivot: when the body speeds up, stops, bounces or turns, the links swing the
+   other way. With pull_k > 0 the links are turned to pass through pull_pts (a strike). pts gets the n + 1 points,
+   in the body's frame. */
+static void tail_step(cm_state *S, const cm_character *ch, const cm_bctx *B, const double base[3], double body_ang, const chain_ctl *ctl, double dt, double (*pts)[3]) {
+  cm_chain *C = &S->tail;
+  int n = ch->tail_n, k, sub, nsub, pulling = ctl->pull_pts && ctl->pull_k > 0;
+  double sz = sqrt(ch->L / 0.7), om0 = ch->tail_omega / sz, zeta = ch->tail_zeta, soft = ch->tail_soft, seg = ch->tail_seg, bend = ch->tail_bend;
+  double th0 = body_ang + PI + ch->tail_rest - ctl->lift, ps0 = cm_clamp(ctl->yaw, -1.2, 1.2), curl = ch->tail_curl + ctl->curl, sag = ch->tail_sag;
+  double vy, kf, hdt, inert = ch->tail_inert, pth, pps, pvt, pvp;
+  const double *dr = B->drift;
+  if (C->n != n) {
+    memset(C, 0, sizeof *C);
+    C->n = n; C->by = base[1]; C->dr[0] = dr[0]; C->dr[1] = dr[1];
+    for (k = 0; k < n; k++) { C->th[k] = th0 + k * curl; C->ps[k] = ps0; }
+  }
+  /* how the root of the tail is being thrown about: forwards, up and down (the gait's bounce), sideways (a turn, a shove) */
+  vy = (base[1] - C->by) / dt; kf = cm_decay(25, dt);
+  C->ay += (cm_clamp((vy - C->vy) / dt, -3 * G, 3 * G) - C->ay) * kf; C->vy = vy; C->by = base[1];
+  C->ax += (cm_clamp(S->a + (dr[0] - C->dr[0]) / dt, -4 * G, 4 * G) - C->ax) * kf;
+  C->az += (cm_clamp(S->v * S->om + (dr[1] - C->dr[1]) / dt, -4 * G, 4 * G) - C->az) * kf; C->dr[0] = dr[0]; C->dr[1] = dr[1];
+  /* worked in steps of 1/120 s at most, so that a game running at 30 steps a second gets the same tail */
+  nsub = (int)ceil(dt * 120 - 1e-6); if (nsub < 1) nsub = 1;
+  hdt = dt / nsub;
+  for (sub = 0; sub < nsub; sub++) {
+    copy3(pts[0], base); pth = th0 - curl; pps = ps0; pvt = 0; pvp = 0;
+    for (k = 0; k < n; k++) {
+      double om = om0 * (1 - soft * k / (n - 1 > 1 ? n - 1 : 1)), ell = fmax(0.5 * seg * (n - k), seg) * 2.2 / inert;
+      double th = C->th[k], ps = C->ps[k], tt = pth + curl, tp = k == 0 ? pps : 0.94 * pps, cps = cos(ps), fth, fps, bmax, off, smax, gy, *q = pts[k + 1];
+      const double *prev = pts[k];
+      fth = -(-C->ax * sin(th) + (C->ay + sag * G) * cos(th)) / ell;
+      fps = -(C->az * cps - C->ax * cos(th) * sin(ps)) / ell;
+      C->vth[k] += (om * om * cm_wrap_pi(tt - th) - 2 * zeta * om * (C->vth[k] - pvt) + fth) * hdt;
+      C->vps[k] += (om * om * (tp - ps) - 2 * zeta * om * (C->vps[k] - pvp) + fps) * hdt;
+      th += C->vth[k] * hdt; ps += C->vps[k] * hdt - S->om * hdt * cos(th) * 0.8;       /* the body turns under a tail that would rather keep pointing where it did */
+      if (pulling) {
+        const double *a = ctl->pull_pts[k], *b = ctl->pull_pts[k + 1];
+        double dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], dl = sqrt(dx * dx + dy * dy + dz * dz);
+        if (dl == 0) dl = 1;
+        th += cm_wrap_pi(atan2(dy, dx) - th) * ctl->pull_k; ps += (asin(cm_clamp(dz / dl, -1, 1)) - ps) * ctl->pull_k;
+        C->vth[k] *= 1 - ctl->pull_k; C->vps[k] *= 1 - ctl->pull_k;
+      }
+      /* a link bends only so far from the one before, and does not go through the ground */
+      bmax = pulling ? 2.5 : bend; off = cm_wrap_pi(th - tt);
+      if (fabs(off) > bmax) { th = tt + cm_clamp(off, -bmax, bmax); C->vth[k] = 0; }
+      smax = k == 0 ? 1.35 : fabs(pps) + bend;
+      if (fabs(ps) > smax) { ps = cm_clamp(ps, -smax, smax); C->vps[k] = 0; }
+      cps = cos(ps);
+      set3(q, prev[0] + seg * cos(th) * cps, prev[1] + seg * sin(th) * cps, prev[2] + seg * sin(ps));
+      gy = cm_ter(&B->fr, q[0], q[2]) + 0.03;
+      if (q[1] < gy && prev[1] >= gy - 1e-6) {
+        double sv = cm_clamp((gy - prev[1]) / (seg * fmax(cps, 0.2)), -1, 1), a1 = asin(sv), a2 = PI - a1;
+        th = fabs(cm_wrap_pi(a1 - th)) < fabs(cm_wrap_pi(a2 - th)) ? a1 : a2; if (C->vth[k] * cos(th) < 0) C->vth[k] = 0;
+        set3(q, prev[0] + seg * cos(th) * cps, prev[1] + seg * sin(th) * cps, prev[2] + seg * sin(ps));
+      }
+      C->th[k] = th; C->ps[k] = ps;
+      pth = th; pps = ps; pvt = C->vth[k]; pvp = C->vps[k];
+    }
+  }
+}
+
+/* An octopus arm through its leg: seven points on a curve from hip to tip, with links of one length. */
+static void arm_curve(const double hip[3], const double knee[3], const double foot[3], double seg, double (*pts)[3]) {
+  double c[3];
+  int i, j;
+  for (j = 0; j < 3; j++) c[j] = 2 * knee[j] - 0.5 * (hip[j] + foot[j]);
+  for (i = 0; i <= 6; i++) { double u = i / 6.0, w = 1 - u; for (j = 0; j < 3; j++) pts[i][j] = w * w * hip[j] + 2 * w * u * c[j] + u * u * foot[j]; }
+  cm_reach_chain(pts, 6, hip, foot, seg, 1);
+}
+
+static void wing_dir(const double ax[3], const double up[3], int s, double a, double sweep, double d[3]) {
+  double c = cos(a), sn = sin(a), ss = sin(sweep);
+  set3(d, up[0] * sn - ax[0] * ss * c, up[1] * sn - ax[1] * ss * c, s * c * cos(sweep));
+}
+/* which way the membrane hangs from a bone: behind it when spread, in against the body when folded */
+static void wing_hang(const double up[3], int s, const double dv[3], double t[3]) {
+  double tl;
+  set3(t, s * (dv[1] * up[2] - dv[2] * up[1]), s * (dv[2] * up[0] - dv[0] * up[2]), s * (dv[0] * up[1] - dv[1] * up[0]));
+  tl = len3(t); if (tl == 0) tl = 1;
+  set3(t, t[0] * (1 / tl), t[1] * (1 / tl), t[2] * (1 / tl));
+}
+/* Two wings of two bones each. fa, fa2: how far the arm and the hand are raised; fold: 0 spread, 1 folded like a Z
+   along the body (so no bone changes length). */
+static void wing_pose(const cm_character *ch, const double root[3], const double ax[3], const double up[3], double fa, double fa2, double fold, cm_wing_pose out[2]) {
+  int i;
+  for (i = 0; i < 2; i++) {
+    int s = i == 0 ? 1 : -1;
+    cm_wing_pose *w = &out[i];
+    double d1[3], d2[3];
+    set3(w->root, root[0] + ax[0] * ch->fly_at[0] + up[0] * ch->fly_at[1], root[1] + ax[1] * ch->fly_at[0] + up[1] * ch->fly_at[1], root[2] + s * ch->fly_at[2]);
+    wing_dir(ax, up, s, cm_lerp(fa, 0.22, fold), cm_lerp(ch->fly_sweep, 1.40, fold), d1);
+    wing_dir(ax, up, s, cm_lerp(fa2, 0.30, fold), cm_lerp(ch->fly_sweep + 0.2, ch->fly_zfold ? -1.25 : 1.5, fold), d2);
+    set3(w->mid, w->root[0] + d1[0] * ch->fly_w1, w->root[1] + d1[1] * ch->fly_w1, w->root[2] + d1[2] * ch->fly_w1);
+    set3(w->tip, w->mid[0] + d2[0] * ch->fly_w2, w->mid[1] + d2[1] * ch->fly_w2, w->mid[2] + d2[2] * ch->fly_w2);
+    wing_hang(up, s, d1, w->t1); wing_hang(up, s, d2, w->t2);
+    w->chord = ch->fly_chord; w->side = s;
+  }
+}
+
 /* turn a direction round the body's own long axis (u); a positive angle turns forward towards the right */
 static void twd(const double u[3], const double v[3], double a, double o[3]) {
   double c = cos(a), s = sin(a), q = dot3(u, v) * (1 - c), r[3];
@@ -279,6 +442,228 @@ static double aim_from(cm_state *S, const cm_character *ch, const cm_bctx *B, co
 }
 
 typedef struct { int on; double p[3], k, pole[3]; } hand_over;
+static void scale3(const double a[3], double k, double o[3]) { o[0] = a[0] * k; o[1] = a[1] * k; o[2] = a[2] * k; }
+static void axpy3(const double a[3], const double d[3], double k, double o[3]) { set3(o, a[0] + d[0] * k, a[1] + d[1] * k, a[2] + d[2] * k); }
+static void unit3(double a[3]) { double l = len3(a); if (l == 0) l = 1; scale3(a, 1 / l, a); }
+static void cross3(const double a[3], const double b[3], double o[3]) { set3(o, a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]); }
+static void pos_event(cm_state *S, const cm_frame *fr, int type, const double local[3], int has_target, const double target[3], int which) {
+  cm_event e;
+  double d[3];
+  memset(&e, 0, sizeof e); e.type = type; e.leg = -1; e.hand = which;
+  cm_to_w(fr, local, e.pos);
+  if (has_target) { sub3(e.pos, target, d); e.miss = len3(d); }
+  cm_event_push(S, &e);
+}
+
+/* Horizontal bodies: animals, the quadruped robot, arthropods, the octopus, the spider mech. Worked out in the
+   body's frame; cm_step moves the result to the world. */
+static void horizontal(cm_state *S, const cm_character *ch, const cm_bctx *B, cm_pose *pose, const act_out *AC, double lean, double FL, double dt) {
+  const double *root = B->root;
+  double cp = cos(B->pitch + lean * 0.3), sn = sin(B->pitch + lean * 0.3), idle = B->idle, P = B->P;
+  cm_action *act = &S->action;
+  cm_mount_pose *mp = &pose->mount[0];
+  int i;
+#define LOC(dst, x, y, z) set3(dst, root[0] + (x) * cp - (y) * sn, root[1] + (x) * sn + (y) * cp, root[2] + (z))
+  set3(pose->axis, cp, sn, 0); set3(pose->up, -sn, cp, 0);
+  pose->n_mounts = 1; memset(mp, 0, sizeof *mp);
+  if (ch->kind == CM_QUAD && ch->has_beast) {
+    /* An animal's body: the spine bends in the middle (flex), the neck carries the head high at rest and low and
+       forward at speed, the head turns to what it watches, the jaw is hinged, the tail is a chain. */
+    const cm_gait_params *gq = &B->gp;
+    double flex = B->flex, pa = B->pitch + lean * 0.3 + ch->beast_tilt, fa2 = pa - flex, nb[3], Wb, tb2, carry, na, nlen, hdp[3], ga2, gzb[3], sdb[3], gub[3], jo, hinge[3], jd[3], t[3], sdot;
+    int bite = S->act == CM_ACT_BITE;
+    cm_jump *Jb = &S->jump;
+#define LOCB(dst, x, y) do { double a2_ = pa + ((x) < 0 ? flex : -flex), c2_ = cos(a2_), s2_ = sin(a2_); set3(dst, root[0] + (x) * c2_ - (y) * s2_, root[1] + (x) * s2_ + (y) * c2_, root[2]); } while (0)
+    pose->body = CM_BODY_BEAST;
+    LOCB(nb, ch->beast_half + 0.03, 0.10);
+    Wb = aim_from(S, ch, B, nb, 1, dt); tb2 = S->twist.x;
+    cm_spring_step(&S->jaw, AC->jaw, 60, 0.75, dt);
+    carry = ch->beast_neck_up * (1 - 0.55 * gq->run - 0.3 * gq->gal) - 0.35 * AC->ext + 0.12 * idle * cm_idle_noise(S->t, P, 5.0) - 0.4 * fmax(0, FL);
+    na = fa2 + carry + 0.5 * Wb; nlen = ch->beast_neck * (1 + 0.28 * AC->ext);
+    set3(hdp, nb[0] + nlen * cos(na) * cos(0.6 * tb2), nb[1] + nlen * sin(na), nb[2] + nlen * cos(na) * sin(0.6 * tb2));
+    ga2 = 0.35 * fa2 + 0.9 * Wb - 0.10 * (1 - AC->alert) + 0.10 * idle * cm_idle_noise(S->t, P, 6.0);
+    set3(gzb, cos(ga2) * cos(tb2), sin(ga2), cos(ga2) * sin(tb2));
+    if (bite && act->has_target && AC->ext > 0) {
+      /* biting at something: the head goes to it as far as the neck will stretch, muzzle first */
+      double tl[3], want[3], wd[3], wl, wmax = ch->beast_neck * 1.45, td2[3], tl2;
+      cm_to_l(&B->fr, act->target, tl);
+      axpy3(tl, gzb, -ch->beast_skull, want); sub3(want, nb, wd); wl = len3(wd); if (wl == 0) wl = 1;
+      if (wl > wmax) axpy3(nb, wd, wmax / wl, want);
+      lerp3(hdp, want, AC->ext, hdp);
+      sub3(tl, hdp, td2); tl2 = len3(td2);
+      if (tl2 > 1e-4) { scale3(td2, 1 / tl2, td2); lerp3(gzb, td2, 0.8 * AC->ext, gzb); unit3(gzb); }
+    }
+    set3(sdb, -sin(tb2), 0, cos(tb2));
+    /* keep the head's side vector square to where it looks */
+    sdot = dot3(sdb, gzb); axpy3(sdb, gzb, -sdot, sdb); unit3(sdb);
+    cross3(sdb, gzb, gub);
+    jo = cm_clamp(S->jaw.x, 0, 1.1);
+    set3(hinge, hdp[0] + (gzb[0] * 0.02 + gub[0] * -0.035), hdp[1] + (gzb[1] * 0.02 + gub[1] * -0.035), hdp[2] + (gzb[2] * 0.02 + gub[2] * -0.035));
+    set3(jd, gzb[0] * cos(jo) + gub[0] * -sin(jo), gzb[1] * cos(jo) + gub[1] * -sin(jo), gzb[2] * cos(jo) + gub[2] * -sin(jo));
+    LOCB(pose->back, -ch->beast_back, 0); LOCB(pose->front, ch->beast_half, 0);
+    copy3(pose->neck, nb); copy3(pose->head, hdp); copy3(pose->gaze, gzb); copy3(pose->side, sdb);
+    copy3(mp->joint, hdp); copy3(mp->base, hinge); axpy3(hinge, jd, ch->beast_jaw, mp->tip); copy3(mp->dir, jd);
+    pose->jaw = jo; pose->alert = AC->alert; pose->flex = flex;
+    axpy3(hdp, gzb, ch->beast_skull, t);
+    if (bite && !act->done && act->t >= 0.365 * act->dur) {
+      cm_event e;
+      double d[3];
+      act->done = 1;
+      memset(&e, 0, sizeof e); e.type = CM_EV_BITE; e.leg = -1;
+      cm_to_w(&B->fr, t, e.pos);
+      set3(e.vel, gzb[0] * cos(S->h) - gzb[2] * sin(S->h), gzb[1], gzb[0] * sin(S->h) + gzb[2] * cos(S->h));
+      if (act->has_target) { sub3(e.pos, act->target, d); e.miss = len3(d); }
+      cm_event_push(S, &e);
+    }
+    if (Jb->stage == CM_JUMP_LAND && Jb->pounce && !Jb->struck) { Jb->struck = 1; pos_event(S, &B->fr, CM_EV_POUNCE, t, 0, t, 0); }
+    if (ch->has_tail) {
+      /* the tail streams out at speed, goes up when the animal is roused, tucks under after a blow, and wags at rest */
+      chain_ctl ctl;
+      double tbase[3];
+      memset(&ctl, 0, sizeof ctl);
+      ctl.yaw = ch->tail_wag * idle * sin(4 * TAU * S->t / P) + 0.6 * ch->tail_wag * AC->alert * sin(19 * S->t) + ch->tail_sway * gq->moving * sin(TAU * S->phase);
+      ctl.lift = ch->tail_lift * (0.45 * gq->run + 0.75 * gq->gal) + ch->tail_alert * AC->alert - 0.7 * fabs(FL);
+      LOCB(tbase, ch->tail_at[0], ch->tail_at[1]);
+      tail_step(S, ch, B, tbase, pa + flex, &ctl, dt, pose->tail_pts);
+      pose->n_tail_pts = ch->tail_n + 1; copy3(pose->tail, pose->tail_pts[ch->tail_n]);
+    } else LOCB(pose->tail, -ch->beast_half - 0.2, 0.05);
+#undef LOCB
+  } else if (ch->kind == CM_QUAD) {
+    double hd[3], Wq, tq, dq[3], qs[3], qup[3], hb[3];
+    pose->body = CM_BODY_QUAD;
+    LOC(pose->neck, 0.40, 0.08, 0); LOC(hd, 0.60, 0.22, 0);
+    Wq = (aim_from(S, ch, B, hd, 1, dt) + 0.2 * idle * cm_idle_noise(S->t, P, 5.0)) * 0.8; tq = S->twist.x;      /* the head turns on the neck */
+    set3(dq, cos(Wq) * cos(tq), sin(Wq), cos(Wq) * sin(tq)); set3(qs, -sin(tq), 0, cos(tq));
+    LOC(pose->back, -0.36, 0.02, 0); LOC(pose->front, 0.36, 0.02, 0); copy3(pose->head, hd); copy3(pose->gaze, dq); copy3(pose->side, qs);
+    LOC(pose->tail, -0.72, 0.16 + pose->pack * 2.2, 0.09 * idle * sin(4 * TAU * S->t / P));
+    /* the gun hangs under the head, fixed to it */
+    cross3(qs, dq, qup);
+    set3(hb, (hd[0] + dq[0] * S->kick[0].x) + qup[0] * -0.07, (hd[1] + dq[1] * S->kick[0].x) + qup[1] * -0.07, (hd[2] + dq[2] * S->kick[0].x) + qup[2] * -0.07);
+    copy3(mp->joint, hd); copy3(mp->base, hb); axpy3(hb, dq, 0.34, mp->tip); copy3(mp->dir, dq); mp->flash = S->flash[0];
+  } else if (ch->has_octo) {
+    /* crawling: the mantle sits behind the head and wobbles after it; each arm is a curve through its leg */
+    double breathe = 1 + 0.05 * sin(TAU * S->t / 1.9) - 0.2 * cm_clamp(S->jaw.x, 0, 1), piv[3], seg7 = ch->octo_arm_seg;
+    int grab = S->act == CM_ACT_GRAB, k;
+    pose->body = CM_BODY_OCTO;
+    LOC(piv, 0.15, 0.1, 0); aim_from(S, ch, B, piv, 1, dt);
+    LOC(pose->back, -0.2, 0, 0); LOC(pose->front, 0.2, 0, 0); LOC(pose->eye, 0.10, 0.12, 0);
+    pose->has_mantle = 1; LOC(pose->mantle_c, -0.10, 0.13, 0); LOC(pose->mantle_tip, -0.40, 0.20 + pose->pack * 2.5, 0.05 * idle * sin(2 * TAU * S->t / P));
+    pose->mantle_r = ch->octo_mantle * breathe; copy3(pose->dome, pose->mantle_c);
+    pose->n_arms = ch->legs;
+    for (i = 0; i < ch->legs; i++) arm_curve(B->hip[i], B->knee[i], B->ankle[i], seg7, pose->arms[i]);
+    if (grab) {
+      /* the arm nearest the target leaves the ground and reaches for it, link by link */
+      double gT[3], best = 1e9, guess[7][3], (*cur)[3], d[3];
+      if (act->has_target) cm_to_l(&B->fr, act->target, gT); else LOC(gT, 0.85, 0.35, 0.2);
+      if (act->arm < 0) for (i = 0; i < ch->legs; i++) { double dq; sub3(gT, B->hip[i], d); dq = len3(d); if (dq < best) { best = dq; act->arm = i; } }
+      cur = pose->arms[act->arm];
+      for (k = 0; k <= 6; k++) set3(guess[k], cur[k][0], cur[k][1] + 0.25 * sin(PI * k / 6), cur[k][2]);
+      cm_reach_chain(guess, 6, B->hip[act->arm], gT, seg7, 0);
+      for (k = 0; k <= 6; k++) lerp3(cur[k], guess[k], AC->ext, cur[k]);
+      for (k = 1; k <= 6; k++) { double al2; sub3(cur[k], cur[k - 1], d); al2 = len3(d); if (al2 == 0) al2 = 1; axpy3(cur[k - 1], d, seg7 / al2, cur[k]); }     /* its links keep their length */
+      if (!act->done && act->t >= 0.42 * act->dur) { act->done = 1; pos_event(S, &B->fr, CM_EV_GRAB, cur[6], act->has_target, act->target, act->arm); }
+    }
+    if (AC->ink) {
+      cm_event e;
+      double ip[3];
+      memset(&e, 0, sizeof e); e.type = CM_EV_INK; e.leg = -1;
+      LOC(ip, -0.3, 0.1, 0); cm_to_w(&B->fr, ip, e.pos); set3(e.vel, -cos(S->h), 0.2, -sin(S->h));
+      cm_event_push(S, &e);
+    }
+    copy3(pose->tail, pose->arms[0][6]);
+    copy3(mp->joint, root); copy3(mp->base, root); copy3(mp->tip, pose->eye); set3(mp->dir, cp, sn, 0);
+  } else if (ch->has_arthro) {
+    /* A scorpion-like body: a low carapace, two clawed arms held out in front, and a tail curled up over the back.
+       The claws drift towards what is being watched; one shoots out to pinch. The tail is the same chain as any
+       other tail, with a rest shape that curls forward, and a strike that drags it onto a target. */
+    int pinch = S->act == CM_ACT_PINCH, sting = S->act == CM_ACT_STING, has_pT = 0, cs;
+    double piv[3], pT[3] = { 0, 0, 0 };
+    pose->body = CM_BODY_ARTHRO;
+    LOC(piv, ch->arthro_half, 0.05, 0); aim_from(S, ch, B, piv, 1, dt);
+    cm_spring_step(&S->jaw, AC->jaw, 60, 0.8, dt);
+    LOC(pose->back, -ch->arthro_half, 0, 0); LOC(pose->front, ch->arthro_half, 0, 0); LOC(pose->dome, 0.04, 0.05, 0);
+    if (ch->arthro_has_head) LOC(pose->eye, ch->arthro_head[0], ch->arthro_head[1], 0); else LOC(pose->eye, ch->arthro_half + 0.02, 0.07, 0);
+    if (ch->arthro_has_thorax) { pose->has_thorax = 1; LOC(pose->thorax[0], ch->arthro_thorax[0], ch->arthro_thorax[1], 0); LOC(pose->thorax[1], ch->arthro_thorax[2], ch->arthro_thorax[3], 0); }
+    if (ch->has_claw && pinch) {
+      has_pT = 1;
+      if (act->has_target) cm_to_l(&B->fr, act->target, pT);
+      else if (ch->claw_has_strike_at) LOC(pT, ch->claw_strike_at[0], ch->claw_strike_at[1], ch->claw_strike_at[2]);
+      else LOC(pT, ch->claw_rest[0] + 0.28, ch->claw_rest[1] + 0.05, 0.12);
+    }
+    if (has_pT && !act->side) act->side = pT[2] - root[2] >= 0 ? 1 : -1;
+    for (cs = 0; ch->has_claw && cs < 2; cs++) {
+      int sg = cs == 0 ? 1 : -1, mine = has_pT && (ch->arthro_both || act->side == sg);
+      cm_claw_pose *cl = &pose->claw[cs];
+      double shc[3], tipT[3], open = 0.4 + 0.25 * AC->alert, rd[3], rl, hdv[3], tgt[3], pole[3], inw[3], io, fd3[3];
+      LOC(shc, ch->claw_at[0], ch->claw_at[1], sg * ch->claw_at[2]);
+      LOC(tipT, ch->claw_rest[0], ch->claw_rest[1] + 0.03 * idle * cm_idle_noise(S->t, P, 3 + cs), sg * ch->claw_rest[2]);
+      if (B->has_aim) { tipT[1] += cm_clamp(0.3 * (B->aim[1] - tipT[1]), -0.08, 0.3); tipT[2] += cm_clamp(0.3 * (B->aim[2] - tipT[2]), -0.18, 0.18); }
+      if (mine) {
+        double to[3];
+        copy3(to, pT); if (ch->arthro_both) to[2] = pT[2] + sg * 0.06;
+        lerp3(tipT, to, AC->ext, tipT); open = (0.4 + 0.8 * cm_clamp(S->jaw.x, 0, 1)) * (1 - 0.9 * AC->shut);
+      }
+      /* the hand points mostly forwards, turning towards what it reaches for */
+      sub3(tipT, shc, rd); rl = len3(rd); if (rl == 0) rl = 1;
+      set3(hdv, 0.5 * cp + 0.5 * rd[0] / rl, 0.5 * sn + 0.5 * rd[1] / rl, 0.5 * rd[2] / rl); unit3(hdv);
+      axpy3(tipT, hdv, -ch->claw_hand, tgt); set3(pole, 0, 1, sg * 0.8);
+      set3(tgt, tipT[0] - hdv[0] * ch->claw_hand, tipT[1] - hdv[1] * ch->claw_hand, tipT[2] - hdv[2] * ch->claw_hand);
+      cm_ik2(shc, tgt, ch->claw_upper, ch->claw_lower, pole, cl->elbow, cl->wrist);
+      copy3(cl->shoulder, shc); axpy3(cl->wrist, hdv, ch->claw_hand, cl->tip);
+      set3(inw, 0, 0, -sg); io = dot3(inw, hdv); axpy3(inw, hdv, -io, inw); unit3(inw);
+      axpy3(cl->wrist, hdv, 0.30 * ch->claw_hand, cl->finger_a);
+      set3(fd3, hdv[0] * cos(open) + inw[0] * sin(open), hdv[1] * cos(open) + inw[1] * sin(open), hdv[2] * cos(open) + inw[2] * sin(open));
+      axpy3(cl->finger_a, fd3, 0.72 * ch->claw_hand, cl->finger_b);
+      cl->side = sg; cl->open = open; pose->n_claws = cs + 1;
+      if (mine && !act->done && act->t >= 0.41 * act->dur) { act->done = 1; pos_event(S, &B->fr, CM_EV_PINCH, cl->tip, act->has_target, act->target, cs); }
+    }
+    if (ch->has_tail) {
+      int n = ch->tail_n, rk;
+      double tb3[3], sT[3] = { 0, 0, 0 }, rp[CM_MAX_CHAIN + 1][3], seg = ch->tail_seg, d[3];
+      chain_ctl ctl;
+      memset(&ctl, 0, sizeof ctl);
+      LOC(tb3, ch->tail_at[0], ch->tail_at[1], 0);
+      if (sting) {
+        if (act->has_target) cm_to_l(&B->fr, act->target, sT);
+        else if (ch->arthro_has_sting_at) LOC(sT, ch->arthro_sting_at[0], ch->arthro_sting_at[1], 0);
+        else LOC(sT, ch->arthro_half + 0.42, 0.02, 0);
+        if (AC->sting > 0) {
+          /* a first guess that arches over the back, then links of the right length fitted to it
+             (a wasp's sting curls round from below) */
+          double top = ch->arthro_under ? fmin(tb3[1], sT[1]) - 0.3 * n * seg : fmax(tb3[1], sT[1]) + 0.42 * n * seg, clear_y = root[1] + 0.40;
+          for (rk = 0; rk <= n; rk++) {
+            double gt = (double)rk / n, g1 = 1 - gt;
+            set3(rp[rk], g1 * g1 * tb3[0] + 2 * g1 * gt * (0.5 * tb3[0] + 0.5 * sT[0]) + gt * gt * sT[0], g1 * g1 * tb3[1] + 2 * g1 * gt * top + gt * gt * sT[1],
+                 g1 * g1 * tb3[2] + 2 * g1 * gt * 0.5 * (tb3[2] + sT[2]) + gt * gt * sT[2]);
+          }
+          /* it must go over the body, not through it: links above the back are kept clear of it */
+          cm_reach_chain(rp, n, tb3, sT, seg, 0.86);
+          if (!ch->arthro_under) for (rk = 1; rk < n; rk++) if (rp[rk][0] < root[0] + ch->arthro_half + 0.12 && rp[rk][1] < clear_y) rp[rk][1] = clear_y;
+          for (rk = 1; rk <= n; rk++) { double rl2; sub3(rp[rk], rp[rk - 1], d); rl2 = len3(d); if (rl2 == 0) rl2 = 1; axpy3(rp[rk - 1], d, seg / rl2, rp[rk]); }
+          ctl.pull_pts = rp; ctl.pull_k = AC->sting;
+        }
+      }
+      ctl.lift = -0.45 * AC->rear - 0.25 * fabs(FL); ctl.curl = -0.10 * AC->rear;
+      ctl.yaw = ch->tail_wag * idle * sin(2 * TAU * S->t / P) + ch->tail_sway * B->gp.moving * sin(TAU * S->phase) + 0.4 * S->twist.x;
+      tail_step(S, ch, B, tb3, B->pitch + lean * 0.3, &ctl, dt, pose->tail_pts);
+      pose->n_tail_pts = n + 1; copy3(pose->tail, pose->tail_pts[n]);
+      copy3(mp->joint, pose->tail_pts[n - 1]); copy3(mp->base, pose->tail_pts[n - 1]); copy3(mp->tip, pose->tail_pts[n]);
+      sub3(pose->tail_pts[n], pose->tail_pts[n - 1], mp->dir); unit3(mp->dir);
+      if (sting && !act->done && act->t >= 0.42 * act->dur) { act->done = 1; pos_event(S, &B->fr, CM_EV_STING, pose->tail_pts[n], act->has_target, act->target, 0); }
+    } else { copy3(pose->tail, pose->back); copy3(mp->joint, root); copy3(mp->base, root); copy3(mp->tip, pose->eye); set3(mp->dir, cp, sn, 0); }
+  } else {
+    double tb[3], Wh, tt, dh[3], bb[3];
+    pose->body = CM_BODY_SPIDER;
+    LOC(tb, 0.05, 0.72, 0);
+    Wh = aim_from(S, ch, B, tb, 1, dt); tt = S->twist.x;        /* the turret goes all the way round */
+    set3(dh, cos(Wh) * cos(tt), sin(Wh), cos(Wh) * sin(tt));
+    axpy3(tb, dh, S->kick[0].x, bb);
+    LOC(pose->back, -0.5, 0.12, 0); LOC(pose->front, 0.5, 0.12, 0); LOC(pose->dome, -0.05, 0.36, 0); LOC(pose->eye, 1.0, 0.08, 0);
+    copy3(mp->joint, tb); copy3(mp->base, bb); axpy3(bb, dh, 1.45, mp->tip); copy3(mp->dir, dh); mp->flash = S->flash[0];
+  }
+#undef LOC
+}
+
 
 static void point_w(const cm_frame *fr, double p[3]) { double t[3]; cm_to_w(fr, p, t); copy3(p, t); }
 static void dir_w(const cm_frame *fr, double d[3]) { double x = d[0] * fr->hc - d[2] * fr->hs, z = d[0] * fr->hs + d[2] * fr->hc; d[0] = x; d[2] = z; }
@@ -292,12 +677,15 @@ int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_s
 
   memset(pose, 0, sizeof *pose);
   pose->kind = ch->kind;
-  if (ch->kind != CM_BIPED && ch->kind != CM_MECH) { cm_step_ground(S, ch, inp, st, terrain, user, dt, &pose->base); return -1; }
   cm_ground_core(S, ch, inp, st, terrain, user, dt, &pose->base, &B);
   root = B.root;
   /* kits: the weapons are put away before changing to another set, then the new ones come up */
   kit_want = ch->mount_type == CM_MOUNT_HELD ? (inp->kit >= CM_KIT_RIFLE && inp->kit <= CM_KIT_SWORD ? inp->kit : S->kit) : CM_KIT_NONE;
-  if (biped) act_tick(S, ch, inp, dt, &B, &AC); else memset(&AC, 0, sizeof AC);
+  if (biped) act_tick(S, ch, inp, dt, &B, &AC);
+  else if (ch->has_beast) beast_tick(S, ch, inp, dt, &AC);
+  else if (ch->has_arthro) arthro_tick(S, ch, inp, dt, &AC);
+  else if (ch->has_octo) octo_tick(S, inp, dt, &AC);
+  else memset(&AC, 0, sizeof AC);
   /* hands that are busy with a load or a fight cannot hold weapons: those are put away first */
   busy = S->carry || S->guard.x > 0.05 || (biped && inp->guard);
   ready = inp->armed && kit_want == S->kit && !busy;
@@ -312,6 +700,27 @@ int cm_step(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_s
   set3(u, sin(lean), cos(lean), 0); set3(f, cos(lean), -sin(lean), 0); set3(zax, 0, 0, 1);
   pose->lean = lean; pose->pack = cm_clamp(S->pack.x, -0.06 * ch->L, 0.06 * ch->L);
 
+  if (!biped && ch->kind != CM_MECH) {
+    int k, j;
+    horizontal(S, ch, &B, pose, &AC, lean, FL, dt);
+    if (ch->has_fly) { wing_pose(ch, root, pose->axis, pose->up, 0, 0, 1, pose->wing); pose->n_wings = 2; }      /* on the ground the wings are folded along the body */
+    /* to the world: points are moved and turned, directions only turned */
+    dir_w(&B.fr, pose->axis); dir_w(&B.fr, pose->up); point_w(&B.fr, pose->back); point_w(&B.fr, pose->front); point_w(&B.fr, pose->tail);
+    if (pose->body == CM_BODY_BEAST || pose->body == CM_BODY_QUAD) { point_w(&B.fr, pose->neck); point_w(&B.fr, pose->head); dir_w(&B.fr, pose->gaze); dir_w(&B.fr, pose->side); }
+    else { point_w(&B.fr, pose->dome); point_w(&B.fr, pose->eye); }
+    point_w(&B.fr, pose->mount[0].joint); point_w(&B.fr, pose->mount[0].base); point_w(&B.fr, pose->mount[0].tip); dir_w(&B.fr, pose->mount[0].dir);
+    for (k = 0; k < pose->n_tail_pts; k++) point_w(&B.fr, pose->tail_pts[k]);
+    for (k = 0; k < pose->n_claws; k++) {
+      cm_claw_pose *cl = &pose->claw[k];
+      point_w(&B.fr, cl->shoulder); point_w(&B.fr, cl->elbow); point_w(&B.fr, cl->wrist); point_w(&B.fr, cl->tip); point_w(&B.fr, cl->finger_a); point_w(&B.fr, cl->finger_b);
+    }
+    if (pose->has_thorax) { point_w(&B.fr, pose->thorax[0]); point_w(&B.fr, pose->thorax[1]); }
+    for (k = 0; k < pose->n_arms; k++) for (j = 0; j < 7; j++) point_w(&B.fr, pose->arms[k][j]);
+    if (pose->has_mantle) { point_w(&B.fr, pose->mantle_c); point_w(&B.fr, pose->mantle_tip); }
+    for (k = 0; k < pose->n_wings; k++) { cm_wing_pose *w = &pose->wing[k]; point_w(&B.fr, w->root); point_w(&B.fr, w->mid); point_w(&B.fr, w->tip); dir_w(&B.fr, w->t1); dir_w(&B.fr, w->t2); }
+    return 0;
+  }
+  pose->body = biped ? CM_BODY_BIPED : CM_BODY_MECH;
   if (ch->kind == CM_MECH) {
     double pc[3], piv[3], Wm, tm, dm[3], d0[3];
     int g;

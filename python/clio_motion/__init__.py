@@ -3,9 +3,9 @@
 """CLIo Motion: characters that move by rule, not by keyframe.  Pure Python, standard library only.
 
 Stage 1 is the numeric kernel (springs, two-bone IK, the gait rules) with the built-in characters as data;
-stage 2 is the ground step (``create_state``, ``step_ground``): legs and hips for every character; stage 3a is
-the whole upright body (``step``): the soldier with weapons and every action, and the mech.  Animals follow,
-checked stage by stage against the JavaScript reference.
+stage 2 is the ground step (``create_state``, ``step_ground``): legs and hips for every character; stage 3 is
+the whole body on the ground (``step``), for every character: weapons, actions, spines, tails, claws, arms.
+Swimming, flight, climbing and the ragdoll follow, checked stage by stage against the JavaScript reference.
 Source: https://github.com/eryxgames/clio-motion
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .ground import STYLE, State, create_state, pose_to_world, step_ground
 from .kernel import (G, TAU, GaitState, Spring, clamp, decay, ease, frac, gait_params, idle_noise, idle_period,
                      ik2, lerp, lob, reach_chain, smooth, wrap_pi)
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 __all__ = ["G", "TAU", "GaitState", "STYLE", "Spring", "State", "characters", "create_state", "step_ground", "step", "upper_body", "start_reload", "pose_to_world", "KITS", "PROPS", "clamp", "decay", "ease", "frac", "gait_params",
            "idle_noise", "idle_period", "ik2", "lerp", "lob", "reach_chain", "smooth", "wrap_pi"]
 

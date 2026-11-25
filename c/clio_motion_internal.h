@@ -26,7 +26,8 @@ static inline double cm_ter(const cm_frame *f, double lx, double lz) {
 /* what the ground step hands to the upper body */
 typedef struct {
   cm_frame fr;
-  double root[3], pitch, Tn, idle, P, bank, sway0, flex, prep, lean_base, aim[3];
+  double root[3], pitch, Tn, idle, P, bank, sway0, flex, prep, lean_base, aim[3], drift[2];
+  double hip[CM_MAX_LEGS][3], knee[CM_MAX_LEGS][3], ankle[CM_MAX_LEGS][3];      /* the legs in the body's frame */
   int has_aim, leg0_side;
   cm_gait_params gp;
 } cm_bctx;

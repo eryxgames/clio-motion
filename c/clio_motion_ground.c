@@ -427,6 +427,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
       double hip[3], knee[3], end[3];
       hip[0] = hips[i][0]; hip[1] = hips[i][1] - S->reach_drop; hip[2] = hips[i][2];
       cm_ik2(hip, ankles[i], ld->upper, ld->lower, ld->pole, knee, end);
+      if (B) { memcpy(B->hip[i], hip, sizeof hip); memcpy(B->knee[i], knee, sizeof knee); memcpy(B->ankle[i], end, sizeof end); }
       memset(o, 0, sizeof *o);
       cm_to_w(&fr, hip, o->hip); cm_to_w(&fr, knee, o->knee); cm_to_w(&fr, end, o->ankle); cm_to_w(&fr, balls[i], o->ball);
       o->has_foot = ld->has_foot; o->side = ld->side; o->planted = !lg->swing.active;
@@ -454,6 +455,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
     B->root[0] = S->x + ix; B->root[1] = S->y; B->root[2] = sway;
     B->pitch = pitch; B->gp = gp; B->Tn = Tn0; B->idle = idle; B->P = P; B->bank = bank_t; B->sway0 = sway0; B->flex = flex;
     B->leg0_side = ch->leg[0].side;
+    B->drift[0] = mvl[0] + S->kv[0] * hc + S->kv[1] * hs; B->drift[1] = mvl[1] - S->kv[0] * hs + S->kv[1] * hc;
     B->has_aim = inp->has_aim && !S->carry;
     if (B->has_aim) { double a3[3]; a3[0] = inp->aim[0]; a3[1] = inp->aim[1]; a3[2] = inp->has_aim > 2 ? inp->aim[2] : S->pz; cm_to_l(&fr, a3, B->aim); }
     B->prep = hasJ && (J->stage == CM_JUMP_PREP || J->stage == CM_JUMP_PUSH) ? cm_clamp(-S->hop.x / (0.22 * h), 0, 1) : 0;

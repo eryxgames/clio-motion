@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.0
+
+- C99 and Python, stage 3b: every character whole on the ground. Animals (hyena, raptor, dragon):
+  bending spine, neck, head and jaw, the tail as a chain with follow-through, bite and pounce.
+  Arthropods (scorpion, mantis, wasp): claws, the pinch, the sting that arches over the back.
+  The octopus: mantle, eight arms as curves, grab and ink. The quadruped robot and the spider
+  mech with their guns. Folded wings on the ground. Both reproduce 48 whole-body replays.
+- `spec/`: ten more recorded runs (53 in all); runs that stay on the ground are kept once, in
+  `spec/body/`.
+
 ## 0.15.0
 
 - C99 and Python, stage 3a: upright bodies whole (`cm_step`, `step`). The soldier's spine, head,

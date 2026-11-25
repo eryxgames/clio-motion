@@ -11,9 +11,9 @@
 #include <string.h>
 
 #define MAXW 8
-#define MAXV 600
+#define MAXV 900
 #define MAXLINE 20000
-#define NIN 55
+#define NIN 72
 
 typedef struct { int n; double w[MAXW][4]; int wall; double wx, wh; } ground;
 
@@ -47,19 +47,35 @@ static void inputs(const double *v, cm_input *in) {
   in->punch = (int)w[26]; in->has_punch_target = w[27] != 0; c3(in->punch_target, w + 28);
   in->has_track = w[31] != 0; c3(in->track, w + 32);
   in->swing = (int)w[35];
+  in->bite = (int)w[36]; c3(in->bite_target, w + 37); in->pinch = (int)w[40]; c3(in->pinch_target, w + 41);
+  in->sting = (int)w[44]; c3(in->sting_target, w + 45); in->grab = (int)w[48]; c3(in->grab_target, w + 49); in->ink = w[52] != 0;
 }
 static void put3(double *v, int *n, const double *p) { v[(*n)++] = p[0]; v[(*n)++] = p[1]; v[(*n)++] = p[2]; }
 
 /* every number of the pose in the order the reference writes them: keys in alphabetical order at every level */
 static int flatten(const cm_pose *P, double *v) {
-  int n = 0, i;
-  if (P->kind == CM_BIPED) {
-    for (i = 0; i < 2; i++) { put3(v, &n, P->arm[i].elbow); put3(v, &n, P->arm[i].hand); put3(v, &n, P->arm[i].shoulder); v[n++] = P->arm[i].side; }
-    if (P->has_carry) { put3(v, &n, P->carry.c); put3(v, &n, P->carry.f); v[n++] = P->carry.held; put3(v, &n, P->carry.side); put3(v, &n, P->carry.size); put3(v, &n, P->carry.u); }
+  int n = 0, i, j, b = P->body, up = b == CM_BODY_BIPED || b == CM_BODY_MECH, hd = b == CM_BODY_BIPED || b == CM_BODY_BEAST || b == CM_BODY_QUAD;
+  if (b == CM_BODY_BEAST) v[n++] = P->alert;
+  if (b == CM_BODY_BIPED) for (i = 0; i < 2; i++) { put3(v, &n, P->arm[i].elbow); put3(v, &n, P->arm[i].hand); put3(v, &n, P->arm[i].shoulder); v[n++] = P->arm[i].side; }
+  for (i = 0; i < P->n_arms; i++) for (j = 0; j < 7; j++) put3(v, &n, P->arms[i][j]);
+  if (!up) { put3(v, &n, P->axis); put3(v, &n, P->back); }
+  if (P->has_carry) { put3(v, &n, P->carry.c); put3(v, &n, P->carry.f); v[n++] = P->carry.held; put3(v, &n, P->carry.side); put3(v, &n, P->carry.size); put3(v, &n, P->carry.u); }
+  if (up) put3(v, &n, P->chest);
+  for (i = 0; i < P->n_claws; i++) {
+    const cm_claw_pose *c = &P->claw[i];
+    put3(v, &n, c->elbow); put3(v, &n, c->finger_a); put3(v, &n, c->finger_b); v[n++] = c->open; put3(v, &n, c->shoulder); v[n++] = c->side; put3(v, &n, c->tip); put3(v, &n, c->wrist);
   }
-  put3(v, &n, P->chest); v[n++] = P->base.crouch; put3(v, &n, P->f);
-  if (P->kind == CM_BIPED) { put3(v, &n, P->gaze); v[n++] = P->grenade_held; put3(v, &n, P->grenade); put3(v, &n, P->head); }
-  v[n++] = P->base.heading; v[n++] = P->lean;
+  v[n++] = P->base.crouch;
+  if (b == CM_BODY_OCTO || b == CM_BODY_ARTHRO || b == CM_BODY_SPIDER) { put3(v, &n, P->dome); put3(v, &n, P->eye); }
+  if (up) put3(v, &n, P->f);
+  if (b == CM_BODY_BEAST) v[n++] = P->flex;
+  if (!up) put3(v, &n, P->front);
+  if (hd) put3(v, &n, P->gaze);
+  if (b == CM_BODY_BIPED) { v[n++] = P->grenade_held; put3(v, &n, P->grenade); }
+  if (hd) put3(v, &n, P->head);
+  v[n++] = P->base.heading;
+  if (b == CM_BODY_BEAST) v[n++] = P->jaw;
+  v[n++] = P->lean;
   for (i = 0; i < P->base.legs; i++) {
     const cm_leg_pose *l = &P->base.leg[i];
     put3(v, &n, l->ankle); put3(v, &n, l->ball); if (l->has_foot) put3(v, &n, l->heel);
@@ -67,20 +83,29 @@ static int flatten(const cm_pose *P, double *v) {
     if (!l->planted) put3(v, &n, l->target);
     if (l->has_foot) put3(v, &n, l->toe);
   }
+  if (P->has_mantle) { put3(v, &n, P->mantle_c); v[n++] = P->mantle_r; put3(v, &n, P->mantle_tip); }
   for (i = 0; i < P->n_mounts; i++) { const cm_mount_pose *m = &P->mount[i]; put3(v, &n, m->base); put3(v, &n, m->dir); v[n++] = m->flash; put3(v, &n, m->joint); v[n++] = m->side; put3(v, &n, m->tip); }
+  if (b == CM_BODY_BEAST || b == CM_BODY_QUAD) put3(v, &n, P->neck);
   v[n++] = P->pack; v[n++] = P->base.pitch;
   for (i = 0; i < P->n_props; i++) {
     const cm_prop_pose *w = &P->prop[i];
     put3(v, &n, w->body); put3(v, &n, w->dir); v[n++] = w->flash; if (w->has_fore) put3(v, &n, w->fore);
     put3(v, &n, w->grip); put3(v, &n, w->grip_low); put3(v, &n, w->mag_a); put3(v, &n, w->mag_b); put3(v, &n, w->muzzle); put3(v, &n, w->o); v[n++] = w->stow; put3(v, &n, w->up);
   }
-  put3(v, &n, P->base.root); put3(v, &n, P->side); put3(v, &n, P->u);
+  put3(v, &n, P->base.root);
+  if (up || hd) put3(v, &n, P->side);
+  if (!up && b != CM_BODY_SPIDER) put3(v, &n, P->tail);
+  for (i = 0; i < P->n_tail_pts; i++) put3(v, &n, P->tail_pts[i]);
+  if (P->has_thorax) { put3(v, &n, P->thorax[0]); put3(v, &n, P->thorax[1]); }
+  if (up) put3(v, &n, P->u); else put3(v, &n, P->up);
+  for (i = 0; i < P->n_wings; i++) { const cm_wing_pose *w = &P->wing[i]; v[n++] = w->chord; put3(v, &n, w->mid); put3(v, &n, w->root); v[n++] = w->side; put3(v, &n, w->t1); put3(v, &n, w->t2); put3(v, &n, w->tip); }
   return n;
 }
 static int tally_slot(int type) {
   switch (type) {
     case CM_EV_FIRE: return 0; case CM_EV_RELOAD: return 1; case CM_EV_LOADED: return 2; case CM_EV_THROW: return 3; case CM_EV_GRAB: return 4; case CM_EV_PUTDOWN: return 5;
     case CM_EV_PUNCH: return 6; case CM_EV_STRIKE: return 7; case CM_EV_LAND: return 8; case CM_EV_JUMP: return 9; case CM_EV_HIT: return 10; case CM_EV_DROP: return 11;
+    case CM_EV_BITE: return 12; case CM_EV_POUNCE: return 13; case CM_EV_PINCH: return 14; case CM_EV_STING: return 15; case CM_EV_INK: return 16;
   }
   return -1;
 }
@@ -95,6 +120,11 @@ static double carried(const cm_event *e) {
     case CM_EV_PUTDOWN: return e->pos[0] + e->pos[1] + e->pos[2] + e->hd;
     case CM_EV_PUNCH: return e->hand + e->pos[0] + e->pos[1] + e->pos[2] + e->vel[0] + e->vel[1] + e->vel[2] + e->miss;
     case CM_EV_STRIKE: return e->pos[0] + e->pos[1] + e->pos[2] + e->point[0] + e->point[1] + e->point[2] + e->vel[0] + e->vel[1] + e->vel[2];
+    case CM_EV_BITE: return e->pos[0] + e->pos[1] + e->pos[2] + e->vel[0] + e->vel[1] + e->vel[2] + e->miss;
+    case CM_EV_POUNCE: return e->pos[0] + e->pos[1] + e->pos[2];
+    case CM_EV_PINCH: case CM_EV_GRAB: return e->pos[0] + e->pos[1] + e->pos[2] + e->hand + e->miss;
+    case CM_EV_STING: return e->pos[0] + e->pos[1] + e->pos[2] + e->miss;
+    case CM_EV_INK: return e->pos[0] + e->pos[1] + e->pos[2] + e->vel[0] + e->vel[1] + e->vel[2];
   }
   return s3;
 }
@@ -106,7 +136,7 @@ static int play(const char *path, int *samples, double *worst) {
   static cm_pose P;
   FILE *f = fopen(path, "r");
   char id[64], name[64];
-  int hz, steps, every, i = 0, k, n, bad = 0, shown = 0, tally[12];
+  int hz, steps, every, i = 0, k, n, bad = 0, shown = 0, tally[17];
   ground g;
   const cm_character *ch;
   cm_input in;
@@ -139,7 +169,7 @@ static int play(const char *path, int *samples, double *worst) {
       if (line[0] != 'p') { fclose(f); return -1; }
       nw = numbers(line + 1, v, MAXV) - 1;
       ng = flatten(&P, got);
-      for (k = 0; k < 12; k++) got[ng++] = tally[k];
+      for (k = 0; k < 17; k++) got[ng++] = tally[k];
       got[ng++] = evsum;
       (*samples)++;
       if (ng != nw || ng != (int)v[0]) { bad++; if (!shown++) printf("%s: sample at step %d has %d values, expected %d\n", id, i + 1, ng, nw); }

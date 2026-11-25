@@ -21,7 +21,7 @@ TOL = 1e-6
 KITS = (None, "rifle", "pistols", "sword")
 PUNCHES = (None, "jab", "cross", "hook")
 SWINGS = (None, "slash", "chop", "thrust")
-TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop")
+TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop", "bite", "pounce", "pinch", "sting", "ink")
 
 
 def inputs(v):
@@ -52,6 +52,11 @@ def inputs(v):
         inp["track"] = w[32:35]
     if w[35]:
         inp["swing"] = {"kind": SWINGS[int(w[35])]}
+    for k, name in enumerate(("bite", "pinch", "sting", "grab")):
+        how = w[36 + 4 * k]
+        if how:
+            inp[name] = {"target": w[37 + 4 * k: 40 + 4 * k]} if how > 1 else {}
+    inp["ink"] = bool(w[52])
     return inp
 
 

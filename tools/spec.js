@@ -41,7 +41,16 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
     const m = c.mount || {}, T = c.torso || {}, A = c.arms || {}, P = c.pod || {};
     out.push('    ' + (MOUNT[m.type] || 'CM_MOUNT_TURRET') + ', ' + (KITC[m.kit] || 'CM_KIT_NONE') + ', ' + (m.n || 1) + ', ' + (m.yaw === undefined ? 0 : 1) + ', '
       + [m.rate || 0, m.kick || 0, m.rise || 0, m.omega || 0, m.aimOmega || 0, m.min || 0, m.max || 0, m.yaw === undefined ? 1 : m.yaw, m.bodyKick || 0].map(num).join(', ') + ',');
-    out.push('    ' + [T.len || 0, T.neck || 0, T.headR || 0, T.shoulderW || 0, A.upper || 0, A.lower || 0, P.h || 0, P.r || 0, P.gunZ || 0, P.gunLen || 0].map(num).join(', ') + ' },');
+    out.push('    ' + [T.len || 0, T.neck || 0, T.headR || 0, T.shoulderW || 0, A.upper || 0, A.lower || 0, P.h || 0, P.r || 0, P.gunZ || 0, P.gunLen || 0].map(num).join(', ') + ',');
+    const bz = c.beast || {}, tl = c.tail, az = c.arthro, cw = az && az.claw, oc = c.octo, fl = c.fly, or = function (x, d) { return x === undefined || x === null ? d : x; };
+    out.push('    ' + [bz.half || 0, bz.back || bz.half || 0, bz.neck || 0, bz.neckUp || 0, bz.skull || 0, bz.jaw || 0, bz.tilt || 0].map(num).join(', ') + ',');
+    out.push('    ' + (tl ? 1 : 0) + ', ' + (tl ? tl.n : 0) + ', ' + list(tl ? tl.at : [0, 0]) + ', '
+      + (tl ? [tl.seg, tl.rest, tl.curl, tl.omega, tl.zeta || 0.45, or(tl.soft, 0.5), or(tl.sag, 0.2), tl.bend || 1.3, tl.lift, tl.wag, tl.alert, tl.sway, or(tl.inert, 1)] : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).map(num).join(', ') + ',');
+    out.push('    ' + [az ? 1 : 0, az && az.both ? 1 : 0, az && az.under ? 1 : 0, az && az.thorax ? 1 : 0, az && az.head ? 1 : 0, az && az.stingAt ? 1 : 0, cw ? 1 : 0, cw && cw.strikeAt ? 1 : 0].join(', ') + ', '
+      + num(az ? az.half : 0) + ', ' + num(az ? az.strike || 0.5 : 0) + ', ' + list(az && az.thorax || [0, 0, 0, 0]) + ', ' + list(az && az.head || [0, 0]) + ', ' + list(az && az.stingAt || [0, 0]) + ',');
+    out.push('    ' + list(cw ? cw.at : [0, 0, 0]) + ', ' + [cw ? cw.upper : 0, cw ? cw.lower : 0, cw ? cw.hand : 0].map(num).join(', ') + ', ' + list(cw ? cw.rest : [0, 0, 0]) + ', ' + list(cw && cw.strikeAt || [0, 0, 0]) + ',');
+    out.push('    ' + (oc ? 1 : 0) + ', ' + num(oc ? oc.mantle : 0) + ', ' + num(oc ? oc.arm.seg : 0) + ', ' + (fl ? 1 : 0) + ', ' + (fl && fl.zfold === false ? 0 : 1) + ', ' + list(fl ? fl.at : [0, 0, 0]) + ', '
+      + [fl ? fl.w1 : 0, fl ? fl.w2 : 0, fl ? fl.chord : 0, fl ? fl.sweep || 0.15 : 0].map(num).join(', ') + ' },');
   });
   out.push('};', '', 'int cm_character_count(void) { return (int)(sizeof CHARACTERS / sizeof CHARACTERS[0]); }',
     'const cm_character *cm_character_at(int i) { return i >= 0 && i < cm_character_count() ? &CHARACTERS[i] : 0; }',

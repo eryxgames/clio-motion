@@ -145,6 +145,9 @@ class State:
         self.block = Spring()
         self.ac_tw = 0.0
         self.ho_rel = [None, None]
+        self.jaw = Spring()
+        self.chains = {}
+        self.ink_t = 0.0
         self.local = None
         self.legs = [Leg([l["rest"][0], terrain(l["rest"][0], 0.0), l["rest"][1]], g0) for l in ch["legs"]]
 

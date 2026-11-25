@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Daniel Sandner
-"""CLIo Motion in Python, stage 3: the upper body of upright characters, their weapons and their actions.
+"""CLIo Motion in Python, stage 3: upper bodies, weapons and actions, for every character on the ground.
 
 For bipeds (the soldier): spine, head, arms, sideways aim, the kits (rifle, two pistols, sword and shield) held and
 stowed, firing and recoil, reloading, the sword's swings and the shield's block, throwing, lifting and carrying a
@@ -11,15 +11,15 @@ replays in spec/body/.
     S = create_state(ch, terrain)
     pose = step(S, ch, {"speed": 1.4, "armed": True, "aim": [8, 1.4, 2]}, STYLE, terrain, 1 / 60)
 
-Animals, arthropods and the octopus (bending spines, necks, tails, claws, arms) are the next part of stage 3;
-``step`` raises NotImplementedError for them, and ``step_ground`` still gives their legs and hips.
+Animals: the spine that bends in a gallop, neck, head and jaw, the tail as a chain, bite and pounce.  Arthropods:
+claws, the pinch, the sting.  The octopus: mantle, arms, grab and ink.  The quadruped robot and the spider mech.
 """
 from __future__ import annotations
 
 import math
 
 from .ground import step_ground
-from .kernel import G, TAU, clamp, idle_noise, ik2, lerp, lob, smooth, wrap_pi
+from .kernel import G, TAU, clamp, decay, idle_noise, ik2, lerp, lob, reach_chain, smooth, wrap_pi
 
 PROPS = {
     "rifle": {"len": 0.91, "body": 0.57, "grip": [0.24, -0.06], "gripLow": [0.225, -0.115], "fore": [0.53, -0.035], "magA": [0.35, -0.035],
@@ -310,15 +310,22 @@ def _act_tick(S, ch, inp, dt, B):
 
 def upper_body(S, ch, inp, st, dt, legs, B):
     kind_ch = ch["kind"]
-    if kind_ch not in ("biped", "mech"):
-        raise NotImplementedError("the upper body of '%s' characters is not ported yet; step_ground gives their legs and hips" % kind_ch)
     root, m = B["root"], ch["mount"]
     pose = {"kind": kind_ch, "root": root, "pitch": B["pitch"], "legs": legs, "crouch": S.crouch}
     if S.ammo is None and m.get("kit"):
         S.ammo = full_ammo(m["kit"])
     # kits: the weapons are put away before changing to another set, then the new ones come up
     kit_want = (inp.get("kit") if inp.get("kit") in KITS else S.kit) if m["type"] == "held" else None
-    AC = _act_tick(S, ch, inp, dt, B) if kind_ch == "biped" else {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0}
+    if kind_ch == "biped":
+        AC = _act_tick(S, ch, inp, dt, B)
+    elif ch.get("beast"):
+        AC = _beast_tick(S, ch, inp, dt)
+    elif ch.get("arthro"):
+        AC = _arthro_tick(S, ch, inp, dt)
+    elif ch.get("octo"):
+        AC = _octo_tick(S, ch, inp, dt)
+    else:
+        AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0}
     # hands that are busy with a load or a fight cannot hold weapons: those are put away first
     busy = bool(S.carry) or S.guard.x > 0.05 or (kind_ch == "biped" and bool(inp.get("guard")))
     ready = bool(inp.get("armed")) and kit_want == S.kit and not busy
@@ -393,6 +400,9 @@ def upper_body(S, ch, inp, st, dt, legs, B):
             pose["mounts"].append({"joint": base, "base": _add(b, _mul(dm, -0.35)), "tip": _add(b, _mul(dm, P["gunLen"])), "dir": dm,
                                    "flash": S.flash[g], "side": sd})
         return pose
+
+    if kind_ch != "biped":
+        return _horizontal(S, ch, inp, dt, legs, B, pose, AC, lean, FL, aim_from)
 
     T, A, gp, kit, e = ch["torso"], ch["arms"], B["gp"], held_kit(S, ch), S.armed.x
     breath = 0.007 * ch["L"] * B["idle"] * math.sin(TAU * S.t / B["P"])
@@ -682,7 +692,501 @@ def upper_body(S, ch, inp, st, dt, legs, B):
     return pose
 
 
+def _target(v):
+    """The target of an input like {"target": [x, y, z]}, or None."""
+    t = v.get("target") if isinstance(v, dict) else None
+    return list(t) if t else None
+
+
+def _asked(v):
+    return v is not None and v is not False
+
+
+def _beast_tick(S, ch, inp, dt):
+    """A beast's own actions.  bite: the neck shoots out, the jaws snap ('bite' event).  A pounce (handled with the
+    jump) leaps onto a target with the jaws open ('pounce' event on landing)."""
+    AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0, "jaw": 0.0, "alert": 0.0}
+    a, k, J = S.act, math.sqrt(ch["L"] / 0.7), S.jump
+    S.act_back = 0.0
+    S.act_crouch = 0.0
+    bite = inp.get("bite")
+    if _asked(bite) and not a and S.mode in ("ground", "fly") and not J:
+        a = S.act = {"name": "bite", "t": 0.0, "dur": 0.46 * k, "done": False, "target": _target(bite)}
+    if a and a["name"] == "bite":
+        a["t"] += dt
+        q = min(a["t"] / a["dur"], 1)
+        AC["ext"] = smooth(0.05, 0.34, q) * (1 - smooth(0.42, 1, q))
+        AC["jaw"] = 0.9 * smooth(0, 0.22, q) * (1 - smooth(0.33, 0.37, q))
+        AC["alert"] = 1
+        AC["lean"] = 0.10 * AC["ext"]
+        S.act_back = -0.12 * k * AC["ext"]
+        S.act_crouch = 0.2 * AC["ext"]
+        if a["t"] >= a["dur"]:
+            S.act = None
+    if J and J.pounce:
+        AC["alert"] = 1
+        AC["jaw"] = 0.85 if J.stage == "air" else 0.85 * (1 - smooth(0, 0.07, J.t)) if J.stage == "land" else 0.25
+        AC["ext"] = 0.7 if J.stage == "air" else 0.7 * (1 - smooth(0, 0.3, J.t)) if J.stage == "land" else 0
+    return AC
+
+
+def _arthro_tick(S, ch, inp, dt):
+    """An arthropod's own actions.  pinch: the nearer claw shoots out and shuts ('pinch' event).  sting: the tail rears
+    back, then whips over the head onto the target ('sting' event)."""
+    AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0, "jaw": 0.0, "alert": 0.0, "sting": 0.0, "rear": 0.0, "shut": 0.0}
+    a, az = S.act, ch["arthro"]
+    free = not a and S.mode in ("ground", "fly")
+    S.act_back = 0.0
+    S.act_crouch = 0.0
+    if az.get("rock") and S.standing and S.mode == "ground":
+        S.act_back = az["rock"] * math.sin(TAU * S.t / 1.4)         # a mantis rocks like a leaf in the wind
+    pinch, sting = inp.get("pinch"), inp.get("sting")
+    if _asked(pinch) and free:
+        a = S.act = {"name": "pinch", "t": 0.0, "dur": az.get("strike") or 0.5, "done": False, "target": _target(pinch), "side": 0}
+    elif _asked(sting) and free and ch.get("tail"):
+        a = S.act = {"name": "sting", "t": 0.0, "dur": 0.72, "done": False, "target": _target(sting)}
+    if a and a["name"] in ("pinch", "sting"):
+        a["t"] += dt
+        q = min(a["t"] / a["dur"], 1)
+        AC["alert"] = 1
+        if a["name"] == "pinch":
+            AC["ext"] = smooth(0.05, 0.36, q) * (1 - smooth(0.52, 1, q))
+            AC["jaw"] = smooth(0, 0.2, q)
+            AC["shut"] = smooth(0.36, 0.41, q) * (1 - smooth(0.62, 0.92, q))
+            S.act_back = -0.06 * AC["ext"]
+        else:
+            AC["rear"] = smooth(0, 0.20, q) * (1 - smooth(0.22, 0.32, q))
+            AC["sting"] = smooth(0.22, 0.40, q) * (1 - smooth(0.52, 1, q))
+            S.act_back = -0.14 * AC["sting"]
+            AC["lean"] = 0.3 * AC["sting"]
+        if a["t"] >= a["dur"]:
+            S.act = None
+    return AC
+
+
+def _octo_tick(S, ch, inp, dt):
+    """grab: the nearest arm lifts off the ground, shoots out and curls round the target ('grab' event).
+    ink: a puff of ink ('ink' event)."""
+    AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0, "jaw": 0.0, "alert": 0.0, "ink": False}
+    a = S.act
+    S.act_back = 0.0
+    S.act_crouch = 0.0
+    S.ink_t = max(0, (S.ink_t or 0) - dt)
+    grab = inp.get("grab")
+    if _asked(grab) and not a and S.mode == "ground":
+        a = S.act = {"name": "grab", "t": 0.0, "dur": 0.8, "done": False, "target": _target(grab), "arm": -1}
+    if a and a["name"] == "grab":
+        a["t"] += dt
+        q = min(a["t"] / a["dur"], 1)
+        AC["alert"] = 1
+        AC["ext"] = smooth(0.04, 0.40, q) * (1 - smooth(0.62, 1, q))
+        AC["lean"] = 0.15 * AC["ext"]
+        S.act_back = -0.05 * AC["ext"]
+        if a["t"] >= a["dur"]:
+            S.act = None
+    if inp.get("ink") and S.ink_t <= 0:
+        S.ink_t = 1.2
+        AC["ink"] = True
+        S.jaw.v += 9
+    S.jaw.step(0, 14, 0.6, dt)                              # the mantle's squeeze, shared by ink and jets
+    return AC
+
+
+def chain_step(S, key, T, l_size, B, base, body_ang, ctl, dt):
+    """A tail (or any trailing chain) as a row of links, each with its own direction and turning speed.  A spring turns
+    a link to carry on from the one before it, bent by 'curl', so a movement at the root runs down the chain and
+    reaches the tip late.  Each link is also a pendulum on a moving pivot: when the body speeds up, stops, bounces or
+    turns, the links swing the other way.  ctl: lift, yaw, curl, and pull = {"pts", "k"} to pass through given points
+    (a strike).  Returns the n + 1 points, in the body's frame."""
+    n, C = T["n"], S.chains.get(key)
+    sz = math.sqrt(l_size / 0.7)
+    om0 = T["omega"] / sz
+    zeta = T.get("zeta") or 0.45
+    soft = T["soft"] if T.get("soft") is not None else 0.5
+    th0 = body_ang + math.pi + T["rest"] - ctl["lift"]
+    ps0 = clamp(ctl["yaw"], -1.2, 1.2)
+    curl = T["curl"] + (ctl.get("curl") or 0)
+    sag = T["sag"] if T.get("sag") is not None else 0.2
+    dr = B.get("drift") or [0, 0]
+    if not C or C["n"] != n:
+        C = S.chains[key] = {"n": n, "th": [th0 + k * curl for k in range(n)], "ps": [ps0] * n, "vth": [0.0] * n, "vps": [0.0] * n,
+                             "by": base[1], "vy": 0.0, "ay": 0.0, "dr": list(dr), "ax": 0.0, "az": 0.0}
+    # how the root of the tail is being thrown about: forwards, up and down (the gait's bounce), sideways (a turn, a shove)
+    vy = (base[1] - C["by"]) / dt
+    kf = decay(25, dt)
+    C["ay"] += (clamp((vy - C["vy"]) / dt, -3 * G, 3 * G) - C["ay"]) * kf
+    C["vy"] = vy
+    C["by"] = base[1]
+    C["ax"] += (clamp(S.a + (dr[0] - C["dr"][0]) / dt, -4 * G, 4 * G) - C["ax"]) * kf
+    C["az"] += (clamp(S.v * S.om + (dr[1] - C["dr"][1]) / dt, -4 * G, 4 * G) - C["az"]) * kf
+    C["dr"] = list(dr)
+    # worked in steps of 1/120 s at most, so that a game running at 30 steps a second gets the same tail
+    nsub = max(1, math.ceil(dt * 120 - 1e-6))
+    hdt = dt / nsub
+    inert = T["inert"] if T.get("inert") is not None else 1
+    pull = ctl.get("pull")
+    pulling = bool(pull) and pull["k"] > 0
+    seg, bend = T["seg"], T.get("bend") or 1.3
+    pts = None
+    for _ in range(nsub):
+        pts = [list(base)]
+        pth, pps, pvt, pvp = th0 - curl, ps0, 0.0, 0.0
+        for k in range(n):
+            om = om0 * (1 - soft * k / max(n - 1, 1))
+            ell = max(0.5 * seg * (n - k), seg) * 2.2 / inert
+            th, ps, tt = C["th"][k], C["ps"][k], pth + curl
+            tp = pps if k == 0 else 0.94 * pps
+            cps = math.cos(ps)
+            fth = -(-C["ax"] * math.sin(th) + (C["ay"] + sag * G) * math.cos(th)) / ell
+            fps = -(C["az"] * cps - C["ax"] * math.cos(th) * math.sin(ps)) / ell
+            C["vth"][k] += (om * om * wrap_pi(tt - th) - 2 * zeta * om * (C["vth"][k] - pvt) + fth) * hdt
+            C["vps"][k] += (om * om * (tp - ps) - 2 * zeta * om * (C["vps"][k] - pvp) + fps) * hdt
+            th += C["vth"][k] * hdt
+            ps += C["vps"][k] * hdt - S.om * hdt * math.cos(th) * 0.8       # the body turns under a tail that would rather keep pointing where it did
+            if pulling:
+                a, b = pull["pts"][k], pull["pts"][k + 1]
+                dx, dy, dz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+                dl = math.sqrt(dx * dx + dy * dy + dz * dz) or 1
+                th += wrap_pi(math.atan2(dy, dx) - th) * pull["k"]
+                ps += (math.asin(clamp(dz / dl, -1, 1)) - ps) * pull["k"]
+                C["vth"][k] *= 1 - pull["k"]
+                C["vps"][k] *= 1 - pull["k"]
+            # a link bends only so far from the one before, and does not go through the ground
+            bmax = 2.5 if pulling else bend
+            off = wrap_pi(th - tt)
+            if abs(off) > bmax:
+                th = tt + clamp(off, -bmax, bmax)
+                C["vth"][k] = 0.0
+            smax = 1.35 if k == 0 else abs(pps) + bend
+            if abs(ps) > smax:
+                ps = clamp(ps, -smax, smax)
+                C["vps"][k] = 0.0
+            cps = math.cos(ps)
+            prev = pts[k]
+            q = [prev[0] + seg * math.cos(th) * cps, prev[1] + seg * math.sin(th) * cps, prev[2] + seg * math.sin(ps)]
+            gy = B["terrain"](q[0], q[2]) + 0.03
+            if q[1] < gy and prev[1] >= gy - 1e-6:
+                sv = clamp((gy - prev[1]) / (seg * max(cps, 0.2)), -1, 1)
+                a1 = math.asin(sv)
+                a2 = math.pi - a1
+                th = a1 if abs(wrap_pi(a1 - th)) < abs(wrap_pi(a2 - th)) else a2
+                if C["vth"][k] * math.cos(th) < 0:
+                    C["vth"][k] = 0.0
+                q = [prev[0] + seg * math.cos(th) * cps, prev[1] + seg * math.sin(th) * cps, prev[2] + seg * math.sin(ps)]
+            C["th"][k] = th
+            C["ps"][k] = ps
+            pts.append(q)
+            pth, pps, pvt, pvp = th, ps, C["vth"][k], C["vps"][k]
+    return pts
+
+
+def _arm_curve(hip, knee, foot, seg):
+    """An octopus arm through its leg: seven points on a curve from hip to tip, with links of one length."""
+    c = [2 * knee[i] - 0.5 * (hip[i] + foot[i]) for i in range(3)]
+    pts = []
+    for i in range(7):
+        u = i / 6
+        w = 1 - u
+        pts.append([w * w * hip[j] + 2 * w * u * c[j] + u * u * foot[j] for j in range(3)])
+    return reach_chain(pts, hip, foot, seg, 1)
+
+
+def wing_pose(ch, root, ax, up, fa, fa2, fold):
+    """Two wings of two bones each.  fa, fa2: how far the arm and the hand are raised; fold: 0 spread, 1 folded like a Z
+    along the body (so no bone changes length)."""
+    F, out = ch["fly"], []
+    sw0 = F.get("sweep") or 0.15
+    for s in (1, -1):
+        wr = [root[0] + ax[0] * F["at"][0] + up[0] * F["at"][1], root[1] + ax[1] * F["at"][0] + up[1] * F["at"][1], root[2] + s * F["at"][2]]
+
+        def direction(a, sweep):
+            c, sn, ss = math.cos(a), math.sin(a), math.sin(sweep)
+            return [up[0] * sn - ax[0] * ss * c, up[1] * sn - ax[1] * ss * c, s * c * math.cos(sweep)]
+
+        def hang(dv):       # which way the membrane hangs from a bone: behind it when spread, in against the body when folded
+            t = [s * (dv[1] * up[2] - dv[2] * up[1]), s * (dv[2] * up[0] - dv[0] * up[2]), s * (dv[0] * up[1] - dv[1] * up[0])]
+            return _mul(t, 1 / (_len(t) or 1))
+
+        d1 = direction(lerp(fa, 0.22, fold), lerp(sw0, 1.40, fold))
+        d2 = direction(lerp(fa2, 0.30, fold), lerp(sw0 + 0.2, 1.5 if F.get("zfold") is False else -1.25, fold))
+        mid = _add(wr, _mul(d1, F["w1"]))
+        tip = _add(mid, _mul(d2, F["w2"]))
+        out.append({"root": wr, "mid": mid, "tip": tip, "t1": hang(d1), "t2": hang(d2), "chord": F["chord"], "side": s})
+    return out
+
+
+def _horizontal(S, ch, inp, dt, legs, B, pose, AC, lean, FL, aim_from):
+    """Horizontal bodies: animals, the quadruped robot, arthropods, the octopus, the spider mech."""
+    root = B["root"]
+    cp, sn = math.cos(B["pitch"] + lean * 0.3), math.sin(B["pitch"] + lean * 0.3)
+    idle, P = B["idle"], B["P"]
+
+    def loc(x, y, z=0):
+        return [root[0] + x * cp - y * sn, root[1] + x * sn + y * cp, root[2] + z]
+
+    pose["axis"] = [cp, sn, 0]
+    pose["up"] = [-sn, cp, 0]
+    if ch["kind"] == "quad" and ch.get("beast"):
+        # An animal's body: the spine bends in the middle (flex), the neck carries the head high at rest and low and
+        # forward at speed, the head turns to what it watches, the jaw is hinged, the tail is a chain.
+        Bz, flex, gq = ch["beast"], B["flex"] or 0, B["gp"]
+        pa = B["pitch"] + lean * 0.3 + (Bz.get("tilt") or 0)
+        fa2 = pa - flex
+
+        def loc_b(x, y, z=0):
+            a2 = pa + (flex if x < 0 else -flex)
+            c2, s2 = math.cos(a2), math.sin(a2)
+            return [root[0] + x * c2 - y * s2, root[1] + x * s2 + y * c2, root[2] + z]
+
+        nb = loc_b(Bz["half"] + 0.03, 0.10)
+        Wb = aim_from(nb, 1)
+        tb2 = S.twist.x
+        S.jaw.step(AC["jaw"], 60, 0.75, dt)
+        carry = Bz["neckUp"] * (1 - 0.55 * gq["run"] - 0.3 * (gq["gal"] or 0)) - 0.35 * AC["ext"] + 0.12 * idle * idle_noise(S.t, P, 5.0) - 0.4 * max(0, FL)
+        na = fa2 + carry + 0.5 * Wb
+        nlen = Bz["neck"] * (1 + 0.28 * AC["ext"])
+        hdp = [nb[0] + nlen * math.cos(na) * math.cos(0.6 * tb2), nb[1] + nlen * math.sin(na), nb[2] + nlen * math.cos(na) * math.sin(0.6 * tb2)]
+        ga2 = 0.35 * fa2 + 0.9 * Wb - 0.10 * (1 - AC["alert"]) + 0.10 * idle * idle_noise(S.t, P, 6.0)
+        gzb = [math.cos(ga2) * math.cos(tb2), math.sin(ga2), math.cos(ga2) * math.sin(tb2)]
+        act_b = S.act if S.act and S.act["name"] == "bite" else None
+        if act_b and act_b["target"] and AC["ext"] > 0:
+            # biting at something: the head goes to it as far as the neck will stretch, muzzle first
+            tl = B["to_l"](act_b["target"])
+            want = _sub(tl, _mul(gzb, Bz["skull"]))
+            wd = _sub(want, nb)
+            wl = _len(wd) or 1
+            wmax = Bz["neck"] * 1.45
+            if wl > wmax:
+                want = _add(nb, _mul(wd, wmax / wl))
+            hdp = _lerp3(hdp, want, AC["ext"])
+            td2 = _sub(tl, hdp)
+            tl2 = _len(td2)
+            if tl2 > 1e-4:
+                gzb = _lerp3(gzb, _mul(td2, 1 / tl2), 0.8 * AC["ext"])
+                gzb = _mul(gzb, 1 / (_len(gzb) or 1))
+        sdb = [-math.sin(tb2), 0, math.cos(tb2)]
+        # keep the head's side vector square to where it looks
+        sdb = _sub(sdb, _mul(gzb, _dot(sdb, gzb)))
+        sdb = _mul(sdb, 1 / (_len(sdb) or 1))
+        gub = [sdb[1] * gzb[2] - sdb[2] * gzb[1], sdb[2] * gzb[0] - sdb[0] * gzb[2], sdb[0] * gzb[1] - sdb[1] * gzb[0]]
+        jo = clamp(S.jaw.x, 0, 1.1)
+        hinge = _add(hdp, _add(_mul(gzb, 0.02), _mul(gub, -0.035)))
+        jd = _add(_mul(gzb, math.cos(jo)), _mul(gub, -math.sin(jo)))
+        jtip = _add(hinge, _mul(jd, Bz["jaw"]))
+        pose["back"] = loc_b(-(Bz.get("back") or Bz["half"]), 0)
+        pose["front"] = loc_b(Bz["half"], 0)
+        pose["neck"] = nb
+        pose["head"] = hdp
+        pose["gaze"] = gzb
+        pose["side"] = sdb
+        pose["mounts"] = [{"joint": hdp, "base": hinge, "tip": jtip, "dir": jd, "flash": 0, "side": 0}]
+        pose["jaw"] = jo
+        pose["alert"] = AC["alert"]
+        pose["flex"] = flex
+        if act_b and not act_b["done"] and act_b["t"] >= 0.365 * act_b["dur"]:
+            act_b["done"] = True
+            mz = B["to_w"](_add(hdp, _mul(gzb, Bz["skull"])))
+            ch_, sh_ = math.cos(S.h), math.sin(S.h)
+            S.events.append({"type": "bite", "pos": mz, "dir": [gzb[0] * ch_ - gzb[2] * sh_, gzb[1], gzb[0] * sh_ + gzb[2] * ch_],
+                             "miss": _len(_sub(mz, act_b["target"])) if act_b["target"] else 0})
+        Jb = S.jump
+        if Jb and Jb.pounce and Jb.stage == "land" and not Jb.struck:
+            Jb.struck = True
+            S.events.append({"type": "pounce", "pos": B["to_w"](_add(hdp, _mul(gzb, Bz["skull"])))})
+        Tl = ch.get("tail")
+        if Tl:
+            # the tail streams out at speed, goes up when the animal is roused, tucks under after a blow, and wags at rest
+            wag = Tl["wag"] * idle * math.sin(4 * TAU * S.t / P) + 0.6 * Tl["wag"] * AC["alert"] * math.sin(19 * S.t) + Tl["sway"] * gq["moving"] * math.sin(TAU * S.phase)
+            pose["tailPts"] = chain_step(S, "tail", Tl, ch["L"], B, loc_b(Tl["at"][0], Tl["at"][1]), pa + flex,
+                                         {"lift": Tl["lift"] * (0.45 * gq["run"] + 0.75 * (gq["gal"] or 0)) + Tl["alert"] * AC["alert"] - 0.7 * abs(FL), "yaw": wag}, dt)
+            pose["tail"] = pose["tailPts"][Tl["n"]]
+        else:
+            pose["tail"] = loc_b(-Bz["half"] - 0.2, 0.05)
+    elif ch["kind"] == "quad":
+        neck, hd = loc(0.40, 0.08), loc(0.60, 0.22)
+        Wq = (aim_from(hd, 1) + 0.2 * idle * idle_noise(S.t, P, 5.0)) * 0.8
+        tq = S.twist.x                                       # the head turns on the neck
+        dq = [math.cos(Wq) * math.cos(tq), math.sin(Wq), math.cos(Wq) * math.sin(tq)]
+        qs = [-math.sin(tq), 0, math.cos(tq)]
+        pose["back"] = loc(-0.36, 0.02)
+        pose["front"] = loc(0.36, 0.02)
+        pose["neck"] = neck
+        pose["head"] = hd
+        pose["gaze"] = dq
+        pose["side"] = qs
+        pose["tail"] = loc(-0.72, 0.16 + pose["pack"] * 2.2, 0.09 * idle * math.sin(4 * TAU * S.t / P))
+        # the gun hangs under the head, fixed to it
+        qup = [qs[1] * dq[2] - qs[2] * dq[1], qs[2] * dq[0] - qs[0] * dq[2], qs[0] * dq[1] - qs[1] * dq[0]]
+        hb = _add(_add(hd, _mul(dq, S.kick[0].x)), _mul(qup, -0.07))
+        pose["mounts"] = [{"joint": hd, "base": hb, "tip": _add(hb, _mul(dq, 0.34)), "dir": dq, "flash": S.flash[0], "side": 0}]
+    elif ch.get("octo"):
+        # crawling: the mantle sits behind the head and wobbles after it; each arm is a curve through its leg
+        Oq = ch["octo"]
+        act_o = S.act if S.act and S.act["name"] == "grab" else None
+        breathe = 1 + 0.05 * math.sin(TAU * S.t / 1.9) - 0.2 * clamp(S.jaw.x, 0, 1)
+        aim_from(loc(0.15, 0.1), 1)
+        pose["back"] = loc(-0.2, 0)
+        pose["front"] = loc(0.2, 0)
+        pose["eye"] = loc(0.10, 0.12)
+        mc = loc(-0.10, 0.13)
+        pose["mantle"] = {"c": mc, "tip": loc(-0.40, 0.20 + pose["pack"] * 2.5, 0.05 * idle * math.sin(2 * TAU * S.t / P)), "r": Oq["mantle"] * breathe}
+        pose["dome"] = mc
+        seg7 = Oq["arm"]["seg"]
+        pose["arms"] = [_arm_curve(l["hip"], l["knee"], l["ankle"], seg7) for l in legs]
+        if act_o:
+            # the arm nearest the target leaves the ground and reaches for it, link by link
+            gT = B["to_l"](act_o["target"]) if act_o["target"] else loc(0.85, 0.35, 0.2)
+            if act_o["arm"] < 0:
+                best = 1e9
+                for k, l in enumerate(legs):
+                    dq2 = _len(_sub(gT, l["hip"]))
+                    if dq2 < best:
+                        best = dq2
+                        act_o["arm"] = k
+            la, cur = legs[act_o["arm"]], pose["arms"][act_o["arm"]]
+            guess7 = [[q[0], q[1] + 0.25 * math.sin(math.pi * k / 6), q[2]] for k, q in enumerate(cur)]
+            rc7 = reach_chain(guess7, la["hip"], gT, seg7)
+            aq = [_lerp3(q, rc7[k], AC["ext"]) for k, q in enumerate(cur)]
+            for ak in range(1, 7):                           # on the way out and back its links keep their length
+                ad = _sub(aq[ak], aq[ak - 1])
+                aq[ak] = _add(aq[ak - 1], _mul(ad, seg7 / (_len(ad) or 1)))
+            pose["arms"][act_o["arm"]] = aq
+            if not act_o["done"] and act_o["t"] >= 0.42 * act_o["dur"]:
+                act_o["done"] = True
+                gw7 = B["to_w"](aq[6])
+                S.events.append({"type": "grab", "pos": gw7, "arm": act_o["arm"], "miss": _len(_sub(gw7, act_o["target"])) if act_o["target"] else 0})
+        if AC.get("ink"):
+            S.events.append({"type": "ink", "pos": B["to_w"](loc(-0.3, 0.1)), "dir": [-math.cos(S.h), 0.2, -math.sin(S.h)]})
+        pose["tail"] = pose["arms"][0][6]
+        pose["mounts"] = [{"joint": root, "base": root, "tip": pose["eye"], "dir": [cp, sn, 0], "flash": 0, "side": 0}]
+    elif ch.get("arthro"):
+        # A scorpion-like body: a low carapace, two clawed arms held out in front, and a tail curled up over the back.
+        # The claws drift towards what is being watched; one shoots out to pinch.  The tail is the same chain as any
+        # other tail, with a rest shape that curls forward, and a strike that drags it onto a target.
+        Az = ch["arthro"]
+        Cw = Az.get("claw")
+        act_a = S.act if S.act and S.act["name"] in ("pinch", "sting") else None
+        aim_from(loc(Az["half"], 0.05), 1)
+        S.jaw.step(AC["jaw"], 60, 0.8, dt)
+        pose["back"] = loc(-Az["half"], 0)
+        pose["front"] = loc(Az["half"], 0)
+        pose["dome"] = loc(0.04, 0.05)
+        pose["eye"] = loc(Az["head"][0], Az["head"][1]) if Az.get("head") else loc(Az["half"] + 0.02, 0.07)
+        if Az.get("thorax"):
+            tx = Az["thorax"]
+            pose["thorax"] = [loc(tx[0], tx[1]), loc(tx[2], tx[3])]
+        pT = None
+        if Cw and act_a and act_a["name"] == "pinch":
+            if act_a["target"]:
+                pT = B["to_l"](act_a["target"])
+            elif Cw.get("strikeAt"):
+                pT = loc(Cw["strikeAt"][0], Cw["strikeAt"][1], Cw["strikeAt"][2])
+            else:
+                pT = loc(Cw["rest"][0] + 0.28, Cw["rest"][1] + 0.05, 0.12)
+        if pT and not act_a["side"]:
+            act_a["side"] = 1 if pT[2] - root[2] >= 0 else -1
+        pose["claws"] = []
+        aim = B["aim"]
+        for cs in range(2 if Cw else 0):
+            sg = 1 if cs == 0 else -1
+            shc = loc(Cw["at"][0], Cw["at"][1], sg * Cw["at"][2])
+            tip_t = loc(Cw["rest"][0], Cw["rest"][1] + 0.03 * idle * idle_noise(S.t, P, 3 + cs), sg * Cw["rest"][2])
+            opn = 0.4 + 0.25 * AC["alert"]
+            if aim:
+                tip_t[1] += clamp(0.3 * (aim[1] - tip_t[1]), -0.08, 0.3)
+                tip_t[2] += clamp(0.3 * (aim[2] - tip_t[2]), -0.18, 0.18)
+            mine = bool(pT) and (bool(Az.get("both")) or act_a["side"] == sg)
+            if mine:
+                tip_t = _lerp3(tip_t, [pT[0], pT[1], pT[2] + sg * 0.06] if Az.get("both") else pT, AC["ext"])
+                opn = (0.4 + 0.8 * clamp(S.jaw.x, 0, 1)) * (1 - 0.9 * AC["shut"])
+            # the hand points mostly forwards, turning towards what it reaches for
+            rd = _sub(tip_t, shc)
+            rl = _len(rd) or 1
+            hdv = [0.5 * cp + 0.5 * rd[0] / rl, 0.5 * sn + 0.5 * rd[1] / rl, 0.5 * rd[2] / rl]
+            hdv = _mul(hdv, 1 / (_len(hdv) or 1))
+            mid, wr = ik2(shc, _sub(tip_t, _mul(hdv, Cw["hand"])), Cw["upper"], Cw["lower"], [0, 1, sg * 0.8])
+            tip_c = _add(wr, _mul(hdv, Cw["hand"]))
+            inw = [0, 0, -sg]
+            inw = _sub(inw, _mul(hdv, _dot(inw, hdv)))
+            inw = _mul(inw, 1 / (_len(inw) or 1))
+            fa3 = _add(wr, _mul(hdv, 0.30 * Cw["hand"]))
+            fd3 = _add(_mul(hdv, math.cos(opn)), _mul(inw, math.sin(opn)))
+            pose["claws"].append({"shoulder": shc, "elbow": mid, "wrist": wr, "tip": tip_c, "fingerA": fa3, "fingerB": _add(fa3, _mul(fd3, 0.72 * Cw["hand"])),
+                                  "side": sg, "open": opn})
+            if mine and not act_a["done"] and act_a["t"] >= 0.41 * act_a["dur"]:
+                act_a["done"] = True
+                cw2 = B["to_w"](tip_c)
+                S.events.append({"type": "pinch", "pos": cw2, "claw": cs, "miss": _len(_sub(cw2, act_a["target"])) if act_a["target"] else 0})
+        Ts = ch.get("tail")
+        if Ts:
+            tb3, pull = loc(Ts["at"][0], Ts["at"][1]), None
+            n_t, seg_t = Ts["n"], Ts["seg"]
+            if act_a and act_a["name"] == "sting":
+                if act_a["target"]:
+                    sT = B["to_l"](act_a["target"])
+                elif Az.get("stingAt"):
+                    sT = loc(Az["stingAt"][0], Az["stingAt"][1], 0)
+                else:
+                    sT = loc(Az["half"] + 0.42, 0.02, 0)
+                if AC["sting"] > 0:
+                    # a first guess that arches over the back, then links of the right length fitted to it
+                    # (a wasp's sting curls round from below)
+                    top = min(tb3[1], sT[1]) - 0.3 * n_t * seg_t if Az.get("under") else max(tb3[1], sT[1]) + 0.42 * n_t * seg_t
+                    guess = []
+                    for gk in range(n_t + 1):
+                        gt = gk / n_t
+                        g1 = 1 - gt
+                        guess.append([g1 * g1 * tb3[0] + 2 * g1 * gt * (0.5 * tb3[0] + 0.5 * sT[0]) + gt * gt * sT[0],
+                                      g1 * g1 * tb3[1] + 2 * g1 * gt * top + gt * gt * sT[1],
+                                      g1 * g1 * tb3[2] + 2 * g1 * gt * 0.5 * (tb3[2] + sT[2]) + gt * gt * sT[2]])
+                    # it must go over the body, not through it: links above the back are kept clear of it
+                    rp = reach_chain(guess, tb3, sT, seg_t, 0.86)
+                    clear_y = root[1] + 0.40
+                    if not Az.get("under"):
+                        for rk in range(1, n_t):
+                            if rp[rk][0] < root[0] + Az["half"] + 0.12 and rp[rk][1] < clear_y:
+                                rp[rk][1] = clear_y
+                    for rk in range(1, n_t + 1):
+                        rd2 = _sub(rp[rk], rp[rk - 1])
+                        rp[rk] = _add(rp[rk - 1], _mul(rd2, seg_t / (_len(rd2) or 1)))
+                    pull = {"pts": rp, "k": AC["sting"]}
+            pose["tailPts"] = chain_step(S, "tail", Ts, ch["L"], B, tb3, B["pitch"] + lean * 0.3,
+                                         {"lift": -0.45 * AC["rear"] - 0.25 * abs(FL), "curl": -0.10 * AC["rear"],
+                                          "yaw": Ts["wag"] * idle * math.sin(2 * TAU * S.t / P) + Ts["sway"] * B["gp"]["moving"] * math.sin(TAU * S.phase) + 0.4 * S.twist.x,
+                                          "pull": pull}, dt)
+            tN, tM = pose["tailPts"][n_t], pose["tailPts"][n_t - 1]
+            sd3 = _sub(tN, tM)
+            pose["tail"] = tN
+            pose["mounts"] = [{"joint": tM, "base": tM, "tip": tN, "dir": _mul(sd3, 1 / (_len(sd3) or 1)), "flash": 0, "side": 0}]
+            if act_a and act_a["name"] == "sting" and not act_a["done"] and act_a["t"] >= 0.42 * act_a["dur"]:
+                act_a["done"] = True
+                sw3 = B["to_w"](tN)
+                S.events.append({"type": "sting", "pos": sw3, "miss": _len(_sub(sw3, act_a["target"])) if act_a["target"] else 0})
+        else:
+            pose["tail"] = pose["back"]
+            pose["mounts"] = [{"joint": root, "base": root, "tip": pose["eye"], "dir": [cp, sn, 0], "flash": 0, "side": 0}]
+    else:
+        tb = loc(0.05, 0.72)
+        Wh = aim_from(tb, 1)
+        tt = S.twist.x                                       # the turret goes all the way round
+        dh = [math.cos(Wh) * math.cos(tt), math.sin(Wh), math.cos(Wh) * math.sin(tt)]
+        bb = _add(tb, _mul(dh, S.kick[0].x))
+        pose["back"] = loc(-0.5, 0.12)
+        pose["front"] = loc(0.5, 0.12)
+        pose["dome"] = loc(-0.05, 0.36)
+        pose["eye"] = loc(1.0, 0.08)
+        pose["mounts"] = [{"joint": tb, "base": bb, "tip": _add(bb, _mul(dh, 1.45)), "dir": dh, "flash": S.flash[0], "side": 0}]
+    return pose
+
+
+def _upper(S, ch, inp, st, dt, legs, B):
+    pose = upper_body(S, ch, inp, st, dt, legs, B)
+    if ch.get("fly"):                                        # on the ground the wings are folded along the body
+        pose["wings"] = wing_pose(ch, pose["root"], pose["axis"], pose["up"], 0, 0, 1)
+    return pose
+
+
 def step(S, ch, inp, st, terrain, dt):
     """One step of a whole character on the ground: legs and hips, then the upper body.  Returns the pose in world
     coordinates (the same keys as the JavaScript reference).  Read ``S.events``, then clear it."""
-    return step_ground(S, ch, inp, st, terrain, dt, upper_body)
+    return step_ground(S, ch, inp, st, terrain, dt, _upper)

@@ -333,5 +333,5 @@ when its health runs out, and gets up again after a few seconds.
   shuffle along a ledge, no jump up to catch one (the game places the grab), and no climb down
   onto a hang. The weapons are put away for it.
 - Turning round out of a run makes the body dip for a moment.
-- The C and Python versions hold the numeric kernel, the ground step and the upright bodies (the
-  soldier and the mech, whole) so far; see the top-level README for what is ported. There are no Unity, Godot or Unreal wrappers yet.
+- The C and Python versions cover everything on the ground for every character; swimming, flight,
+  the ladder, the ledge and the ragdoll are not ported yet (see the top-level README). There are no Unity, Godot or Unreal wrappers yet.

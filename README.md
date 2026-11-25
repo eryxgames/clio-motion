@@ -49,18 +49,17 @@ the bottom, each stage checked against the reference before the next one starts.
 | 1. Numeric kernel: springs, two-bone IK, throw solver, chain fitter, gait rules | yes | yes | yes |
 | 2. Ground stepping: speed and turning, any direction, foot planning, jump and pounce, hips, leg IK | yes | yes | yes |
 | 3a. Upright bodies whole: the soldier's spine, head, arms and aim, the three kits, firing and reloading, sword and shield, throwing, the crate, stance and punches; the mech's hull and guns | yes | yes | yes |
-| 3b. Animals, arthropods and the octopus: bending spines, necks, jaws, claws, arms, tail chains, bites and stings | yes | | |
+| 3b. Animals, arthropods and the octopus: bending spines, necks, jaws, claws, arms, tail chains, folded wings; bites, pinches, stings, grabs, ink | yes | yes | yes |
 | 4. Swimming, flight, ladder, ledge, ragdoll | yes | | |
 | 5. Engine wrappers (Unity, Godot, Unreal) and the CLIo hook | | | |
 
 Stage 1 agrees with the reference to the last bit or two on 921 recorded cases, in both languages.
 Stage 2 reproduces 24 recorded runs (828 sampled poses of every character) to the ten digits they are
-recorded with. Stage 3a reproduces 20 more (864 poses of the soldier and the mech: every number
-of the pose, the count of each event, and what the events carry).
+recorded with. Stage 3 reproduces 48 whole-body runs (1,854 poses of all eleven
+characters: every number of the pose, the count of each event, and what the events carry).
 
-So in C and Python today: the soldier and the mech are whole on the ground, with weapons and
-every action (`cm_step`, `step`); every other character has its legs and hips (`cm_step_ground`,
-`step_ground`).
+So in C and Python today every character is whole on the ground, with its weapons and every
+action (`cm_step`, `step`). Swimming, flight, the ladder, the ledge and the ragdoll are stage 4.
 
 ## Use
 
@@ -109,18 +108,19 @@ reference again; the C and Python versions then have to follow.
 
 `tools/spec.js` writes the built-in characters as JSON and, for each function of the numeric
 kernel, a few dozen inputs with the outputs the reference gives, and the characters again as a C
-table. `tools/golden.js` plays 43 runs described as data in `spec/scenarios.json` (every character
+table. `tools/golden.js` plays 53 runs described as data in `spec/scenarios.json` (every character
 through its gaits on rolling ground; turns, sidesteps, drifting, blows, steps, jumps and pounces;
 the soldier aiming, fighting, carrying, climbing and knocked down; hunts, stings, a swim and two
-flights) and records the whole pose ten times a second in `spec/golden/`. The 24 runs that use
-only what the ground step reads are also written to `spec/ground/` as replays that need no JSON
-reader: the inputs step by step, and what the ground step must leave behind. Runs of the soldier
-and the mech are written to `spec/body/` the same way, with every input and the whole pose. A port
-passes a stage when it reproduces those numbers.
+flights) and records the whole pose ten times a second. The 48 runs that stay on the ground are
+written to `spec/body/` as replays that need no JSON reader: every input step by step, the whole
+pose, and the events. The 24 of them that use only what the ground step reads are also written
+to `spec/ground/`, with what the ground step alone must leave behind. The five runs that swim,
+fly, climb or fall (stage 4) are in `spec/golden/`. A port passes a stage when it reproduces
+those numbers.
 
 ## Planned
 
-- The rest of stage 3 and stage 4 in C and Python, then the engine wrappers and the CLIo hook.
+- Stage 4 in C and Python, then the engine wrappers and the CLIo hook.
 - A first-person arms view, with the FPS demo.
 - Flight that a game can use as behaviour, not only as a pose: take-off run and landing flare,
   banking turns with a turn radius that follows from speed, soaring and stooping (birds of prey),
