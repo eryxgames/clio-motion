@@ -355,6 +355,101 @@ void cm_place(cm_state *s, const cm_character *ch, cm_terrain_fn terrain, void *
 /* Start a reload by hand (asked: reload full weapons too). Returns 1 if it started. */
 int cm_start_reload(cm_state *s, const cm_character *ch, int asked);
 
+/* ------------------------------------------------------------------------------------------------ for other languages
+   A body behind a handful of calls that take and give plain numbers, for a program that loads this library at run
+   time (Python's ctypes, C#'s P/Invoke, GDExtension...). The shared library (make shared: libclio_motion.so, .dylib,
+   clio_motion.dll) exports these and nothing else.
+
+     void *b = malloc(cm_body_size());
+     cm_body_init(b, "hyena", NULL);                 0, or -1 if there is no such character
+     double in[CM_NIN] = { 0 }; in[0] = 1.4;         the inputs as numbers: see cm_input_from_numbers
+     cm_body_step(b, in, 1.0 / 60);
+     n = cm_body_joints(b, joints);                  n joints, twelve numbers each: place, then its x, y and z axes
+
+   A body must stay where it is in memory (its rider, if it has one, points at it). The ground is flat unless
+   cm_body_ground_... says otherwise. Nothing here is safe to call for one body from two threads at once. */
+#if defined(CM_STATIC)
+#  define CM_API
+#elif defined(_WIN32)
+#  if defined(CM_BUILD)
+#    define CM_API __declspec(dllexport)
+#  else
+#    define CM_API __declspec(dllimport)
+#  endif
+#elif defined(__GNUC__)
+#  define CM_API __attribute__((visibility("default")))
+#else
+#  define CM_API
+#endif
+/* Building the shared library on Linux: the maths it calls are asked for as the oldest C library has them, so that
+   one built on a new system loads on an old one too. */
+#if defined(CM_BUILD) && defined(__linux__)
+#  include <math.h>
+#  if defined(__GLIBC__) && defined(__x86_64__)
+__asm__(".symver exp,exp@GLIBC_2.2.5"); __asm__(".symver pow,pow@GLIBC_2.2.5"); __asm__(".symver fmod,fmod@GLIBC_2.2.5");
+__asm__(".symver log,log@GLIBC_2.2.5");
+#  elif defined(__GLIBC__) && defined(__aarch64__)
+__asm__(".symver exp,exp@GLIBC_2.17"); __asm__(".symver pow,pow@GLIBC_2.17"); __asm__(".symver fmod,fmod@GLIBC_2.17");
+__asm__(".symver log,log@GLIBC_2.17");
+#  endif
+#endif
+#define CM_VERSION "0.25.0"
+#define CM_NIN 82                                  /* how many numbers the inputs are */
+#define CM_NEV 22                                  /* how many kinds of event there are (CM_EV_... run from 1) */
+
+/* The inputs from CM_NIN numbers, in the order the recorded runs keep them (tools/golden.js: inputLine, inputLine3):
+   0 speed  1 crouch  2 steer  3 a heading is given  4 heading  5 dir  6 jump  7 a blow  8-10 its push  11 a drift
+   12-13 its velocity  14 pounce  15 at a target  16-18 the target
+   19 aim: how many numbers (0 none, 2, 3)  20-22 the point  23 fire  24 armed  25 kit (0 as it is, 1 rifle, 2 pistols,
+   3 sword)  26 reload  27 throw (1, 2 at a target)  28-30  31 pickup  32 at a place  33-35  36 with a heading  37
+   38 with a size  39-41  42 putdown  43 guard  44 block  45 punch (1 jab, 2 cross, 3 hook)  46 at a target  47-49
+   50 track  51-53  54 swing (1 slash, 2 chop, 3 thrust)  55 bite (1, 2 at a target)  56-58  59 pinch  60-62
+   63 sting  64-66  67 grab  68-70  71 ink  72 a depth is given  73 depth  74 a height is given  75 height  76 climb
+   77 drop  78 die (1 from straight ahead, 2 with a push)  79-81 the push */
+CM_API void cm_input_from_numbers(const double *v, cm_input *in);
+
+CM_API const char *cm_version(void);
+CM_API int cm_body_size(void);
+/* style: seven numbers (bounce stride arm lean step snap still), or NULL for the plain one. */
+CM_API int cm_body_init(void *body, const char *character, const double *style);
+/* The ground: flat; a sum of n waves (height kx kz phase each: height * sin(kx x + kz z + phase)) with, if has_wall,
+   wall_h more beyond x = wall_x; or a grid of heights, nx by nz, cell apart, from (x0, z0), row after row along x -
+   between its points the height is blended, beyond its edge it is the edge's. The grid is not copied: it has to stay.
+   After changing the ground, cm_body_reset starts the body again on it, standing at the origin. */
+CM_API void cm_body_ground_flat(void *body);
+CM_API int cm_body_ground_waves(void *body, int n, const double *waves, int has_wall, double wall_x, double wall_h);
+CM_API int cm_body_ground_grid(void *body, double x0, double z0, double cell, int nx, int nz, const double *heights);
+CM_API void cm_body_reset(void *body);
+CM_API void cm_body_place(void *body, double x, double z, double heading);
+/* One step. in: CM_NIN numbers, or NULL for the same inputs as the last step. Returns 0, or -1 if the step failed. */
+CM_API int cm_body_step(void *body, const double *in, double dt);
+/* A call that changes what the body is doing, by the numbers the recorded runs use: 1 dive in (swim), 2 out of the
+   water, 3 take off, 4 land, 5 take hold of a ladder (args: x y0 spacing amp freq phase), 6 let go of it, 7 grab a
+   ledge (args: x y z), 8 place (args: x z heading), 9 stand up, 11 dismount. Returns what the call returns (1 done). */
+CM_API int cm_body_call(void *body, int call, const double *args);
+/* Riding: the rider on the mount (0 if it cannot be ridden). Each step, step the mount first, then the rider. */
+CM_API int cm_body_mount(void *rider, void *mount);
+/* out: where it is (x, z), its heading, its speed, its root's height, the mode it is in (0 ground, 1 ladder,
+   2 ragdoll, 3 swim, 4 fly, 5 ledge, 6 ride), whether it lies still (a ragdoll at rest), its kit (0 none). */
+CM_API void cm_body_state(const void *body, double out[8]);
+/* How many of each kind of event since the last call: out[CM_EV_FIRE - 1] and so on, CM_NEV numbers. */
+CM_API void cm_body_events(void *body, int *out);
+/* The skeleton of the pose as it is now. The rig's name ("soldier_pistols"); its joints, twelve numbers each (place,
+   x, y, z axes; the pose's axes: x forward, y up, z right); each joint's move from the template pose, sixteen numbers
+   (glTF's axes, column after column). Each returns the number of joints, or -1 if the pose fits no rig. */
+CM_API const char *cm_body_rig(void *body);
+CM_API int cm_body_joints(void *body, double *out);
+CM_API int cm_body_moves(void *body, double *out);
+/* Points carried by joints (a stand-in model's corners): n points, each with its joint and its place in that
+   joint's frame; out: three numbers each, in the pose's axes - or, with frame (twelve numbers: three rows of a 3 x 3
+   matrix, then an offset), as frame's matrix times the point plus the offset. Returns n, or -1. */
+CM_API int cm_body_points(void *body, int n, const int *joint, const double *local, const double *frame, double *out);
+/* A skin: n corners at rest in the template pose (glTF's axes, metres); corner k is carried by count[k] joints,
+   listed one after another in joint and weight. out as for cm_body_points, from glTF's axes. Returns n, or -1. */
+CM_API int cm_body_skin(void *body, int n, const double *rest, const int *count, const int *joint, const double *weight,
+                        const double *frame, double *out);
+
+
 #ifdef __cplusplus
 }
 #endif

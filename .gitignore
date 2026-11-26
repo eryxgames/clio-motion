@@ -13,3 +13,5 @@ dist/
 .DS_Store
 c/examples/live2d_svg
 *_live.svg
+c/test_api
+c/build/

@@ -119,6 +119,34 @@ percent); the reference stretches those, a rigid part cannot. And a foot drawn a
 the reference aims it from the heel at the toe tip, so it tilts by up to 8 degrees as the toes
 bend at push-off; carried by the foot joint it stays straight.
 
+## For other languages: the shared library
+
+    make shared          # build/libclio_motion.so (.dylib on a Mac); on Windows: build.bat, from a Developer Command Prompt
+
+The shared library exports one small interface and nothing else: a body behind calls that take
+and give plain numbers, for a program that loads the library at run time - Python's ctypes, C#'s
+P/Invoke, an engine's extension. `clio_motion.h` lists it under "for other languages".
+
+    void *b = malloc(cm_body_size());
+    double in[CM_NIN] = { 0 }, joints[12 * CM_MAX_JOINTS];
+    cm_body_init(b, "hyena", NULL);                 /* a character by name; a style, or NULL */
+    in[0] = 1.4; in[3] = 1; in[4] = 0.5;            /* speed; a heading is given; the heading */
+    cm_body_step(b, in, 1.0 / 60);                  /* in: the inputs as 82 numbers; NULL: the same as last step */
+    n = cm_body_joints(b, joints);                  /* twelve numbers a joint: place, x, y, z axes */
+
+Besides: the ground (flat, a sum of waves, or a grid of heights), `cm_body_place`, the calls that
+change mode (dive in, take off, a ladder, a ledge, stand up), riding (`cm_body_mount`), where the
+body is and what it is doing (`cm_body_state`), its events as counts (`cm_body_events`), each
+joint's move from the template pose (`cm_body_moves`), a stand-in model's corners
+(`cm_body_points`) and a skinned model's (`cm_body_skin`), both through a frame of your own
+axes if wanted. The 82 numbers are listed at `cm_input_from_numbers`: they are the order the
+recorded runs keep the inputs in.
+
+`test_api.c` (part of `make test`) uses every call on every character. `python/tests/test_native.py`
+plays all 88 recorded runs through the library from Python and gets the reference's skeletons,
+events and modes. On Linux the library asks for the maths functions as the oldest C library
+has them, so one built on a new system loads on an old one.
+
 ## Size and speed
 
 No allocation: the state is one struct of about 24 KB (it keeps the last pose and the ragdoll), the

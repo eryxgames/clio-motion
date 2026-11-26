@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.25.0
+
+The C core under other languages: a shared library, and Python loading it.
+
+- C: a flat interface for programs that load the library at run time (`cm_body_...` in
+  `clio_motion.h`): a body behind calls on plain numbers - its ground (flat, waves, a grid of
+  heights), steps with the inputs as 82 numbers, the calls that change mode, riding, state,
+  events, joints, moves, a model's corners and a skin's. `make shared` builds
+  `libclio_motion.so` / `.dylib`, `build.bat` `clio_motion.dll`; it exports that interface only.
+  On Linux it asks for the oldest maths functions, so it loads on old systems.
+- Python: `clio_motion.native` finds the library, checks it against the Python on a short walk,
+  and runs bodies in it (`Body`, `bind`, `Skin`, `encode`): 30 to 40 times as fast.
+- Checked: `c/test_api.c` uses every call on every character; `python/tests/test_native.py`
+  plays the 88 recorded runs through the library from Python and gets the reference's 1,192
+  skeletons, its events and modes, and compares corners, a skin and a grid ground with the
+  Python's.
+- `.github/workflows/release.yml`: builds the library for Linux, macOS, Windows and Android,
+  runs that test where it can, keeps the builds as artifacts of every push, and makes a release
+  for a tag `vX.Y.Z`. Written after CLIo Picture's; not yet run.
+- Fixed: `make CFLAGS=...` dropped `-ffp-contract=off`.
+
 ## 0.24.0
 
 For CLIo's second step with the library: bodies in lines.

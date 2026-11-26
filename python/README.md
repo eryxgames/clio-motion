@@ -137,6 +137,29 @@ SKELETON` and is moved by `rig.joint_move`; a level drawn in lines shows the bod
 them). See "3D models" in CLIo's authoring guide. `python tools/clio/carry.py PATH/TO/CLIo` puts this version
 there; `--check` says whether CLIo's copy is this one.
 
+## The C core under Python
+
+`clio_motion.native` loads the C library, when there is one, and runs bodies in it: thirty to
+forty times as fast as the Python, the same to nine digits.
+
+    from clio_motion import native
+    if native.load():                               # None: no library, or one that does not agree with the Python
+        b = native.Body("hyena")
+        b.step(1 / 60, {"speed": 1.4, "heading": 0.5})    # the same inputs as cm.step; b.step(1 / 60): the same again
+        b.x, b.z, b.heading, b.speed, b.mode, b.events()
+        b.joints(), b.moves()                       # 12 and 16 numbers a joint
+        m = native.bind(cm.mesh.build(rig))         # once; b.points(m): the model's corners, an array('d')
+
+    python -m clio_motion.native                    # what is in use, and how fast
+
+The library is built from `c/` (`make shared`; `build.bat` on Windows) and looked for in
+`CLIO_MOTION_LIB` (`none` for none), then in `lib/` beside the package or one folder up, then
+in the folders listed in `native.DIRS`, then where the system keeps libraries. When it is loaded
+it walks three characters beside the Python and is not used if they differ (`native.status()`
+says why). C and Python agree to about nine digits, not to the last one: over a long time two
+bodies given the same inputs can come to step differently, so a game that must play back the
+same should stay with one of them.
+
 ## Speed, and the check
 
 Speed on one core, whole steps a second: about 5,000 for the soldier, 7,000 for the hyena and
@@ -151,3 +174,4 @@ Check it against the JavaScript reference:
     python python/tests/test_body.py      # also the skeletons, against spec/skeleton/
     python python/tests/test_clips.py     # every clip, against spec/clips.txt (half a minute)
     python python/tests/test_mesh.py      # the model in triangles
+    python python/tests/test_native.py    # the C library, if it is there: every recorded run through it
