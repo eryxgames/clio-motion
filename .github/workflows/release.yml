@@ -4,6 +4,8 @@
 # v0.25.0 - makes a GitHub release: clio-motion-VERSION-PLATFORM.zip for each machine and checksums.txt.
 #
 # A tag must match CM_VERSION in c/clio_motion.h and have a "## VERSION" section in CHANGELOG.md.
+# To release: git tag v0.25.0 && git push origin v0.25.0 - the release is made here, with its files. One made by
+# hand on GitHub first (which also makes the tag) is kept as it was written and given the files.
 # Every push to main keeps the builds as artifacts of its run, so a library can be had without a release.
 name: Build and release
 
@@ -138,5 +140,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/clio-motion-*.zip dist/checksums.txt \
-            --title "CLIo Motion $VERSION" --notes-file notes.md
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME is there already: adding its files"
+            gh release upload "$GITHUB_REF_NAME" dist/clio-motion-*.zip dist/checksums.txt --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/clio-motion-*.zip dist/checksums.txt \
+              --title "CLIo Motion $VERSION" --notes-file notes.md
+          fi

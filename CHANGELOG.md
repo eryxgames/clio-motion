@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- The release workflow has run now: 0.25.0's library built for all eight machines (Linux x64 and
+  arm64, macOS universal, Windows x64 and arm64, three Android ABIs) and passed
+  `python/tests/test_native.py` on those that can run it there.
+- Its release job adds the zips and `checksums.txt` to a release that is already there instead of
+  failing (a release made by hand on GitHub, which also makes the tag, was left without files).
+  To release, push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
 ## 0.25.0
 
 The C core under other languages: a shared library, and Python loading it.
