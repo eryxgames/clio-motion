@@ -29,7 +29,7 @@ these: see the end.
 Inputs (all optional). Legs: `speed` (m/s), `crouch` (0..1), `steer` (-1..1) or `heading`
 (radians), `dir` (the way to go, measured from the facing), `jump`, `hit: {"impulse": [x, y, z]}`,
 `move: [vx, vz]` (drift while standing), `pounce` (animals). Soldier: `aim: [x, y, z]`, `fire`,
-`armed`, `kit` ("rifle", "pistols", "sword", "chaingun", "chainguns" for a soldier, a gunner and
+`armed`, `kit` ("rifle", "pistols", "sword", "chaingun", "chainguns", "shotgun", "rpg", "flamer" for a soldier, a gunner and
 a commando - any of them carries any; "hands", "case", "trolley" for a person,
 a woman, a technician, a scientist and one in a hazmat suit, who have it in the hand whatever `armed` says), `reload`, `throw: {"target": [x, y, z]}`,
 `pickup: {"at": [x, y, z], "heading": a, "size": {"d": .., "h": .., "w": ..}}`, `putdown`,

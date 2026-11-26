@@ -17,7 +17,7 @@ const ahead = S => [S.px + 20 * Math.cos(S.h), 1.2, S.pz + 20 * Math.sin(S.h)];
 for (const id of GUNNERS) { const c = M.CHARACTERS[id], so = M.CHARACTERS.soldier;
   ok(c.kind === 'biped' && c.L === so.L && c.legs === so.legs && c.mount.kit === 'chaingun' && !c.mount.civil, id + ' is the soldier\'s body with a chaingun'); }
 // any body that bears arms carries any weapon; people who are not soldiers carry their own things, and only those
-const ARMS = ['rifle', 'pistols', 'sword', 'chaingun', 'chainguns'], CIVIL = ['hands', 'case', 'trolley'];
+const ARMS = ['rifle', 'pistols', 'sword', 'chaingun', 'chainguns', 'shotgun', 'rpg', 'flamer'], CIVIL = ['hands', 'case', 'trolley'];
 for (const id of ['soldier', 'gunner', 'commando']) { const c = M.CHARACTERS[id];
   ok(JSON.stringify(M.kitsOf(c)) === JSON.stringify(ARMS), id + ' carries ' + M.kitsOf(c));
   for (const k of CIVIL) ok(!M.kitFits(c, k), id + ' does not carry ' + k); }

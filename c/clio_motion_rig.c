@@ -24,6 +24,7 @@ const cm_rig *cm_rig_for(const cm_character *ch, const cm_pose *pose) {
     for (i = 0; i < pose->n_props; i++) if (pose->prop[i].kind == CM_PROP_PISTOL && kit != CM_KIT_SWORD) kit = CM_KIT_PISTOLS; else if (pose->prop[i].kind == CM_PROP_SWORD) kit = CM_KIT_SWORD;
       else if (pose->prop[i].kind == CM_PROP_CASE) kit = CM_KIT_CASE; else if (pose->prop[i].kind == CM_PROP_TROLLEY) kit = CM_KIT_TROLLEY;
     for (i = 0; i < pose->n_props; i++) if (pose->prop[i].kind == CM_PROP_SIDEGUN) kit = CM_KIT_CHAINGUNS; else if (pose->prop[i].kind == CM_PROP_CHAINGUN) kit = CM_KIT_CHAINGUN;
+      else if (pose->prop[i].kind == CM_PROP_SHOTGUN) kit = CM_KIT_SHOTGUN; else if (pose->prop[i].kind == CM_PROP_LAUNCHER) kit = CM_KIT_RPG; else if (pose->prop[i].kind == CM_PROP_FLAMER) kit = CM_KIT_FLAMER;
   }
   for (i = 0; i < cm_rig_count(); i++) { const cm_rig *r = cm_rig_at(i); if (!strcmp(r->id, ch->id) && r->kit == kit) return r; }
   return 0;
@@ -74,7 +75,7 @@ static void declare(const cm_character *c, const cm_pose *p, const cm_rig *rig, 
         double sv[3];
         cross3(w->dir, w->up, sv);
         add(D, w->o, w->muzzle, sv);
-        if (w->kind == CM_PROP_RIFLE || w->kind == CM_PROP_PISTOL || w->kind == CM_PROP_CHAINGUN || w->kind == CM_PROP_SIDEGUN) add(D, w->mag_a, w->mag_b, sv);
+        if (w->kind != CM_PROP_SWORD && w->kind != CM_PROP_SHIELD && w->kind != CM_PROP_CASE && w->kind != CM_PROP_TROLLEY) add(D, w->mag_a, w->mag_b, sv);      /* a firearm's magazine */
       }
       if (!p->climbing && !p->down) copy3(gp, p->grenade);
       else set3(gp, root[0] + (u[0] * 0.09 + f[0] * 0.07) + rt[0] * 0.185, root[1] + (u[1] * 0.09 + f[1] * 0.07) + rt[1] * 0.185, root[2] + (u[2] * 0.09 + f[2] * 0.07) + rt[2] * 0.185);

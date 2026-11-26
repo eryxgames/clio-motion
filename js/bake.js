@@ -76,7 +76,7 @@
         else if (ch.arthro) { inp.sting = {}; step(DT); inp.sting = null; }  // a wasp's is its sting
         else if (ch.octo) { inp.grab = {}; step(DT); inp.grab = null; }      // an octopus's is an arm shot out to grab
         else if (S.kit === 'sword') { inp.swing = { kind: 'slash' }; step(DT); inp.swing = null; }
-        else if (M.KITS[S.kit] && M.KITS[S.kit].spin) inp.fire = true;         // a chaingun: the trigger is held while the barrels come up, and through the burst
+        else if (M.KITS[S.kit] && (M.KITS[S.kit].spin || M.KITS[S.kit].stream)) inp.fire = true;         // a chaingun: the trigger is held while the barrels come up, and through the burst; a launcher is steadied first; a flamethrower streams
         else { inp.fire = true; step(DT); inp.fire = false; }
         dur = S.kit === 'sword' ? 0.75 : inp.fire ? 1.0 : 0.5; frames = timed(dur, o.fps || 12); loop = false; inp.fire = false;
       } else if (name === 'chop' || name === 'thrust' || name === 'block') {
@@ -741,6 +741,7 @@
       if (ch.mount.type !== 'held' || !pose.props) return null;
       var kinds = pose.props.map(function (w) { return w.kind; }), kit = kinds.indexOf('sword') >= 0 ? 'sword' : kinds.indexOf('pistol') >= 0 ? 'pistols' : 'rifle';
       if (kinds.indexOf('sidegun') >= 0) kit = 'chainguns'; else if (kinds.indexOf('chaingun') >= 0) kit = 'chaingun';
+      else if (kinds.indexOf('shotgun') >= 0) kit = 'shotgun'; else if (kinds.indexOf('launcher') >= 0) kit = 'rpg'; else if (kinds.indexOf('flamer') >= 0) kit = 'flamer';
       if (ch.mount.civil) kit = kinds.indexOf('case') >= 0 ? 'case' : kinds.indexOf('trolley') >= 0 ? 'trolley' : 'hands';      // a person who is not a soldier
       return kit === ch.mount.kit ? null : kit;
     }

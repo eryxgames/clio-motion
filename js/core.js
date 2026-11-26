@@ -675,7 +675,13 @@
     // a gunner's: a chaingun carried at the hip by its rear grip and the handle on top, its barrels from 'body' to the muzzle and its
     // ammunition in a box under it ('magA' to 'magB'); and the same gun as one of a pair, one in each hand
     chaingun: { len: 1.05, body: 0.50, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: [0.42, 0.11], magA: [0.30, -0.07], magB: [0.30, -0.24], kick: 0.32, rise: 0.5, rounds: 200, reload: 3.2, seat: 0.80 },
-    sidegun: { len: 1.05, body: 0.50, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: null, magA: [0.30, -0.07], magB: [0.30, -0.24], kick: 0.32, rise: 0.5, rounds: 150, reload: 3.2, seat: 0.80 }
+    sidegun: { len: 1.05, body: 0.50, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: null, magA: [0.30, -0.07], magB: [0.30, -0.24], kick: 0.32, rise: 0.5, rounds: 150, reload: 3.2, seat: 0.80 },
+    // a shotgun: shouldered as a rifle is, its fore-end worked back and forward after every shot; 'magA' to 'magB' is a shell at the port
+    // a launcher: a tube on the right shoulder; 'magA' to 'magB' is the rocket in its mouth (inside the tube when there is none: 'back')
+    // a flamethrower: a lance at the hip, fed from the tanks on the back; 'magA' to 'magB' is the canister under it
+    shotgun: { len: 0.95, body: 0.50, grip: [0.26, -0.06], gripLow: [0.245, -0.115], fore: [0.58, -0.045], magA: [0.42, -0.035], magB: [0.42, -0.08], kick: 3.4, rise: 10, rounds: 8, reload: 2.2, seat: 0.80, pump: 0.10 },
+    launcher: { len: 0.95, body: 0.30, grip: [0.50, -0.07], gripLow: [0.49, -0.16], fore: [0.68, -0.06], magA: [0.92, 0], magB: [1.14, 0], kick: 2.2, rise: 3, rounds: 1, reload: 2.8, seat: 0.78, back: 0.62 },
+    flamer: { len: 0.90, body: 0.42, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: [0.40, -0.06], magA: [0.22, -0.06], magB: [0.22, -0.20], kick: 0.04, rise: 0, rounds: 120, reload: 3.0, seat: 0.80 }
   };
   // civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
   // pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
@@ -684,7 +690,11 @@
   var KITS = { rifle: { props: ['rifle'], rate: 9 }, pistols: { props: ['pistol', 'pistol'], rate: 7 }, sword: { props: ['sword', 'shield'], rate: 0, melee: true },
     hands: { props: [], rate: 0, melee: true, civil: true }, 'case': { props: ['case'], rate: 0, melee: true, civil: true },
     trolley: { props: ['trolley'], rate: 0, melee: true, civil: true, pace: 1.0 },
-    chaingun: { props: ['chaingun'], rate: 22, spin: 0.35, pace: 0.85, bodyKick: 0.10 }, chainguns: { props: ['sidegun', 'sidegun'], rate: 30, spin: 0.35, pace: 0.70, bodyKick: 0.10 } };
+    chaingun: { props: ['chaingun'], rate: 22, spin: 0.35, pace: 0.85, bodyKick: 0.10 }, chainguns: { props: ['sidegun', 'sidegun'], rate: 30, spin: 0.35, pace: 0.70, bodyKick: 0.10 },
+    // a shotgun kicks hard and is pumped between shots; a launcher is steadied for a moment before it fires (its 'spin') and is loaded
+    // again as soon as it has (auto); a flamethrower is a stream of puffs for as long as the trigger is held, and is walked with
+    shotgun: { props: ['shotgun'], rate: 1.4, bodyKick: 0.9 }, rpg: { props: ['launcher'], rate: 0.5, spin: 0.45, pace: 0.85, bodyKick: 1.3, auto: true },
+    flamer: { props: ['flamer'], rate: 14, pace: 0.80, bodyKick: 0.02, stream: true } };
   // Any body that bears arms carries any weapon; people who are not soldiers carry their own things, and only those.
   function kitFits(ch, name) { return ch.mount.type === 'held' && !!KITS[name] && !KITS[name].civil === !ch.mount.civil; }
   // the kits a character can carry; none for one that holds nothing in its hands
@@ -703,7 +713,7 @@
   }
   function stowPlace(kind, k, root, u, f, zc) {
     var down = Math.atan2(-u[1], -u[0]);
-    if (kind === 'rifle') return { o: [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], th: down, z: zc - 0.02 };       // muzzle down across the back
+    if (kind === 'rifle' || kind === 'shotgun' || kind === 'launcher' || kind === 'flamer') return { o: [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], th: down, z: zc - 0.02 };       // muzzle down across the back
     if (kind === 'chaingun') return { o: [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], th: down, z: zc - 0.02 };    // the same, and more of it
     if (kind === 'sidegun') return { o: [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], th: down, z: zc + (k === 0 ? 0.11 : -0.11) };
     if (kind === 'sword') return { o: [root[0] + 0.10 * u[0] + 0.06 * f[0], root[1] + 0.10 * u[1] + 0.06 * f[1]], th: down - 0.45, z: root[2] - 0.17 };     // in a scabbard on the left hip, point down and back
@@ -713,13 +723,15 @@
     return { o: [root[0] + 0.05 * u[0] + 0.03 * f[0], root[1] + 0.05 * u[1] + 0.03 * f[1]], th: down + 0.2, z: root[2] + (k === 0 ? 0.15 : -0.15) };  // hip holsters
   }
   function readyPlace(kind, k, chest, u, f, W, kick) {            // kick: how far recoil has driven the prop back (negative)
-    if (kind === 'rifle') {
+    if (kind === 'rifle' || kind === 'shotgun') {
       var a = kick - 0.15;                                         // the butt sits in the shoulder pocket
       return { o: [chest[0] - 0.11 * u[0] + 0.10 * f[0] + Math.cos(W) * a, chest[1] - 0.11 * u[1] + 0.10 * f[1] + Math.sin(W) * a], th: W, z: chest[2] + 0.04 };
     }
     // a chaingun is fired from the hip: it turns about a point in front of the right hip, and recoil drives it straight back.
     // One of a pair is out at its own side
-    if (kind === 'chaingun') return { o: [chest[0] - 0.36 * u[0] + 0.10 * f[0] + Math.cos(W) * (kick - 0.30), chest[1] - 0.36 * u[1] + 0.10 * f[1] + Math.sin(W) * (kick - 0.30)], th: W, z: chest[2] + 0.13 };
+    if (kind === 'chaingun' || kind === 'flamer') return { o: [chest[0] - 0.36 * u[0] + 0.10 * f[0] + Math.cos(W) * (kick - 0.30), chest[1] - 0.36 * u[1] + 0.10 * f[1] + Math.sin(W) * (kick - 0.30)], th: W, z: chest[2] + 0.13 };
+    // a launcher lies on the right shoulder, two fifths of it behind
+    if (kind === 'launcher') return { o: [chest[0] + 0.06 * u[0] + Math.cos(W) * (kick - 0.42), chest[1] + 0.06 * u[1] + Math.sin(W) * (kick - 0.42)], th: W, z: chest[2] + 0.16 };
     if (kind === 'sidegun') return { o: [chest[0] - 0.34 * u[0] + 0.06 * f[0] + Math.cos(W) * (kick - 0.26), chest[1] - 0.34 * u[1] + 0.06 * f[1] + Math.sin(W) * (kick - 0.26)], th: W, z: chest[2] + (k === 0 ? 0.25 : -0.25) };
     // sword: held low at the right side, point up and forward. shield: upright on the left forearm, in front of the body
     if (kind === 'sword') return { o: [chest[0] - 0.24 * u[0] + 0.20 * f[0], chest[1] - 0.24 * u[1] + 0.20 * f[1]], th: 0.95 + 0.3 * W, z: chest[2] + 0.21 };
@@ -729,6 +741,12 @@
     if (kind === 'trolley') return { o: [chest[0] - 0.04 * u[0] - 0.20 - 0.98 * Math.cos(0.85), chest[1] - 0.04 * u[1] - 0.50 - 0.98 * Math.sin(0.85)], th: 0.85, z: chest[2] + 0.22 };
     var r = 0.50 + kick;                                           // arm's length; recoil also flips the muzzle up
     return { o: [chest[0] + 0.03 * u[0] + Math.cos(W) * r, chest[1] + 0.03 * u[1] + Math.sin(W) * r], th: W - 8 * kick, z: chest[2] + (k === 0 ? 0.08 : -0.08) };
+  }
+  // an empty launcher has no rocket in its mouth: the one it is drawn with is drawn back inside the tube, out of sight
+  function unload(w) {
+    var bk = PROPS[w.kind].back, k;
+    if (!bk) return;
+    for (k = 0; k < 3; k++) { w.magA[k] -= w.dir[k] * bk; w.magB[k] -= w.dir[k] * bk; }
   }
   function beltPlace(k, root, u, f) {                               // a pistol brought down to the magazine holder on the belt
     return { o: [root[0] + 0.20 * u[0] + 0.16 * f[0], root[1] + 0.20 * u[1] + 0.16 * f[1]], th: 0.1, z: root[2] + (k === 0 ? 0.12 : -0.12) };
@@ -768,6 +786,7 @@
     S.cool = 1 / (kit ? kit.rate : m.rate); S.flash[g] = 1; S.kick[g].v -= D.kick; S.rise.v += D.rise;
     S.lean.v -= (kit && kit.bodyKick) || m.bodyKick || 0.5;
     S.events.push({ type: 'fire', gun: g });
+    if (kit && kit.auto && S.ammo[g] === 0) startReload(S, ch);      // a launcher is loaded again as soon as it has fired
   }
 
   // ------------------------------------------- actions with the hands and body
@@ -1081,9 +1100,9 @@
       var props = [], hold = [null, null];
       if (kit) for (i = 0; i < kit.props.length; i++) {
         var kind = kit.props[i], rel = an === 'reload' && act.gun === i ? rs : -1, Wi = W, place, slide = 0;
-        if (kind === 'rifle' && rel >= 0) Wi -= 0.32 * smooth(0, 0.12, rel) * (1 - smooth(0.84, 1, rel));          // muzzle dips while the hand is away
-        if (kind === 'rifle') Wi -= 0.45 * tk;
-        if ((kind === 'chaingun' || kind === 'sidegun') && rel >= 0) Wi -= 0.5 * smooth(0, 0.15, rel) * (1 - smooth(0.8, 1, rel));          // a new belt: the muzzle goes down while it is fed in
+        if ((kind === 'rifle' || kind === 'shotgun' || kind === 'launcher') && rel >= 0) Wi -= 0.32 * smooth(0, 0.12, rel) * (1 - smooth(0.84, 1, rel));          // muzzle dips while the hand is away
+        if (kind === 'rifle' || kind === 'shotgun' || kind === 'launcher') Wi -= 0.45 * tk;
+        if ((kind === 'chaingun' || kind === 'sidegun' || kind === 'flamer') && rel >= 0) Wi -= 0.5 * smooth(0, 0.15, rel) * (1 - smooth(0.8, 1, rel));          // a new belt: the muzzle goes down while it is fed in
         place = readyPlace(kind, i, chest, u, f, Wi, S.kick[i].x);
         if (kind === 'pistol' && rel >= 0) {
           // one-handed: the pistol comes down to the belt, the magazine drops into the holder and a fresh one is pushed home
@@ -1123,14 +1142,21 @@
         var w = propAt(kind, place.o, place.th, place.z);
         w.flash = S.flash[i]; w.stow = 1 - eP[i];
         if (slide) { w.magA = [w.magA[0] - w.up[0] * slide, w.magA[1] - w.up[1] * slide, w.magA[2]]; w.magB = [w.magB[0] - w.up[0] * slide, w.magB[1] - w.up[1] * slide, w.magB[2]]; }
+        if (!(S.ammo[i] > 0)) unload(w);
         props.push(w);
       }
       // hands: the right hand holds prop 0; the left holds prop 1, or the foregrip of a two-handed prop
       if (props.length) { hold[0] = props[0].grip; hold[1] = props.length > 1 ? props[1].grip : props[0].fore; }
-      if (an === 'reload' && act.gun === 0 && props.length && props[0].kind === 'rifle') {
+      // a shotgun's fore-end is worked back and forward between shots
+      if (props.length && props[0].kind === 'shotgun' && hold[1] && S.cool > 0 && an !== 'reload') {
+        var pm = PROPS.shotgun.pump * Math.sin(Math.PI * smooth(0.12, 0.70, 1 - S.cool * kit.rate));
+        hold[1] = [hold[1][0] - props[0].dir[0] * pm, hold[1][1] - props[0].dir[1] * pm, hold[1][2] - props[0].dir[2] * pm];
+      }
+      if (an === 'reload' && act.gun === 0 && props.length && (props[0].kind === 'rifle' || props[0].kind === 'shotgun' || props[0].kind === 'launcher')) {
         // reloading the rifle: the off hand leaves the foregrip, takes the magazine to the pouch on the hip, comes back
         // with a fresh one, seats it and returns. Every waypoint is a live point, so it works on the move.
         var w0 = props[0], nn = w0.up, seat = w0.magB, mlen = 0.115, kq = 0, magHeld = true, hp;
+        if (PROPS[w0.kind].back && !(S.ammo[0] > 0)) seat = [seat[0] + w0.dir[0] * PROPS[w0.kind].back, seat[1] + w0.dir[1] * PROPS[w0.kind].back, seat[2] + w0.dir[2] * PROPS[w0.kind].back];      // an empty launcher is loaded at its mouth
         var pouch = [root[0] + 0.10 * u[0] + 0.12 * f[0], root[1] + 0.10 * u[1] + 0.12 * f[1], root[2] - 0.16];
         var below = [seat[0] - 0.07 * nn[0], seat[1] - 0.07 * nn[1], seat[2]];
         if (rs < 0.16) { hp = lerp3(w0.fore, seat, smooth(0, 0.16, rs)); magHeld = false; }
@@ -1139,6 +1165,7 @@
         else if (rs < 0.74) { kq = 1 - smooth(0.50, 0.74, rs); hp = lerp3(below, pouch, kq); }
         else if (rs < 0.80) hp = lerp3(below, seat, smooth(0.74, 0.80, rs));
         else { hp = lerp3(seat, w0.fore, smooth(0.80, 1, rs)); magHeld = false; }
+        if (w0.kind === 'launcher' && rs < 0.40) magHeld = false;      // there is nothing in its mouth to take out: the hand goes for the next rocket empty
         hold[1] = hp;
         if (magHeld) {
           var mx = lerp(nn[0], u[0], kq), my = lerp(nn[1], u[1], kq), ml = Math.sqrt(mx * mx + my * my) || 1;
@@ -1786,7 +1813,7 @@
     var kit = heldKit(S, ch), props = [];
     if (kit) for (i = 0; i < kit.props.length; i++) {
       var pl = mixPlace(stowPlace(kit.props[i], i, root, u, f, chest[2]), readyPlace(kit.props[i], i, chest, u, f, 0, 0), S.armed.x);
-      var w = propAt(kit.props[i], pl.o, pl.th, pl.z); w.stow = 1 - S.armed.x; props.push(w);
+      var w = propAt(kit.props[i], pl.o, pl.th, pl.z); w.stow = 1 - S.armed.x; if (!(S.ammo[i] > 0)) unload(w); props.push(w);
     }
     S.local = {
       kind: 'biped', heading: S.h, root: root, pitch: 0, lean: lean, legs: legs, crouch: 0, pack: 0, chest: chest, head: head,
@@ -1861,7 +1888,7 @@
     var kit = heldKit(S, ch), props = [];
     if (kit) for (i = 0; i < kit.props.length; i++) {
       var pl = mixPlace(stowPlace(kit.props[i], i, root, u, f, 0), readyPlace(kit.props[i], i, chest, u, f, 0, 0), S.armed.x);
-      var w = propAt(kit.props[i], pl.o, pl.th, pl.z); w.stow = 1 - S.armed.x; props.push(w);
+      var w = propAt(kit.props[i], pl.o, pl.th, pl.z); w.stow = 1 - S.armed.x; if (!(S.ammo[i] > 0)) unload(w); props.push(w);
     }
     S.x = root[0]; S.y = root[1]; S.lastY = S.y;
     var wr = l2w(S.ladFrame, [root[0], 0, 0]); S.px = wr[0]; S.pz = wr[2];

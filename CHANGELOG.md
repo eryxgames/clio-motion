@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.29.0
+
+Troopers: a shotgun, a rocket launcher, a flamethrower - each with moves of its own.
+
+- `shotgun` (prop `shotgun`): shouldered as a rifle is; a shot every 0.7 s, and between shots the
+  left hand works the fore-end a tenth of a metre back and forward again; eight shells, then it
+  is loaded as a rifle is. It kicks twice as hard as a rifle.
+- `rpg` (prop `launcher`): a tube on the right shoulder with a rocket in its mouth. The trigger
+  held, it is steadied for 0.45 s (its `spin`) and fires; it is loaded again at once (`auto`):
+  the left hand goes down to the hip empty and comes up with the next rocket to the tube's
+  mouth, 2.8 s in all. Fired and not yet loaded, there is no rocket in it (the rocket is the
+  prop's "magazine", drawn back inside the tube: `back`). Carried at a jog at most.
+- `flamer` (prop `flamer`): a lance at the hip, both hands on it, and two tanks on the back in
+  place of the pack (the rig's). A stream of 13 puffs a second - `fire` events - for as long as
+  the trigger is held (`stream`); 120 of them to a canister; walked with.
+- Any of the three bodies that bear arms carries any of the eight weapons. 50 rigs now.
+- Clips: `attack` holds the trigger for a second for the launcher and the flamethrower.
+- C: `CM_KIT_SHOTGUN`, `CM_KIT_RPG`, `CM_KIT_FLAMER`, `CM_PROP_SHOTGUN`, `CM_PROP_LAUNCHER`,
+  `CM_PROP_FLAMER`; the flat interface takes the kits as 9, 10 and 11.
+- Gait Bench: the three weapons under "In the hands".
+- Checked: 7 more recorded runs (115; 4,974 poses; 1,658 skeletons; 697 clips), which C and
+  Python reproduce; everything recorded before is unchanged. `js/test/trooper_test.js`.
+
 ## 0.28.0
 
 Gunners, and weapons that change hands.

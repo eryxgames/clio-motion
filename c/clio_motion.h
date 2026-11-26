@@ -64,8 +64,8 @@ enum { CM_EV_HIT = 1, CM_EV_JUMP, CM_EV_LAND, CM_EV_FIRE, CM_EV_RELOAD, CM_EV_LO
 enum { CM_MODE_GROUND, CM_MODE_LADDER, CM_MODE_RAGDOLL, CM_MODE_SWIM, CM_MODE_FLY, CM_MODE_LEDGE, CM_MODE_RIDE };
 enum { CM_MOUNT_HELD, CM_MOUNT_FIXED, CM_MOUNT_TURRET, CM_MOUNT_JAW };
 /* the last three kits are for people who are not soldiers (and only for them): nothing in the hands, a case, a case on wheels */
-enum { CM_KIT_NONE, CM_KIT_RIFLE, CM_KIT_PISTOLS, CM_KIT_SWORD, CM_KIT_HANDS, CM_KIT_CASE, CM_KIT_TROLLEY, CM_KIT_CHAINGUN, CM_KIT_CHAINGUNS };      /* any body that bears arms carries any weapon */
-enum { CM_PROP_RIFLE, CM_PROP_PISTOL, CM_PROP_SWORD, CM_PROP_SHIELD, CM_PROP_CASE, CM_PROP_TROLLEY, CM_PROP_CHAINGUN, CM_PROP_SIDEGUN };
+enum { CM_KIT_NONE, CM_KIT_RIFLE, CM_KIT_PISTOLS, CM_KIT_SWORD, CM_KIT_HANDS, CM_KIT_CASE, CM_KIT_TROLLEY, CM_KIT_CHAINGUN, CM_KIT_CHAINGUNS, CM_KIT_SHOTGUN, CM_KIT_RPG, CM_KIT_FLAMER };      /* any body that bears arms carries any weapon */
+enum { CM_PROP_RIFLE, CM_PROP_PISTOL, CM_PROP_SWORD, CM_PROP_SHIELD, CM_PROP_CASE, CM_PROP_TROLLEY, CM_PROP_CHAINGUN, CM_PROP_SIDEGUN, CM_PROP_SHOTGUN, CM_PROP_LAUNCHER, CM_PROP_FLAMER };
 enum { CM_ACT_NONE, CM_ACT_RELOAD, CM_ACT_THROW, CM_ACT_PICKUP, CM_ACT_PUTDOWN, CM_ACT_PUNCH, CM_ACT_SWING, CM_ACT_BITE, CM_ACT_PINCH, CM_ACT_STING, CM_ACT_GRAB };
 enum { CM_BODY_BIPED, CM_BODY_MECH, CM_BODY_BEAST, CM_BODY_QUAD, CM_BODY_OCTO, CM_BODY_ARTHRO, CM_BODY_SPIDER };
 enum { CM_PUNCH_JAB = 1, CM_PUNCH_CROSS, CM_PUNCH_HOOK };
@@ -394,7 +394,7 @@ __asm__(".symver exp,exp@GLIBC_2.17"); __asm__(".symver pow,pow@GLIBC_2.17"); __
 __asm__(".symver log,log@GLIBC_2.17");
 #  endif
 #endif
-#define CM_VERSION "0.28.0"
+#define CM_VERSION "0.29.0"
 #define CM_NIN 82                                  /* how many numbers the inputs are */
 #define CM_NEV 22                                  /* how many kinds of event there are (CM_EV_... run from 1) */
 

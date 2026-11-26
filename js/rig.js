@@ -244,7 +244,9 @@
       G('torso', 0, 2);
       var pkA = upY(add(p.chest, add(mul(f, -0.21), mul(u, -0.04))), p.pack), pkB = upY(add(mid, mul(f, -0.20)), p.pack);
       J('Hips', null, p.root, p.chest); J('Pack', 'Hips', pkA, pkB);
-      if (!D) cap(pkA, pkB, H ? H.pack : 0.10, C.pack, { part: 'pack' });
+      var tanks = !D && (p.props || []).some(function (w) { return w.kind === 'flamer'; });      // a flamethrower's two tanks are on the back in place of the pack
+      if (tanks) { cap(aside(pkA, 0.075), aside(pkB, 0.075), 0.068, C.metal, { part: 'pack' }); cap(aside(pkA, -0.075), aside(pkB, -0.075), 0.068, C.metal, { of: 'pack' }); }
+      else if (!D) cap(pkA, pkB, H ? H.pack : 0.10, C.pack, { part: 'pack' });
       else {
         if (W('tank', 'on')) cap(add(pkA, mul(f, 0.03)), add(pkB, mul(f, 0.03)), 0.07, P('pack'), { part: 'pack' });
         if (W('pack', 'on')) cap(add(pkA, mul(u, -0.03)), add(pkB, mul(u, 0.02)), 0.092, P('pack'), { part: 'pack' });
@@ -395,6 +397,29 @@
           cap(add(hb, mul(w.dir, -0.16)), add(hb, mul(w.dir, 0.0)), 0.015, C.dark, { of: 'weapon' });
           cap(add(w.body, mul(w.dir, -0.16)), add(hb, mul(w.dir, -0.16)), 0.012, C.dark, { of: 'weapon' });
           cap(w.grip, w.gripLow, 0.025, C.dark, { of: 'weapon' });
+        } else if (w.kind === 'shotgun') {
+          // a shotgun: the body and the butt, the barrel with the tube under it, the fore-end the hand works
+          cap(w.o, w.body, 0.036, C.metal, { part: 'weapon', end: w.muzzle });
+          cap(w.body, w.muzzle, 0.020, C.metal, { of: 'weapon' });
+          cap(add(w.body, mul(w.up, -0.036)), add(add(w.muzzle, mul(w.dir, -0.10)), mul(w.up, -0.036)), 0.016, C.dark, { of: 'weapon' });
+          cap(add(w.body, add(mul(w.dir, 0.02), mul(w.up, -0.040))), add(w.body, add(mul(w.dir, 0.15), mul(w.up, -0.040))), 0.027, C.dark, { of: 'weapon' });
+          cap(w.grip, w.gripLow, 0.024, C.dark, { of: 'weapon' });
+        } else if (w.kind === 'launcher') {
+          // a launcher: the tube, flared behind, a sight on top, two grips under it
+          cap(w.o, w.muzzle, 0.058, C.pack, { part: 'weapon' });
+          cap(w.o, add(w.o, mul(w.dir, 0.07)), 0.072, C.dark, { of: 'weapon' });
+          cap(add(w.body, mul(w.up, 0.06)), add(w.body, mul(w.up, 0.12)), 0.012, C.dark, { of: 'weapon' });
+          cap(w.grip, w.gripLow, 0.022, C.dark, { of: 'weapon' });
+          cap(w.fore, add(w.fore, mul(w.up, -0.09)), 0.020, C.dark, { of: 'weapon' });
+        } else if (w.kind === 'flamer') {
+          // a flamethrower: the lance and its pipe to the nozzle, a pilot light, two grips, the hose's end behind
+          cap(w.o, w.body, 0.040, C.metal, { part: 'weapon', end: w.muzzle });
+          cap(w.body, w.muzzle, 0.016, C.dark, { of: 'weapon' });
+          ball(w.muzzle, 0.028, C.metal, { of: 'weapon' });
+          ball(add(w.muzzle, add(mul(w.dir, -0.03), mul(w.up, 0.034))), 0.013, C.glow, { of: 'weapon', raw: true });
+          cap(w.grip, w.gripLow, 0.024, C.dark, { of: 'weapon' });
+          cap(w.fore, add(w.fore, mul(w.up, -0.08)), 0.020, C.dark, { of: 'weapon' });
+          cap(w.o, add(w.o, add(mul(w.dir, -0.09), mul(w.up, -0.10))), 0.018, C.dark, { of: 'weapon' });
         } else if (pistol) {
           cap(w.o, w.muzzle, 0.024, C.metal, { part: 'weapon' });
           cap(w.grip, w.gripLow, 0.021, C.dark, { of: 'weapon' });
@@ -405,8 +430,13 @@
         }
         J(pair ? sideName('Magazine', k) : 'Magazine', nm, w.magA, w.magB, sv);
         if (chain) cap(w.magA, w.magB, 0.062, C.pack, { of: 'weapon', sq: true });                  // the box the belt comes out of
+        else if (w.kind === 'launcher') { cap(w.magA, w.magB, 0.044, C.metal, { of: 'weapon' }); ball(w.magB, 0.052, C.armor, { of: 'weapon' }); }      // the rocket, and its nose
+        else if (w.kind === 'flamer') cap(w.magA, w.magB, 0.046, C.armor, { of: 'weapon' });        // the canister
+        else if (w.kind === 'shotgun') cap(w.magA, w.magB, 0.012, C.glow, { of: 'weapon' });        // a shell at the port
         else cap(w.magA, w.magB, pistol ? 0.017 : 0.026, C.dark, { of: 'weapon' });
-        if (!stowed) flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, chain ? 0.13 : pistol ? 0.06 : 0.09);
+        if (!stowed && w.kind === 'flamer') { flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, 0.15); flash({ tip: add(w.muzzle, mul(w.dir, 0.30)), dir: w.dir, flash: w.flash }, 0.26); flash({ tip: add(w.muzzle, mul(w.dir, 0.70)), dir: w.dir, flash: w.flash }, 0.34); }
+        else if (!stowed && w.kind === 'launcher') { flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, 0.16); flash({ tip: w.o, dir: mul(w.dir, -1), flash: w.flash }, 0.24); }      // and the blast behind
+        else if (!stowed) flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, chain || w.kind === 'shotgun' ? 0.13 : pistol ? 0.06 : 0.09);
       });
       // a grenade on the belt, or in the throwing hand; and the place where a carried load sits
       var gr = p.grenade || { p: aside(add(p.root, add(mul(u, 0.09), mul(f, 0.07))), 0.185), held: false };

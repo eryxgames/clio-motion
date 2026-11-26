@@ -17,7 +17,7 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
 // the same characters as a C table, with what the ported stages read
 (function () {
   const KIND = { biped: 'CM_BIPED', mech: 'CM_MECH', quad: 'CM_QUAD', hex: 'CM_HEX' };
-  const MOUNT = { held: 'CM_MOUNT_HELD', fixed: 'CM_MOUNT_FIXED', turret: 'CM_MOUNT_TURRET', jaw: 'CM_MOUNT_JAW' }, KITC = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD', hands: 'CM_KIT_HANDS', 'case': 'CM_KIT_CASE', trolley: 'CM_KIT_TROLLEY', chaingun: 'CM_KIT_CHAINGUN', chainguns: 'CM_KIT_CHAINGUNS' };
+  const MOUNT = { held: 'CM_MOUNT_HELD', fixed: 'CM_MOUNT_FIXED', turret: 'CM_MOUNT_TURRET', jaw: 'CM_MOUNT_JAW' }, KITC = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD', hands: 'CM_KIT_HANDS', 'case': 'CM_KIT_CASE', trolley: 'CM_KIT_TROLLEY', chaingun: 'CM_KIT_CHAINGUN', chainguns: 'CM_KIT_CHAINGUNS', shotgun: 'CM_KIT_SHOTGUN', rpg: 'CM_KIT_RPG', flamer: 'CM_KIT_FLAMER' };
   const num = function (x) { const t = String(x); return /[.e]/.test(t) ? t : t + '.0'; };
   const list = function (a) { return '{ ' + a.map(num).join(', ') + ' }'; };
   const gait = function (g) { return g ? '{ ' + list(g.phases) + ', ' + list(g.duty) + ' }' : '{ { 0.0 }, { 0.0, 0.0 } }'; };
@@ -89,7 +89,7 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
     });
   });
   c.push('static const cm_rig RIGS[] = {');
-  const KITN = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD', hands: 'CM_KIT_HANDS', 'case': 'CM_KIT_CASE', trolley: 'CM_KIT_TROLLEY', chaingun: 'CM_KIT_CHAINGUN', chainguns: 'CM_KIT_CHAINGUNS' };
+  const KITN = { rifle: 'CM_KIT_RIFLE', pistols: 'CM_KIT_PISTOLS', sword: 'CM_KIT_SWORD', hands: 'CM_KIT_HANDS', 'case': 'CM_KIT_CASE', trolley: 'CM_KIT_TROLLEY', chaingun: 'CM_KIT_CHAINGUN', chainguns: 'CM_KIT_CHAINGUNS', shotgun: 'CM_KIT_SHOTGUN', rpg: 'CM_KIT_RPG', flamer: 'CM_KIT_FLAMER' };
   names.forEach(function (n) { c.push('  { "' + n[0] + '", "' + n[2].id + '", ' + (KITN[n[2].kit] || 'CM_KIT_NONE') + ', ' + num(n[2].ears) + ', ' + n[2].joints.length + ', ' + n[2].parts.length + ', J_' + n[1] + ', P_' + n[1] + ' },'); });
   c.push('};', '', 'int cm_rig_count(void) { return (int)(sizeof RIGS / sizeof RIGS[0]); }', 'const cm_rig *cm_rig_at(int i) { return i >= 0 && i < cm_rig_count() ? &RIGS[i] : 0; }',
     'const cm_rig *cm_rig_find(const char *name) {', '  int i;', '  for (i = 0; i < cm_rig_count(); i++) if (!strcmp(RIGS[i].name, name)) return &RIGS[i];', '  return 0;', '}', '');

@@ -23,8 +23,9 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Weapons as data: rifle, two pistols, sword and shield; aiming, recoil, reload, swings, block.
 - Hands: throwing, lifting and carrying a crate, a fighting stance and three punches.
 - Weapons that change hands: a rifle, two pistols, a sword and shield, a chaingun fired from the
-  hip (its barrels come up to speed before the first round) and a pair of them - any of which
-  any of the three bodies that bear arms puts away and takes up.
+  hip (its barrels come up to speed before the first round) and a pair of them, a shotgun pumped
+  between shots, a rocket launcher steadied, fired and loaded again, a flamethrower with its
+  tanks on the back - any of which any of the three bodies that bear arms puts away and takes up.
 - People for a crowd: the soldier's body in plain clothes, an overall and hard hat, a lab coat or
   a hazmat suit, with nothing in the hands, a case in one (a briefcase, a tool box), or a case on
   wheels pulled behind with its axle on the ground wherever the ground is.
@@ -82,11 +83,11 @@ the bottom, each stage checked against the reference before the next one starts.
 Stage 1 agrees with the reference to the last bit or two on 1,569 recorded cases, in both languages
 (160 of them are stage 5a's rule for placing a part's picture).
 Stage 2 reproduces 30 recorded runs (1,062 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4 reproduce 108 whole-body runs (4,518 poses of all
+recorded with. Stages 3 and 4 reproduce 115 whole-body runs (4,974 poses of all
 nineteen characters: every number of the pose, the count of each event, what the events carry, and
-the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,506:
+the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,658:
 the joints, the parts they carry, the draw order and shading, the moves). Stage 5b, in Python,
-records every clip of every character as the reference's baker does (625 clips, 8,398 poses),
+records every clip of every character as the reference's baker does (697 clips, 9,401 poses),
 and dresses people from the wardrobe as the reference does (45 looks).
 
 So the C and Python versions now do everything the reference does: every character whole on the

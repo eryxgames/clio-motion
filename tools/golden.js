@@ -78,13 +78,13 @@ function inputLine(inp) {
     h ? 1 : 0, h ? h[0] : 0, h ? h[1] : 0, h ? h[2] || 0 : 0, m ? 1 : 0, m ? m[0] || 0 : 0, m ? m[1] || 0 : 0, pc ? 1 : 0, t ? 1 : 0, t ? t[0] : 0, t ? t[1] : 0, t ? t[2] || 0 : 0].map(fmt17).join(' ');
 }
 /* Everything a whole biped or mech reads: the 19 numbers of inputLine, then
-   aim (0 none, 2 or 3 numbers given) ax ay az, fire, armed, kit (0 unsaid, 1 rifle, 2 pistols, 3 sword, 4 hands, 5 case, 6 trolley, 7 chaingun, 8 chainguns), reload,
+   aim (0 none, 2 or 3 numbers given) ax ay az, fire, armed, kit (0 unsaid, 1 rifle, 2 pistols, 3 sword, 4 hands, 5 case, 6 trolley, 7 chaingun, 8 chainguns, 9 shotgun, 10 rpg, 11 flamer), reload,
    throw (0, 1 no target, 2 target) tx ty tz, pickup, hasAt ax ay az, hasHeading heading, hasSize d h w, putdown, guard, block,
    punch (0, 1 jab, 2 cross, 3 hook), hasTarget tx ty tz, hasTrack tx ty tz, swing (0, 1 slash, 2 chop, 3 thrust),
    then bite, pinch, sting and grab, each as (0, 1 no target, 2 target) tx ty tz, and ink,
    then hasDepth depth (swimming), hasHeight height (flying), climb, drop (hanging from a ledge),
    then die (0, 1 knocked down from straight ahead, 2 with the impulse given) ix iy iz */
-const KITN = { rifle: 1, pistols: 2, sword: 3, hands: 4, 'case': 5, trolley: 6, chaingun: 7, chainguns: 8 }, PUNCHN = { jab: 1, cross: 2, hook: 3 }, SWINGN = { slash: 1, chop: 2, thrust: 3 };
+const KITN = { rifle: 1, pistols: 2, sword: 3, hands: 4, 'case': 5, trolley: 6, chaingun: 7, chainguns: 8, shotgun: 9, rpg: 10, flamer: 11 }, PUNCHN = { jab: 1, cross: 2, hook: 3 }, SWINGN = { slash: 1, chop: 2, thrust: 3 };
 const TALLY = ['fire', 'reload', 'loaded', 'throw', 'grab', 'putdown', 'punch', 'strike', 'land', 'jump', 'hit', 'drop', 'bite', 'pounce', 'pinch', 'sting', 'ink', 'grip', 'top', 'die', 'mount', 'dismount'];
 const MODES = ['ground', 'ladder', 'ragdoll', 'swim', 'fly', 'ledge', 'ride'], CALLS = ['', 'enterSwim', 'leaveSwim', 'enterFly', 'leaveFly', 'enterLadder', 'leaveLadder', 'grabLedge', 'place', 'stand', 'mountUp', 'dismount'];
 // a ladder as data: rung k is at y0 + k * spacing + amp * sin(freq * k + phase), so the rungs can be uneven

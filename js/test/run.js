@@ -8,7 +8,7 @@ const cp = require('child_process'), path = require('path');
 const root = path.join(__dirname, '..', '..');
 const tests = [['act_test.js', 28], ['fight_test.js 30 60', 4], ['fight_terrain.js', 1], ['beast_test.js', 23], ['creature_test.js', 26],
   ['octo_test.js', 16], ['fly_test.js', 20], ['sword_test.js', 5], ['omni_test.js', 36], ['ledge_test.js', 9], ['ride_test.js', 9], ['beast_test.js horse', 23],
-  ['test.js', 0], ['rag_test.js', 0], ['turn_test.js', 0], ['hit_test.js', 0], ['prop_test.js', 0], ['clip_test.js', 0], ['template_test.js', 0], ['cutout_test.js', 0], ['skeleton_test.js', 0], ['people_test.js', 0], ['gunner_test.js', 0]];
+  ['test.js', 0], ['rag_test.js', 0], ['turn_test.js', 0], ['hit_test.js', 0], ['prop_test.js', 0], ['clip_test.js', 0], ['template_test.js', 0], ['cutout_test.js', 0], ['skeleton_test.js', 0], ['people_test.js', 0], ['gunner_test.js', 0], ['trooper_test.js', 0]];
 let bad = 0;
 function run(label, cmd, want) {
   let out = '', ok = true;

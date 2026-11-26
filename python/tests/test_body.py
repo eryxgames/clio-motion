@@ -19,7 +19,7 @@ import clio_motion as cm  # noqa: E402
 from test_ground import ground, inputs as ground_inputs  # noqa: E402
 
 TOL = 1e-6
-KITS = (None, "rifle", "pistols", "sword", "hands", "case", "trolley", "chaingun", "chainguns")
+KITS = (None, "rifle", "pistols", "sword", "hands", "case", "trolley", "chaingun", "chainguns", "shotgun", "rpg", "flamer")
 PUNCHES = (None, "jab", "cross", "hook")
 SWINGS = (None, "slash", "chop", "thrust")
 TALLY = ("fire", "reload", "loaded", "throw", "grab", "putdown", "punch", "strike", "land", "jump", "hit", "drop", "bite", "pounce", "pinch", "sting", "ink",
