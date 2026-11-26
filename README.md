@@ -4,8 +4,9 @@ Characters that move by rule, not by keyframe. Give a character's proportions an
 do (go this fast, face that way, aim there, jump, climb, strike) and CLIo Motion works out the
 pose, every step, on any ground: where the feet land, how the hips rise and fall, how the spine,
 arms, tail or wings follow. The same rules drive a soldier, a heavy mech, a hyena, a horse, a
-raptor, a scorpion, an octopus, a wasp and a dragon, and a soldier riding the horse, the spider
-mech or the dragon.
+raptor, a scorpion, an octopus, a wasp and a dragon, a soldier riding the horse, the spider
+mech or the dragon, and people who are not soldiers: a person in plain clothes, a technician, a
+scientist, and one in a hazmat suit.
 
 It runs live inside a game loop, in 2D or 3D, or bakes to sprite sheets and glTF files that Unity,
 Godot, Unreal and CLIo load as ordinary animation.
@@ -21,6 +22,9 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Ladders, and a ledge grab: hang by the hands, pull up, stand on top.
 - Weapons as data: rifle, two pistols, sword and shield; aiming, recoil, reload, swings, block.
 - Hands: throwing, lifting and carrying a crate, a fighting stance and three punches.
+- People for a crowd: the soldier's body in plain clothes, an overall and hard hat, a lab coat or
+  a hazmat suit, with nothing in the hands, a case in one (a briefcase, a tool box), or a case on
+  wheels pulled behind with its axle on the ground wherever the ground is.
 - Tails, tentacles and stings as chains with follow-through; bites, pinches and grabs that reach
   a target.
 - Swimming (octopus) and flight (wasp, dragon).
@@ -67,14 +71,14 @@ the bottom, each stage checked against the reference before the next one starts.
 | 5d. The C core under another language: a shared library with a flat interface (bodies as plain numbers), loaded by Python as CLIo loads CLIo Picture | | yes | yes |
 | 5e. In an engine: Unity, Godot, Unreal | | | |
 
-Stage 1 agrees with the reference to the last bit or two on 1,142 recorded cases, in both languages
+Stage 1 agrees with the reference to the last bit or two on 1,386 recorded cases, in both languages
 (160 of them are stage 5a's rule for placing a part's picture).
-Stage 2 reproduces 28 recorded runs (984 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4 reproduce 88 whole-body runs (3,576 poses of all
-twelve characters: every number of the pose, the count of each event, what the events carry, and
-the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,192:
+Stage 2 reproduces 29 recorded runs (1,020 sampled poses of every character) to the ten digits they are
+recorded with. Stages 3 and 4 reproduce 100 whole-body runs (4,086 poses of all
+sixteen characters: every number of the pose, the count of each event, what the events carry, and
+the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,362:
 the joints, the parts they carry, the draw order and shading, the moves). Stage 5b, in Python,
-records every clip of every character as the reference's baker does (214 clips, 2,918 poses).
+records every clip of every character as the reference's baker does (466 clips, 6,190 poses).
 
 So the C and Python versions now do everything the reference does: every character whole on the
 ground, with its weapons and every action; in the water, in the air, on a ladder and on a ledge;

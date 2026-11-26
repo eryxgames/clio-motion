@@ -1,0 +1,768 @@
+{
+ "format": "clio-motion-rig",
+ "version": 1,
+ "id": "hazmat",
+ "name": "hazmat_rifle",
+ "kit": "rifle",
+ "kind": "biped",
+ "units": "metres",
+ "axes": {
+  "up": "+Y",
+  "forward": "+Z",
+  "right": "-X"
+ },
+ "height": 1.7283,
+ "leg": 0.92,
+ "pose": "template",
+ "joints": [
+  {
+   "name": "UpperLeg_R",
+   "parent": "Hips",
+   "head": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "tail": [
+    -0.1,
+    0.456816,
+    0.077147
+   ]
+  },
+  {
+   "name": "LowerLeg_R",
+   "parent": "UpperLeg_R",
+   "head": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "tail": [
+    -0.1,
+    0.08,
+    -0.13
+   ]
+  },
+  {
+   "name": "Foot_R",
+   "parent": "LowerLeg_R",
+   "head": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "tail": [
+    -0.1,
+    0.08,
+    0.066
+   ]
+  },
+  {
+   "name": "Toe_R",
+   "parent": "Foot_R",
+   "head": [
+    -0.1,
+    0,
+    0.02
+   ],
+   "tail": [
+    -0.1,
+    0,
+    0.13
+   ]
+  },
+  {
+   "name": "UpperLeg_L",
+   "parent": "Hips",
+   "head": [
+    0.1,
+    0.89,
+    0
+   ],
+   "tail": [
+    0.1,
+    0.456816,
+    0.077147
+   ]
+  },
+  {
+   "name": "LowerLeg_L",
+   "parent": "UpperLeg_L",
+   "head": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "tail": [
+    0.1,
+    0.08,
+    -0.13
+   ]
+  },
+  {
+   "name": "Foot_L",
+   "parent": "LowerLeg_L",
+   "head": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "tail": [
+    0.1,
+    0.08,
+    0.066
+   ]
+  },
+  {
+   "name": "Toe_L",
+   "parent": "Foot_L",
+   "head": [
+    0.1,
+    0,
+    0.02
+   ],
+   "tail": [
+    0.1,
+    0,
+    0.13
+   ]
+  },
+  {
+   "name": "Hips",
+   "parent": null,
+   "head": [
+    0,
+    0.89,
+    0
+   ],
+   "tail": [
+    0,
+    1.259834,
+    0.011098
+   ]
+  },
+  {
+   "name": "Pack",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.356092,
+    -0.196108
+   ],
+   "tail": [
+    0,
+    1.074471,
+    -0.191155
+   ],
+   "carried": true
+  },
+  {
+   "name": "Spine",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "tail": [
+    0,
+    1.453746,
+    0.016917
+   ]
+  },
+  {
+   "name": "Head",
+   "parent": "Spine",
+   "head": [
+    0,
+    1.600263,
+    0.017208
+   ],
+   "tail": [
+    0,
+    1.722546,
+    0.055035
+   ]
+  },
+  {
+   "name": "Grenade",
+   "parent": "Hips",
+   "head": [
+    -0.185,
+    0.97786,
+    0.072668
+   ],
+   "tail": [
+    -0.185,
+    1.029684,
+    0.074223
+   ],
+   "carried": true
+  },
+  {
+   "name": "Carry",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.099703,
+    0.346446
+   ],
+   "tail": [
+    0,
+    1.151527,
+    0.348001
+   ],
+   "carried": true
+  },
+  {
+   "name": "UpperArm_R",
+   "parent": "Spine",
+   "head": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "tail": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ]
+  },
+  {
+   "name": "LowerArm_R",
+   "parent": "UpperArm_R",
+   "head": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "tail": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ]
+  },
+  {
+   "name": "Hand_R",
+   "parent": "LowerArm_R",
+   "head": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "tail": [
+    -0.6203,
+    0.915018,
+    0.000751
+   ]
+  },
+  {
+   "name": "UpperArm_L",
+   "parent": "Spine",
+   "head": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "tail": [
+    0.393951,
+    1.143721,
+    0.007614
+   ]
+  },
+  {
+   "name": "LowerArm_L",
+   "parent": "UpperArm_L",
+   "head": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "tail": [
+    0.583836,
+    0.951861,
+    0.001856
+   ]
+  },
+  {
+   "name": "Hand_L",
+   "parent": "LowerArm_L",
+   "head": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "tail": [
+    0.6203,
+    0.915018,
+    0.000751
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "joint": "UpperLeg_R",
+   "group": "leg0",
+   "slot": "thigh",
+   "a": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "r": 0.078,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerLeg_R",
+   "group": "leg0",
+   "slot": "shin",
+   "a": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.058,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerLeg_R",
+   "group": "leg0",
+   "slot": "shin",
+   "a": [
+    -0.1,
+    0.249567,
+    -0.036784
+   ],
+   "b": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.064,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "Foot_R",
+   "group": "leg0",
+   "slot": "foot",
+   "a": [
+    -0.1,
+    0.04,
+    -0.19
+   ],
+   "b": [
+    -0.1,
+    0.04,
+    0.02
+   ],
+   "r": 0.046,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "Toe_R",
+   "group": "leg0",
+   "slot": "foot",
+   "a": [
+    -0.1,
+    0.035,
+    0.02
+   ],
+   "b": [
+    -0.1,
+    0.035,
+    0.09
+   ],
+   "r": 0.04,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "UpperLeg_L",
+   "group": "leg1",
+   "slot": "thigh",
+   "a": [
+    0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "r": 0.078,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerLeg_L",
+   "group": "leg1",
+   "slot": "shin",
+   "a": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.058,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerLeg_L",
+   "group": "leg1",
+   "slot": "shin",
+   "a": [
+    0.1,
+    0.249567,
+    -0.036784
+   ],
+   "b": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.064,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "Foot_L",
+   "group": "leg1",
+   "slot": "foot",
+   "a": [
+    0.1,
+    0.04,
+    -0.19
+   ],
+   "b": [
+    0.1,
+    0.04,
+    0.02
+   ],
+   "r": 0.046,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "Toe_L",
+   "group": "leg1",
+   "slot": "foot",
+   "a": [
+    0.1,
+    0.035,
+    0.02
+   ],
+   "b": [
+    0.1,
+    0.035,
+    0.09
+   ],
+   "r": 0.04,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "Pack",
+   "group": "torso",
+   "slot": "pack",
+   "a": [
+    0,
+    1.355192,
+    -0.166121
+   ],
+   "b": [
+    0,
+    1.144987,
+    -0.162425
+   ],
+   "r": 0.07,
+   "color": "#8a9097"
+  },
+  {
+   "joint": "Hips",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    0.1,
+    0.89,
+    0
+   ],
+   "r": 0.098,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Hips",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    0,
+    0.939978,
+    0.0015
+   ],
+   "b": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "r": 0.12,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "b": [
+    0,
+    1.319807,
+    0.012898
+   ],
+   "r": 0.134,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "r": 0.066,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0,
+    1.600263,
+    0.017208
+   ],
+   "b": null,
+   "r": 0.128,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0,
+    1.570477,
+    0.072893
+   ],
+   "b": null,
+   "r": 0.082,
+   "color": "#1d2a33"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0,
+    1.564567,
+    0.091999
+   ],
+   "b": null,
+   "r": 0.064,
+   "color": "#7fb6c9"
+  },
+  {
+   "joint": "UpperArm_R",
+   "group": "arm0",
+   "slot": "upperArm",
+   "a": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "r": 0.048,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerArm_R",
+   "group": "arm0",
+   "slot": "forearm",
+   "a": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "b": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "r": 0.043,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Hand_R",
+   "group": "arm0",
+   "slot": "forearm",
+   "a": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "b": null,
+   "r": 0.042,
+   "color": "#2d5f8f"
+  },
+  {
+   "joint": "UpperArm_L",
+   "group": "arm1",
+   "slot": "upperArm",
+   "a": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "r": 0.048,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "LowerArm_L",
+   "group": "arm1",
+   "slot": "forearm",
+   "a": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "b": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "r": 0.043,
+   "color": "#e3c62f"
+  },
+  {
+   "joint": "Hand_L",
+   "group": "arm1",
+   "slot": "forearm",
+   "a": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "b": null,
+   "r": 0.042,
+   "color": "#2d5f8f"
+  }
+ ],
+ "slots": [
+  {
+   "id": "head",
+   "label": "Head",
+   "axis": "ball"
+  },
+  {
+   "id": "torso",
+   "label": "Torso",
+   "axis": "up"
+  },
+  {
+   "id": "upperArm",
+   "label": "Upper arm",
+   "axis": "down"
+  },
+  {
+   "id": "forearm",
+   "label": "Forearm and hand",
+   "axis": "down"
+  },
+  {
+   "id": "thigh",
+   "label": "Thigh",
+   "axis": "down"
+  },
+  {
+   "id": "shin",
+   "label": "Shin",
+   "axis": "down"
+  },
+  {
+   "id": "foot",
+   "label": "Foot",
+   "axis": "right"
+  },
+  {
+   "id": "case",
+   "label": "Case",
+   "axis": "right"
+  },
+  {
+   "id": "pack",
+   "label": "Air tank",
+   "axis": "down"
+  }
+ ],
+ "clips": [
+  "idle",
+  "walk",
+  "back",
+  "left",
+  "right",
+  "run",
+  "sneak",
+  "jump",
+  "attack",
+  "reload",
+  "chop",
+  "thrust",
+  "block",
+  "throw",
+  "pickup",
+  "carry",
+  "putdown",
+  "guard",
+  "jab",
+  "cross",
+  "hook",
+  "hit",
+  "turn",
+  "climb",
+  "hang",
+  "climbup",
+  "die"
+ ]
+}

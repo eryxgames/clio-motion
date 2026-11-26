@@ -1,7 +1,33 @@
 # Changelog
 
-## Unreleased
+## 0.26.0
 
+People for a crowd.
+
+- Four characters who are not soldiers: `person` (plain clothes), `technician` (an overall, a hard
+  hat, a bright band, boots), `scientist` (a lab coat) and `hazmat` (a suit with a hood, a visor
+  and an air tank). They are the soldier's body dressed otherwise - the same skeleton, gaits,
+  jumps, ladders, ledges, riding, fists, hits and falls - and a little slower at a run
+  (5.2 m/s). Their models are the bench's simple ones.
+- Three kits for them, and only for them (a soldier asked for one keeps his weapons, a person
+  asked for a rifle keeps what he has): `hands` (nothing), `case` (a case in the right hand - a
+  briefcase for the person and the scientist, a thicker tool box for the technician and the one in
+  the hazmat suit; it swings a little with the arm) and `trolley` (a case on wheels pulled by its
+  handle: the hand stays low behind, the axle is on the ground wherever the ground is, and it is
+  taken at a jog at most). They are in the hand whether or not `armed` is asked; fists up, a
+  crate, a ladder or a change of kit lets them go; a body that falls drops them.
+- The thing carried has a joint, `Case`. Rigs and templates: `person`, `person_case`,
+  `person_trolley` and the same for the others (the technician starts with the case).
+- Clips: people have no `attack`, `reload` or `throw`; the rest are a soldier's.
+- C: `CM_KIT_HANDS`, `CM_KIT_CASE`, `CM_KIT_TROLLEY`, `CM_PROP_CASE`, `CM_PROP_TROLLEY`, and
+  `mount_civil` in `cm_character`. The flat interface takes the kits as 4, 5 and 6. A library
+  older than this does not know the four people: `native.Body("person")` says so.
+- Checked: 12 more recorded runs (100 in all, 4,086 poses; 1,362 skeletons; 466 clips), which C
+  and Python reproduce as before; the 88 earlier runs, their skeletons, the 214 earlier clips and
+  every earlier template are unchanged to the byte. `js/test/people_test.js` checks the hand on
+  the handle, the wheels on the ground, the pace, the clothes and the joints.
+- Gait Bench: the four people, and their kits under "In the hands".
+- A rig lists only the image parts it has (a person with empty hands has no case to draw).
 - The release workflow has run now: 0.25.0's library built for all eight machines (Linux x64 and
   arm64, macOS universal, Windows x64 and arm64, three Android ABIs) and passed
   `python/tests/test_native.py` on those that can run it there.

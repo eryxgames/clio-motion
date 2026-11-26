@@ -69,6 +69,7 @@
         while (frames.length < 40 && tail < 2) { frames.push(grab()); for (var j = 0; j < per; j++) step(DT); if (!S.jump) tail++; }
         dur = frames.length / fps; loop = false;
       } else if (name === 'attack') {
+        if (ch.mount.civil) return null;                                     // people in plain clothes have no weapon to attack with (they have fists: guard, jab, cross, hook)
         inp.aim = [1e4, 0]; run(2); inp.aim = [1e4, S.y + 0.3 * ch.L]; run(1);
         if (ch.beast) { inp.bite = {}; step(DT); inp.bite = null; }          // an animal's attack is its bite
         else if (ch.arthro && ch.arthro.claw) { inp.pinch = {}; step(DT); inp.pinch = null; }  // a scorpion's is its claw, a mantis's both forelegs
@@ -112,7 +113,7 @@
         while (frames.length < 60 && endR < 2) { frames.push(grab()); for (jr = 0; jr < perR; jr++) step(DT); if (!S.act) endR++; }
         dur = frames.length / fpsR; loop = false;
       } else if (name === 'throw') {
-        if (ch.kind !== 'biped') return null;
+        if (ch.kind !== 'biped' || ch.mount.civil) return null;
         inp.aim = [1e4, 0]; run(2); inp.aim = [1e4, S.y + 0.3 * ch.L]; run(1);
         inp.throw = { target: [9 * ch.L, 0, 0] }; step(DT); inp.throw = null;
         frames = untilDone(function () { return !S.act; }, 2); dur = frames.length / (o.fps || 12); loop = false;
@@ -704,9 +705,9 @@
         format: 'clio-motion-rig', version: 1, id: ch.id, name: kit ? ch.id + '_' + kit : ch.id, kit: kit || (ch.mount.type === 'held' ? ch.mount.kit : null), kind: ch.kind,
         units: 'metres', axes: { up: '+Y', forward: '+Z', right: '-X' }, height: Math.round(top * 1e4) / 1e4, leg: ch.L, pose: 'template',
         // carried: a joint for something the body carries (a weapon, its magazine, a pack, a load), not part of the body
-        joints: prims.joints.map(function (j) { var o2 = { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; if (ch.kind === 'biped' && /^(Weapon|Magazine|Shield|Grenade|Carry|Pack)/.test(j.name)) o2.carried = true; return o2; }),
+        joints: prims.joints.map(function (j) { var o2 = { name: j.name, parent: j.parent, head: r6(conv(j.o)), tail: r6(tailOf(j)) }; if (ch.kind === 'biped' && /^(Weapon|Magazine|Shield|Case|Grenade|Carry|Pack)/.test(j.name)) o2.carried = true; return o2; }),
         parts: prims.map(function (q) { return { joint: q.j, group: q.g, slot: q.part || q.of || null, a: r6(conv(q.a)), b: q.b ? r6(conv(q.b)) : null, r: q.r, color: q.col }; }),
-        slots: (R.SLOTS[ch.id] || []).map(function (sl) { return { id: sl[0], label: sl[1], axis: sl[2] }; }),
+        slots: slotsOf(ch, prims).map(function (sl) { return { id: sl[0], label: sl[1], axis: sl[2] }; }),
         clips: clipNames(ch)
       };
     }
@@ -729,9 +730,12 @@
     //   jointMove(sk, j)            the 4 x 4 matrix (glTF axes, column after column) that takes anything bound to
     //                               joint j from the template pose to where it is now: world = move * rest
     function unconv(g) { return [g[2], g[1], -g[0]]; }
+    // the image parts of a character that this rig has (a person with empty hands has no case to draw)
+    function slotsOf(ch, prims) { return (R.SLOTS[ch.id] || []).filter(function (sl) { return prims.some(function (q) { return q.part === sl[0]; }); }); }
     function kitOf(ch, pose) {
       if (ch.mount.type !== 'held' || !pose.props) return null;
       var kinds = pose.props.map(function (w) { return w.kind; }), kit = kinds.indexOf('sword') >= 0 ? 'sword' : kinds.indexOf('pistol') >= 0 ? 'pistols' : 'rifle';
+      if (ch.mount.civil) kit = kinds.indexOf('case') >= 0 ? 'case' : kinds.indexOf('trolley') >= 0 ? 'trolley' : 'hands';      // a person who is not a soldier
       return kit === ch.mount.kit ? null : kit;
     }
     var rigs = {};
@@ -762,7 +766,7 @@
       var o = {};
       (pose.props || []).forEach(function (w, k) {
         var st = w.stow > 0.5;
-        o['prop' + k] = w.kind === 'pistol' ? [k === 0 ? (st ? 2.1 : 3.1) : (st ? -2.1 : -2.9), k === 0 ? 3 : 1] : w.kind === 'sword' ? [st ? -2.3 : 3.1, 3] : w.kind === 'shield' ? [st ? -0.6 : -2.6, 1] : [st ? -0.5 : 0.5, 2];
+        o['prop' + k] = w.kind === 'pistol' ? [k === 0 ? (st ? 2.1 : 3.1) : (st ? -2.1 : -2.9), k === 0 ? 3 : 1] : w.kind === 'sword' ? [st ? -2.3 : 3.1, 3] : w.kind === 'shield' ? [st ? -0.6 : -2.6, 1] : w.kind === 'case' ? [2.6, 3] : w.kind === 'trolley' ? [-2.4, 1] : [st ? -0.5 : 0.5, 2];
       });
       if (pose.kind === 'biped') o.grenade = [pose.grenade && pose.grenade.held ? 3.05 : 2.2, 3];
       return o;
@@ -802,9 +806,9 @@
     // the bone's end (none for a part whose picture stays upright), and a circle clio-joint-<part> at the joint, as
     // wide as the part. A reader needs only those, and the scale bar clio-scale (one metre), to take the drawing apart.
     // A part listed in APART (a weapon) has its bone laid level under the figure, where it is easier to draw.
-    var APART = { weapon: 1 };
+    var APART = { weapon: 1, 'case': 1 };
     function svgTemplate(ch) {
-      var prims = R.buildPrims(templatePose(ch, { arms: 0 }), ch, { flash: false, model: true }), slots = R.SLOTS[ch.id] || [];
+      var prims = R.buildPrims(templatePose(ch, { arms: 0 }), ch, { flash: false, model: true }), slots = slotsOf(ch, prims);
       var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, i;
       prims.forEach(function (q) { [q.a, q.b, q.end].forEach(function (p) { if (p) { x0 = Math.min(x0, p[0] - q.r); x1 = Math.max(x1, p[0] + q.r); y0 = Math.min(y0, p[1] - q.r); y1 = Math.max(y1, p[1] + q.r); } }); });
       y0 = Math.min(y0, 0);

@@ -52,5 +52,6 @@ typedef struct {
 void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, const cm_style *st, cm_terrain_fn terrain, void *user, double dt, cm_ground_pose *out, cm_bctx *B);
 void cm_event_push(cm_state *s, const cm_event *e);
 void cm_kit_fill(cm_state *s);                 /* full magazines for the kit in hand */
+double cm_kit_pace(const cm_state *s, const cm_character *ch);       /* how fast what is in the hand lets the body go: 0 for as fast as it likes */
 
 #endif

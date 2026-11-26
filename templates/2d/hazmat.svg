@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" id="clio-motion-hazmat" width="560" height="916" viewBox="0 0 560 916">
+ <title>CLIo Motion drawing template: Scientist in a hazmat suit</title>
+ <sodipodi:namedview pagecolor="#ffffff" bordercolor="#999999" inkscape:document-units="px" showgrid="false"/>
+ <g inkscape:groupmode="layer" id="clio-guides-hazmat" inkscape:label="Guide: Scientist in a hazmat suit (locked, leave as it is)" sodipodi:insensitive="true">
+  <line x1="28" y1="747.48" x2="532" y2="747.48" stroke="#b9bec6" stroke-width="1"/>
+  <g id="clio-figure" opacity="0.38">
+   <line x1="167.97" y1="218.36" x2="164.56" y2="331.99" stroke="rgb(159,139,33)" stroke-width="37.63" stroke-linecap="round"/>
+   <line x1="164.56" y1="331.99" x2="161.38" y2="437.78" stroke="rgb(159,139,33)" stroke-width="33.71" stroke-linecap="round"/>
+   <circle cx="161.38" cy="437.78" r="16.46" fill="rgb(31,67,100)"/>
+   <line x1="162.56" y1="398.6" x2="192.8" y2="568.41" stroke="rgb(159,139,33)" stroke-width="61.15" stroke-linecap="round"/>
+   <line x1="192.8" y1="568.41" x2="111.6" y2="716.12" stroke="rgb(159,139,33)" stroke-width="45.47" stroke-linecap="round"/>
+   <line x1="148.14" y1="649.65" x2="111.6" y2="716.12" stroke="rgb(31,67,100)" stroke-width="50.18" stroke-linecap="round"/>
+   <line x1="88.08" y1="731.8" x2="170.4" y2="731.8" stroke="rgb(31,67,100)" stroke-width="36.06" stroke-linecap="round"/>
+   <line x1="170.4" y1="733.76" x2="197.84" y2="733.76" stroke="rgb(31,67,100)" stroke-width="31.36" stroke-linecap="round"/>
+   <line x1="97.44" y1="216.24" x2="98.89" y2="298.64" stroke="rgb(110,115,121)" stroke-width="54.88" stroke-linecap="round"/>
+   <line x1="162.56" y1="398.6" x2="162.56" y2="398.6" stroke="rgb(182,158,38)" stroke-width="76.83" stroke-linecap="round"/>
+   <line x1="163.15" y1="379.01" x2="165.5" y2="300.64" stroke="rgb(182,158,38)" stroke-width="94.08" stroke-linecap="round"/>
+   <line x1="165.5" y1="300.64" x2="167.62" y2="230.12" stroke="rgb(182,158,38)" stroke-width="105.06" stroke-linecap="round"/>
+   <line x1="167.97" y1="218.36" x2="167.97" y2="218.36" stroke="rgb(182,158,38)" stroke-width="51.74" stroke-linecap="round"/>
+   <circle cx="169.3" cy="120.18" r="50.18" fill="rgb(182,158,38)"/>
+   <circle cx="191.13" cy="131.85" r="32.14" fill="rgb(23,34,41)"/>
+   <circle cx="198.62" cy="134.17" r="25.09" fill="rgb(127,182,201)"/>
+   <line x1="162.56" y1="398.6" x2="192.8" y2="568.41" stroke="rgb(204,178,42)" stroke-width="61.15" stroke-linecap="round"/>
+   <line x1="192.8" y1="568.41" x2="111.6" y2="716.12" stroke="rgb(204,178,42)" stroke-width="45.47" stroke-linecap="round"/>
+   <line x1="148.14" y1="649.65" x2="111.6" y2="716.12" stroke="rgb(41,86,129)" stroke-width="50.18" stroke-linecap="round"/>
+   <line x1="88.08" y1="731.8" x2="170.4" y2="731.8" stroke="rgb(41,86,129)" stroke-width="36.06" stroke-linecap="round"/>
+   <line x1="170.4" y1="733.76" x2="197.84" y2="733.76" stroke="rgb(41,86,129)" stroke-width="31.36" stroke-linecap="round"/>
+   <line x1="167.97" y1="218.36" x2="164.56" y2="331.99" stroke="rgb(204,178,42)" stroke-width="37.63" stroke-linecap="round"/>
+   <line x1="164.56" y1="331.99" x2="161.38" y2="437.78" stroke="rgb(204,178,42)" stroke-width="33.71" stroke-linecap="round"/>
+   <circle cx="161.38" cy="437.78" r="16.46" fill="rgb(41,86,129)"/>
+  </g>
+  <g id="clio-bones" fill="none" stroke="#d6217f" stroke-width="1.4">
+   <circle id="clio-joint-head" cx="169.3" cy="120.18" r="50.18"/>
+   <line id="clio-bone-torso" x1="163.15" y1="379.01" x2="168.44" y2="202.69"/>
+   <circle id="clio-joint-torso" cx="163.15" cy="379.01" r="47.04"/>
+   <line id="clio-bone-upperArm" x1="167.97" y1="218.36" x2="164.56" y2="331.99"/>
+   <circle id="clio-joint-upperArm" cx="167.97" cy="218.36" r="18.82"/>
+   <line id="clio-bone-forearm" x1="164.56" y1="331.99" x2="161.38" y2="437.78"/>
+   <circle id="clio-joint-forearm" cx="164.56" cy="331.99" r="16.86"/>
+   <line id="clio-bone-thigh" x1="162.56" y1="398.6" x2="192.8" y2="568.41"/>
+   <circle id="clio-joint-thigh" cx="162.56" cy="398.6" r="30.58"/>
+   <line id="clio-bone-shin" x1="192.8" y1="568.41" x2="111.6" y2="716.12"/>
+   <circle id="clio-joint-shin" cx="192.8" cy="568.41" r="22.74"/>
+   <line id="clio-bone-foot" x1="88.08" y1="731.8" x2="197.84" y2="731.8"/>
+   <circle id="clio-joint-foot" cx="88.08" cy="731.8" r="18.03"/>
+   <line id="clio-bone-pack" x1="97.44" y1="216.24" x2="98.89" y2="298.64"/>
+   <circle id="clio-joint-pack" cx="97.44" cy="216.24" r="27.44"/>
+  </g>
+  <g id="clio-labels" font-family="sans-serif" font-size="11" fill="#a3175f">
+   <text x="224.48" y="123.18">Head</text>
+   <text x="217.83" y="293.85">Torso</text>
+   <text x="190.08" y="278.17">Upper arm</text>
+   <text x="184.83" y="387.89">Forearm and hand</text>
+   <text x="213.26" y="486.5">Thigh</text>
+   <text x="179.94" y="645.26">Shin</text>
+   <text x="165.99" y="734.8">Foot</text>
+   <text x="130.6" y="260.44">Air tank</text>
+  </g>
+  <line id="clio-scale" x1="70" y1="832" x2="462" y2="832" stroke="#444a54" stroke-width="2"/>
+  <g font-family="sans-serif" font-size="11" fill="#444a54">
+   <text id="clio-scale-length" x="470" y="836">1 m</text>
+   <text x="70" y="854">Draw each part in the layer that has its name, over the figure.</text>
+   <text x="70" y="868">The figure faces right. A line is a bone; the circle is its joint.</text>
+   <text x="70" y="882">One drawing serves both sides. An empty layer keeps its plain shape.</text>
+   <text x="70" y="896">Leave this guide layer in the file: it says where the bones are.</text>
+  </g>
+ </g>
+ <g inkscape:groupmode="layer" id="clio-part-torso" inkscape:label="Torso"/>
+ <g inkscape:groupmode="layer" id="clio-part-pack" inkscape:label="Air tank"/>
+ <g inkscape:groupmode="layer" id="clio-part-head" inkscape:label="Head"/>
+ <g inkscape:groupmode="layer" id="clio-part-thigh" inkscape:label="Thigh"/>
+ <g inkscape:groupmode="layer" id="clio-part-shin" inkscape:label="Shin"/>
+ <g inkscape:groupmode="layer" id="clio-part-foot" inkscape:label="Foot"/>
+ <g inkscape:groupmode="layer" id="clio-part-upperArm" inkscape:label="Upper arm"/>
+ <g inkscape:groupmode="layer" id="clio-part-forearm" inkscape:label="Forearm and hand"/>
+</svg>

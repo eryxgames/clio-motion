@@ -307,6 +307,8 @@
     S.crouch += (Math.max(clamp(inp.crouch || 0, 0, 1), S.actCrouch || 0) - S.crouch) * decay(14 / Tn0, dt);
     var vT = clamp(inp.speed || 0, 0, ch.vmax * (1 - 0.65 * Math.min(S.crouch, 1)));
     if (S.carry) vT = S.act ? 0 : Math.min(vT, 0.62 * Math.sqrt(G * L));       // a load is walked, not run; lifting and setting down are done standing
+    var kitNow = heldKit(S, ch);
+    if (kitNow && kitNow.pace && S.armed.x > 0.5) vT = Math.min(vT, kitNow.pace * Math.sqrt(G * L));       // nor is a case on wheels run with
     if (inp.heading != null) vT *= clamp(1.5 - Math.abs(he) / 0.8, 0, 1);      // brake for a sharp turn, pivot, then go
     var aMax = (vT > S.v ? 0.4 : 0.65) * G;
     if (S.jump && S.jump.pounce && S.jump.stage === 'land') aMax = 1.3 * G;      // dig in after a pounce
@@ -664,9 +666,19 @@
       kick: 1.6, rise: 3, rounds: 12, reload: 1.1, seat: 0.60 },
     // a sword: 'muzzle' is its point, 'body' where the blade starts. A shield: a board held by a grip behind its middle; it faces the way its 'up' points away from
     sword: { len: 0.95, body: 0.15, grip: [0.07, 0], gripLow: [0.13, -0.09], fore: null, magA: [0.13, 0.09], magB: [0.13, -0.09], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0 },
-    shield: { len: 0.62, body: 0.31, grip: [0.31, 0.06], gripLow: [0.31, 0.02], fore: null, magA: [0.26, 0.0], magB: [0.36, 0.0], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0 }
+    shield: { len: 0.62, body: 0.31, grip: [0.31, 0.06], gripLow: [0.31, 0.02], fore: null, magA: [0.26, 0.0], magB: [0.36, 0.0], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0 },
+    // what people who are not soldiers carry. A case by its handle: 'o' and 'muzzle' are its top corners, 'magA' and 'magB' its bottom ones.
+    // A case on wheels pulled by its handle: 'o' is the axle, 'body' where the case ends and the handle's rods begin, 'muzzle' the grip;
+    // 'magA' to 'magB' is the middle line of the case itself, which lies on the side of the rods away from the ground.
+    'case': { len: 0.42, body: 0.21, grip: [0.21, 0.035], gripLow: [0.21, 0], fore: null, magA: [0, -0.30], magB: [0.42, -0.30], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0 },
+    trolley: { len: 0.98, body: 0.56, grip: [0.98, 0], gripLow: [0.90, 0], fore: null, magA: [0.03, 0.11], magB: [0.56, 0.11], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0, wheel: 0.035 }
   };
-  var KITS = { rifle: { props: ['rifle'], rate: 9 }, pistols: { props: ['pistol', 'pistol'], rate: 7 }, sword: { props: ['sword', 'shield'], rate: 0, melee: true } };
+  // civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
+  // pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
+  var KITS = { rifle: { props: ['rifle'], rate: 9 }, pistols: { props: ['pistol', 'pistol'], rate: 7 }, sword: { props: ['sword', 'shield'], rate: 0, melee: true },
+    hands: { props: [], rate: 0, melee: true, civil: true }, 'case': { props: ['case'], rate: 0, melee: true, civil: true },
+    trolley: { props: ['trolley'], rate: 0, melee: true, civil: true, pace: 1.0 } };
+  function kitFits(ch, name) { return !!KITS[name] && !KITS[name].civil === !ch.mount.civil; }
   // the three ways to swing a blade: when it lands (as a share of the whole) and how long it takes
   var SWINGS = { slash: { dur: 0.62 }, chop: { dur: 0.70 }, thrust: { dur: 0.55 } };
   function fullAmmo(kitName) { return KITS[kitName].props.map(function (k) { return PROPS[k].rounds; }); }
@@ -684,6 +696,8 @@
     if (kind === 'rifle') return { o: [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], th: down, z: zc - 0.02 };       // muzzle down across the back
     if (kind === 'sword') return { o: [root[0] + 0.10 * u[0] + 0.06 * f[0], root[1] + 0.10 * u[1] + 0.06 * f[1]], th: down - 0.45, z: root[2] - 0.17 };     // in a scabbard on the left hip, point down and back
     if (kind === 'shield') return { o: [root[0] + 0.10 * u[0] - 0.20 * f[0], root[1] + 0.10 * u[1] - 0.20 * f[1]], th: down + Math.PI, z: zc };             // slung on the back, face outwards
+    if (kind === 'case') return { o: [root[0] - 0.12 * u[0] - 0.21 * f[0], root[1] - 0.12 * u[1] - 0.21 * f[1]], th: Math.atan2(f[1], f[0]), z: root[2] + 0.20 };    // let go of: against the right thigh
+    if (kind === 'trolley') return { o: [root[0] - 0.80 * u[0] - 0.34 * f[0], root[1] - 0.80 * u[1] - 0.34 * f[1]], th: down + Math.PI, z: zc + 0.22 };            // let go of: standing behind
     return { o: [root[0] + 0.05 * u[0] + 0.03 * f[0], root[1] + 0.05 * u[1] + 0.03 * f[1]], th: down + 0.2, z: root[2] + (k === 0 ? 0.15 : -0.15) };  // hip holsters
   }
   function readyPlace(kind, k, chest, u, f, W, kick) {            // kick: how far recoil has driven the prop back (negative)
@@ -694,6 +708,9 @@
     // sword: held low at the right side, point up and forward. shield: upright on the left forearm, in front of the body
     if (kind === 'sword') return { o: [chest[0] - 0.24 * u[0] + 0.20 * f[0], chest[1] - 0.24 * u[1] + 0.20 * f[1]], th: 0.95 + 0.3 * W, z: chest[2] + 0.21 };
     if (kind === 'shield') return { o: [chest[0] - 0.36 * u[0] + 0.30 * f[0], chest[1] - 0.36 * u[1] + 0.30 * f[1]], th: Math.atan2(u[1], u[0]) - 0.12, z: chest[2] - 0.20 };
+    // a case hangs level from the right hand at the end of a straight arm; a case on wheels leans from its axle up to the hand held low behind
+    if (kind === 'case') return { o: [chest[0] - 0.04 * u[0] - 0.19, chest[1] - 0.04 * u[1] - 0.565], th: 0, z: chest[2] + 0.25 };
+    if (kind === 'trolley') return { o: [chest[0] - 0.04 * u[0] - 0.20 - 0.98 * Math.cos(0.85), chest[1] - 0.04 * u[1] - 0.50 - 0.98 * Math.sin(0.85)], th: 0.85, z: chest[2] + 0.22 };
     var r = 0.50 + kick;                                           // arm's length; recoil also flips the muzzle up
     return { o: [chest[0] + 0.03 * u[0] + Math.cos(W) * r, chest[1] + 0.03 * u[1] + Math.sin(W) * r], th: W - 8 * kick, z: chest[2] + (k === 0 ? 0.08 : -0.08) };
   }
@@ -975,11 +992,11 @@
   function upperBody(S, ch, inp, st, dt, legs, B) {
     var root = B.root, m = ch.mount, pose = { kind: ch.kind, root: root, pitch: B.pitch, legs: legs, crouch: S.crouch };
     // kits: the weapons are put away before changing to another set, then the new ones come up
-    var kitWant = m.type === 'held' ? (inp.kit && KITS[inp.kit] ? inp.kit : S.kit) : null;
+    var kitWant = m.type === 'held' ? (inp.kit && kitFits(ch, inp.kit) ? inp.kit : S.kit) : null;
     var AC = ch.kind === 'biped' ? actTick(S, ch, inp, dt, B) : ch.beast ? beastTick(S, ch, inp, dt, B) : ch.arthro ? arthroTick(S, ch, inp, dt, B) : ch.octo ? octoTick(S, ch, inp, dt) : { lean: 0, tw: 0, ext: 0, load: 0 };
     // hands that are busy with a load or a fight cannot hold weapons: those are put away first
     var busy = !!S.carry || S.guard.x > 0.05 || (ch.kind === 'biped' && !!inp.guard);
-    var ready = !!inp.armed && kitWant === S.kit && !busy;
+    var ready = (!!inp.armed || !!m.civil) && kitWant === S.kit && !busy;
     if (kitWant !== S.kit && S.armed.x < 0.04) { S.kit = kitWant; S.ammo = fullAmmo(S.kit); S.gun = 0; }
     if (!ready && S.act && S.act.name === 'reload') S.act = null;
     if (inp.reload) startReload(S, ch, true);
@@ -1061,6 +1078,22 @@
           else if (act.kind === 'chop') { place.th = lerp(lerp(place.th, 2.35, wd), -0.30, ht); so = [-0.06 * wd + 0.22 * ht, 0.30 * wd + 0.12 * ht]; }
           else { place.th = lerp(place.th, 0.05, Math.max(wd, ht)); so = [-0.14 * wd + 0.30 * ht, 0.14 * wd + 0.20 * ht]; place.z = lerp(place.z, chest[2] + 0.12, ht); }
           place.o = [place.o[0] + f[0] * so[0] + u[0] * so[1], place.o[1] + f[1] * so[0] + u[1] * so[1]];
+        }
+        if (kind === 'case') {
+          // it swings a little with the arm that holds it, against the leg on that side
+          var cs = -0.09 * st.arm * gp.moving * S.legs[0].fwd;
+          place.o = [place.o[0] + cs, place.o[1] + 0.8 * cs * cs]; place.th = 0.5 * cs;
+        }
+        if (kind === 'trolley') {
+          // the hand stays where it is; the axle is put on the ground behind, wherever the ground is there
+          var PT = PROPS.trolley, hx = place.o[0] + PT.len * Math.cos(place.th), hy = place.o[1] + PT.len * Math.sin(place.th);
+          for (var pass = 0; pass < 2; pass++) {             // twice: where the axle comes to rest depends on how high the ground is there
+            var gw = B.terrain(place.o[0], place.z);
+            if (gw > hy - 1.3 * PT.len) {
+              var tt = Math.asin(clamp((hy - gw - PT.wheel) / PT.len, 0.12, 0.97));
+              place = { o: [hx - PT.len * Math.cos(tt), hy - PT.len * Math.sin(tt)], th: tt, z: place.z };
+            }
+          }
         }
         if (kind === 'shield') {
           // blocking brings the shield up and across in front of the face and chest; a swing of the sword opens it a little
@@ -1440,6 +1473,19 @@
       mount: { type: 'jaw', n: 1, rate: 2, kick: 0, rise: 0, omega: 30, aimOmega: 8, min: -0.3, max: 0.5, yaw: 0.6, bodyKick: 0 }
     };
   })();
+  /* People who are not soldiers: the same body in other clothes (the rig dresses them), with nothing in the
+     hands or a case in one of them. They walk, run, crouch, jump, climb, ride, are hit and fall as a soldier does. */
+  function civilian(id, label, kit) {
+    var so = CHARACTERS.soldier, c = {}, k;
+    for (k in so) c[k] = so[k];
+    c.id = id; c.label = label; c.vmax = 5.2;
+    c.mount = { type: 'held', kit: kit, civil: true, omega: so.mount.omega, aimOmega: so.mount.aimOmega, min: so.mount.min, max: so.mount.max, yaw: so.mount.yaw };
+    return c;
+  }
+  CHARACTERS.person = civilian('person', 'Person', 'hands');
+  CHARACTERS.technician = civilian('technician', 'Technician', 'case');
+  CHARACTERS.scientist = civilian('scientist', 'Scientist', 'hands');
+  CHARACTERS.hazmat = civilian('hazmat', 'Scientist in a hazmat suit', 'hands');
   // an arm on the ground: six links of fixed length from the body to the planted tip, arching up through the bend of its leg
   function armCurve(hip, knee, foot, seg) {
     var c = [2 * knee[0] - 0.5 * (hip[0] + foot[0]), 2 * knee[1] - 0.5 * (hip[1] + foot[1]), 2 * knee[2] - 0.5 * (hip[2] + foot[2])], pts = [], i;
@@ -2164,6 +2210,6 @@
     G: G, CHARACTERS: CHARACTERS, createState: createState, step: step, enterLadder: enterLadder, leaveLadder: leaveLadder, stand: stand, place: place, enterSwim: enterSwim, leaveSwim: leaveSwim, enterFly: enterFly, leaveFly: leaveFly, grabLedge: grabLedge, mountUp: mountUp, dismount: dismount,
     // the numeric kernel on its own, for the ports in other languages to be checked against
     kernel: { clamp: clamp, lerp: lerp, frac: frac, smooth: smooth, decay: decay, spring: spring, ease: ease, idleNoise: idleNoise, idlePeriod: idlePeriod, gaitParams: gaitParams, reachChain: reachChain }, frameOf: frameOf, l2w: l2w, w2l: w2l, wrapPi: wrapPi,
-    blendPose: blendPose, ik2: ik2, PROPS: PROPS, KITS: KITS, CRATE: CRATE, PUNCH: PUNCH, SWINGS: SWINGS, lob: lob, startReload: startReload, LAD_PH: LAD_PH, LAD_DUTY: LAD_DUTY, idlePeriod: idlePeriod
+    blendPose: blendPose, ik2: ik2, PROPS: PROPS, KITS: KITS, kitFits: kitFits, CRATE: CRATE, PUNCH: PUNCH, SWINGS: SWINGS, lob: lob, startReload: startReload, LAD_PH: LAD_PH, LAD_DUTY: LAD_DUTY, idlePeriod: idlePeriod
   };
 });

@@ -15,19 +15,32 @@
 #define G CM_G
 
 typedef struct { double len, body, grip[2], grip_low[2]; int has_fore; double fore[2], mag_a[2], mag_b[2], kick, rise; int rounds; double reload, seat; } prop_def;
-static const prop_def PROPS[4] = {
+static const prop_def PROPS[6] = {
   { 0.91, 0.57, { 0.24, -0.06 }, { 0.225, -0.115 }, 1, { 0.53, -0.035 }, { 0.35, -0.035 }, { 0.35, -0.15 }, 1.5, 5, 30, 1.7, 0.80 },      /* rifle */
   { 0.20, 0.12, { 0.025, -0.03 }, { 0.0, -0.11 }, 0, { 0, 0 }, { 0.012, -0.045 }, { 0.012, -0.12 }, 1.6, 3, 12, 1.1, 0.60 },              /* pistol */
   { 0.95, 0.15, { 0.07, 0 }, { 0.13, -0.09 }, 0, { 0, 0 }, { 0.13, 0.09 }, { 0.13, -0.09 }, 0, 0, 0, 0, 0 },                              /* sword */
-  { 0.62, 0.31, { 0.31, 0.06 }, { 0.31, 0.02 }, 0, { 0, 0 }, { 0.26, 0.0 }, { 0.36, 0.0 }, 0, 0, 0, 0, 0 }                                /* shield */
+  { 0.62, 0.31, { 0.31, 0.06 }, { 0.31, 0.02 }, 0, { 0, 0 }, { 0.26, 0.0 }, { 0.36, 0.0 }, 0, 0, 0, 0, 0 },                               /* shield */
+  /* what people who are not soldiers carry. A case by its handle: its rear end and muzzle are its top corners, the magazine's ends its
+     bottom ones. A case on wheels: its rear end is the axle, 'body' where the case ends and the rods begin, the muzzle the grip; the
+     magazine's ends are the middle line of the case itself */
+  { 0.42, 0.21, { 0.21, 0.035 }, { 0.21, 0 }, 0, { 0, 0 }, { 0, -0.30 }, { 0.42, -0.30 }, 0, 0, 0, 0, 0 },                                /* case */
+  { 0.98, 0.56, { 0.98, 0 }, { 0.90, 0 }, 0, { 0, 0 }, { 0.03, 0.11 }, { 0.56, 0.11 }, 0, 0, 0, 0, 0 }                                    /* trolley */
 };
-typedef struct { int n, props[2]; double rate; int melee; } kit_def;
-static const kit_def KITS[4] = {
-  { 0, { 0, 0 }, 0, 0 },
-  { 1, { CM_PROP_RIFLE, 0 }, 9, 0 },
-  { 2, { CM_PROP_PISTOL, CM_PROP_PISTOL }, 7, 0 },
-  { 2, { CM_PROP_SWORD, CM_PROP_SHIELD }, 0, 1 }
+#define TROLLEY_WHEEL 0.035
+/* civil: a kit for people who are not soldiers; in the hand whether or not weapons are asked for. pace: the fastest it is taken along */
+typedef struct { int n, props[2]; double rate; int melee, civil; double pace; } kit_def;
+static const kit_def KITS[7] = {
+  { 0, { 0, 0 }, 0, 0, 0, 0 },
+  { 1, { CM_PROP_RIFLE, 0 }, 9, 0, 0, 0 },
+  { 2, { CM_PROP_PISTOL, CM_PROP_PISTOL }, 7, 0, 0, 0 },
+  { 2, { CM_PROP_SWORD, CM_PROP_SHIELD }, 0, 1, 0, 0 },
+  { 0, { 0, 0 }, 0, 1, 1, 0 },
+  { 1, { CM_PROP_CASE, 0 }, 0, 1, 1, 0 },
+  { 1, { CM_PROP_TROLLEY, 0 }, 0, 1, 1, 1.0 }
 };
+static int kit_fits(const cm_character *ch, int kit) { return kit >= CM_KIT_RIFLE && kit <= CM_KIT_TROLLEY && !KITS[kit].civil == !ch->mount_civil; }
+/* how fast what is in the hand lets the body go: 0 for as fast as it likes */
+double cm_kit_pace(const cm_state *S, const cm_character *ch) { return ch->mount_type == CM_MOUNT_HELD && S->kit && S->armed.x > 0.5 ? KITS[S->kit].pace : 0; }
 static const double SWING_DUR[4] = { 0, 0.62, 0.70, 0.55 };
 static const struct { int hand; double dur, hit; } PUNCH[4] = { { 0, 0, 0 }, { 1, 0.34, 0.36 }, { 0, 0.50, 0.42 }, { 1, 0.56, 0.46 } };
 static const double CRATE[3] = { 0.44, 0.36, 0.50 };          /* depth, height, width */
@@ -78,6 +91,8 @@ static place_t stow_place(int kind, int k, const double root[3], const double u[
   if (kind == CM_PROP_RIFLE) { p.o[0] = root[0] + 0.65 * u[0] - 0.22 * f[0]; p.o[1] = root[1] + 0.65 * u[1] - 0.22 * f[1]; p.th = down; p.z = zc - 0.02; }                  /* muzzle down across the back */
   else if (kind == CM_PROP_SWORD) { p.o[0] = root[0] + 0.10 * u[0] + 0.06 * f[0]; p.o[1] = root[1] + 0.10 * u[1] + 0.06 * f[1]; p.th = down - 0.45; p.z = root[2] - 0.17; }  /* in a scabbard on the left hip */
   else if (kind == CM_PROP_SHIELD) { p.o[0] = root[0] + 0.10 * u[0] - 0.20 * f[0]; p.o[1] = root[1] + 0.10 * u[1] - 0.20 * f[1]; p.th = down + PI; p.z = zc; }              /* slung on the back */
+  else if (kind == CM_PROP_CASE) { p.o[0] = root[0] - 0.12 * u[0] - 0.21 * f[0]; p.o[1] = root[1] - 0.12 * u[1] - 0.21 * f[1]; p.th = atan2(f[1], f[0]); p.z = root[2] + 0.20; }   /* let go of: against the right thigh */
+  else if (kind == CM_PROP_TROLLEY) { p.o[0] = root[0] - 0.80 * u[0] - 0.34 * f[0]; p.o[1] = root[1] - 0.80 * u[1] - 0.34 * f[1]; p.th = down + PI; p.z = zc + 0.22; }           /* let go of: standing behind */
   else { p.o[0] = root[0] + 0.05 * u[0] + 0.03 * f[0]; p.o[1] = root[1] + 0.05 * u[1] + 0.03 * f[1]; p.th = down + 0.2; p.z = root[2] + (k == 0 ? 0.15 : -0.15); }           /* hip holsters */
   return p;
 }
@@ -88,6 +103,9 @@ static place_t ready_place(int kind, int k, const double chest[3], const double 
     p.o[0] = chest[0] - 0.11 * u[0] + 0.10 * f[0] + cos(W) * a; p.o[1] = chest[1] - 0.11 * u[1] + 0.10 * f[1] + sin(W) * a; p.th = W; p.z = chest[2] + 0.04;
   } else if (kind == CM_PROP_SWORD) { p.o[0] = chest[0] - 0.24 * u[0] + 0.20 * f[0]; p.o[1] = chest[1] - 0.24 * u[1] + 0.20 * f[1]; p.th = 0.95 + 0.3 * W; p.z = chest[2] + 0.21; }
   else if (kind == CM_PROP_SHIELD) { p.o[0] = chest[0] - 0.36 * u[0] + 0.30 * f[0]; p.o[1] = chest[1] - 0.36 * u[1] + 0.30 * f[1]; p.th = atan2(u[1], u[0]) - 0.12; p.z = chest[2] - 0.20; }
+  /* a case hangs level from the right hand at the end of a straight arm; a case on wheels leans from its axle up to the hand held low behind */
+  else if (kind == CM_PROP_CASE) { p.o[0] = chest[0] - 0.04 * u[0] - 0.19; p.o[1] = chest[1] - 0.04 * u[1] - 0.565; p.th = 0; p.z = chest[2] + 0.25; }
+  else if (kind == CM_PROP_TROLLEY) { p.o[0] = chest[0] - 0.04 * u[0] - 0.20 - 0.98 * cos(0.85); p.o[1] = chest[1] - 0.04 * u[1] - 0.50 - 0.98 * sin(0.85); p.th = 0.85; p.z = chest[2] + 0.22; }
   else {
     double r = 0.50 + kick;                                    /* arm's length; recoil also flips the muzzle up */
     p.o[0] = chest[0] + 0.03 * u[0] + cos(W) * r; p.o[1] = chest[1] + 0.03 * u[1] + sin(W) * r; p.th = W - 8 * kick; p.z = chest[2] + (k == 0 ? 0.08 : -0.08);
@@ -723,7 +741,7 @@ static int body_step(cm_state *S, const cm_character *ch, const cm_input *inp, c
 
   root = B.root;
   /* kits: the weapons are put away before changing to another set, then the new ones come up */
-  kit_want = ch->mount_type == CM_MOUNT_HELD ? (inp->kit >= CM_KIT_RIFLE && inp->kit <= CM_KIT_SWORD ? inp->kit : S->kit) : CM_KIT_NONE;
+  kit_want = ch->mount_type == CM_MOUNT_HELD ? (kit_fits(ch, inp->kit) ? inp->kit : S->kit) : CM_KIT_NONE;
   if (biped) act_tick(S, ch, inp, dt, &B, &AC);
   else if (ch->has_beast) beast_tick(S, ch, inp, dt, &AC);
   else if (ch->has_arthro) arthro_tick(S, ch, inp, dt, &AC);
@@ -731,7 +749,7 @@ static int body_step(cm_state *S, const cm_character *ch, const cm_input *inp, c
   else memset(&AC, 0, sizeof AC);
   /* hands that are busy with a load or a fight cannot hold weapons: those are put away first */
   busy = S->carry || S->guard.x > 0.05 || (biped && inp->guard);
-  ready = inp->armed && kit_want == S->kit && !busy;
+  ready = (inp->armed || ch->mount_civil) && kit_want == S->kit && !busy;
   if (ch->mount_type == CM_MOUNT_HELD && kit_want != S->kit && S->armed.x < 0.04) { S->kit = kit_want; full_ammo(S); S->gun = 0; }
   if (!ready && S->act == CM_ACT_RELOAD) S->act = CM_ACT_NONE;
   if (inp->reload) cm_start_reload(S, ch, 1);
@@ -845,6 +863,24 @@ static int body_step(cm_state *S, const cm_character *ch, const cm_input *inp, c
         else if (act->kind == CM_SWING_CHOP) { place.th = cm_lerp(cm_lerp(place.th, 2.35, wd), -0.30, ht); so[0] = -0.06 * wd + 0.22 * ht; so[1] = 0.30 * wd + 0.12 * ht; }
         else { place.th = cm_lerp(place.th, 0.05, fmax(wd, ht)); so[0] = -0.14 * wd + 0.30 * ht; so[1] = 0.14 * wd + 0.20 * ht; place.z = cm_lerp(place.z, chest[2] + 0.12, ht); }
         place.o[0] = place.o[0] + f[0] * so[0] + u[0] * so[1]; place.o[1] = place.o[1] + f[1] * so[0] + u[1] * so[1];
+      }
+      if (kind == CM_PROP_CASE) {
+        /* it swings a little with the arm that holds it, against the leg on that side */
+        double cs = -0.09 * st->arm * gp->moving * S->leg[0].fwd;
+        place.o[0] = place.o[0] + cs; place.o[1] = place.o[1] + 0.8 * cs * cs; place.th = 0.5 * cs;
+      }
+      if (kind == CM_PROP_TROLLEY) {
+        /* the hand stays where it is; the axle is put on the ground behind, wherever the ground is there */
+        const prop_def *PT = &PROPS[CM_PROP_TROLLEY];
+        double hx = place.o[0] + PT->len * cos(place.th), hy = place.o[1] + PT->len * sin(place.th);
+        int pass;
+        for (pass = 0; pass < 2; pass++) {                    /* twice: where the axle comes to rest depends on how high the ground is there */
+          double gw = cm_ter(&B.fr, place.o[0], place.z);
+          if (gw > hy - 1.3 * PT->len) {
+            double tt = asin(cm_clamp((hy - gw - TROLLEY_WHEEL) / PT->len, 0.12, 0.97));
+            place.o[0] = hx - PT->len * cos(tt); place.o[1] = hy - PT->len * sin(tt); place.th = tt;
+          }
+        }
       }
       if (kind == CM_PROP_SHIELD) {
         /* blocking brings the shield up and across in front of the face and chest; a swing of the sword opens it a little */

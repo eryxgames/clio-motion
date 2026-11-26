@@ -4,7 +4,7 @@ function bad(o,p=''){ if(typeof o==='number') return isFinite(o)?null:p; if(o&&t
 const D=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 // 1. sideways aim: how well does the weapon end up pointing at the target?
 console.log('--- sideways aim (target 4 leg lengths away, at chest height)');
-for(const id of Object.keys(M.CHARACTERS)) { const ch=M.CHARACTERS[id], out=[];
+for(const id of Object.keys(M.CHARACTERS)) { const ch=M.CHARACTERS[id], out=[]; if (ch.mount.civil) continue;      // people in plain clothes aim nothing
   for(const deg of [0,30,60,-45,120,180]){ const env={terrain:x=>0}, S=M.createState(ch,env); const a=deg/57.2958, R=4*ch.L; let p,nan=null;
     for(let i=0;i<480;i++){ p=M.step(S,ch,{speed:0,crouch:0,armed:true,aim:[S.px+R*Math.cos(a), S.y+0.2*ch.L, S.pz+R*Math.sin(a)]},st,env,1/120); nan=nan||bad(p); }
     const w=p.props?p.props[0]:p.mounts[0], o=p.props?w.o:w.base, t=[S.px+R*Math.cos(a),S.y+0.2*ch.L,S.pz+R*Math.sin(a)], to=[t[0]-o[0],t[1]-o[1],t[2]-o[2]], l=Math.hypot(...to);

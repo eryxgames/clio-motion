@@ -9,7 +9,11 @@ model in Blender for 3D. Your art goes onto the character's own skeleton, so it 
     templates/3d/<name>.glb              the same skeleton with a stand-in model, skinned
 
 `<name>` is the character, and for the soldier also the kit: `soldier` (rifle), `soldier_pistols`,
-`soldier_sword`. `node tools/templates.js` writes all of them again from the code. Gait Bench
+`soldier_sword`. People who are not soldiers (`person`, `technician`, `scientist`, `hazmat`) are
+the soldier's skeleton in other clothes, each with three kits of their own: nothing in the hands,
+a case in the right hand, a case on wheels (`person`, `person_case`, `person_trolley`; the
+technician starts with the case, so `technician`, `technician_hands`, `technician_trolley`). The
+case has a joint, `Case`, where a soldier's rig has `Weapon`. `node tools/templates.js` writes all of them again from the code. Gait Bench
 saves the same files for the character on screen ("Save the template", "Save the 3D template").
 
 ## 2D: a drawing in Inkscape

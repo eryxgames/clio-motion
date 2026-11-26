@@ -18,7 +18,7 @@
     ch: boot.ch || 'soldier', speed: boot.speed != null ? boot.speed : 1.4, crouch: boot.crouch || 0, terrain: boot.terrain || 'rough',
     ladder: false, armed: boot.armed !== false, view: boot.view || 'side', fps: boot.fps || 0, overlays: boot.overlays !== false,
     preset: boot.preset || 'neutral', style: boot.style || { bounce: 1, stride: 1, arm: 1, lean: 1, step: 1, snap: 0.3 },
-    paused: false, slow: false, down: false, steer: 0, heading: null, dir: 0, kit: boot.kit === 'pistols' || boot.kit === 'sword' ? boot.kit : 'rifle'
+    paused: false, slow: false, down: false, steer: 0, heading: null, dir: 0, kit: M.KITS[boot.kit] ? boot.kit : 'rifle'
   };
   if (!M.CHARACTERS[set.ch]) set.ch = 'soldier';
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
@@ -31,7 +31,7 @@
   var ch, env, S, yOff = 0, pose = null, footprints = [], trail = [], xf = null, held = null, keep = {};
   var cam = { y: 0, z: 0, look: 1, yaw: 0, pit: 0, fx: 0 }, aimScreen = null, firing = false, fireOnce = false, jumpOnce = false, dieOnce = null, hitOnce = null, reloadOnce = false, ladFrame = null, lastK = -1, simTick = 0;
   var rider = null, riderArmed = false;                          // a soldier on the back of the character on stage
-  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {} };      // image parts per character and slot
+  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {}, person: {}, technician: {}, scientist: {}, hazmat: {} };      // image parts per character and slot
   // things in the world that the actions deal with, and the two-character fight
   var wall = null, baseTerrain = null, climbOnce = false, dropOnce = false, swingOnce = null, blockHeld = false, camView = 2, pounceOnce = null, stingOnce = null, inkOnce = false, swimDown = false, inks = [], grenades = [], sparks = [], crateObj = null, cratePending = null, wantPick = false, wantPut = false, throwOnce = null, guardOn = false, punchOnce = null;
   var FT = typeof GaitFight !== 'undefined' ? GaitFight : null, F = null, say = { text: '', t: 9 }, lastAim = null;
@@ -48,6 +48,7 @@
 
   function reset(keepSpeed) {
     ch = M.CHARACTERS[set.ch]; yOff = 0;
+    if (ch.mount.type === 'held' && !M.kitFits(ch, set.kit)) set.kit = ch.mount.kit;       // a soldier's kits are not a person's
     wall = null; baseTerrain = makeTerrain(set.terrain, ch.L);
     env = { terrain: function (x, z) { return baseTerrain(x, z) + (wall && x > wall.x ? wall.h : 0); }, ladder: null };
     S = M.createState(ch, env); rider = null; riderArmed = false;
@@ -741,7 +742,7 @@
   var STYLE_IDS = { bounce: 'sBounce', stride: 'sStride', arm: 'sArm', lean: 'sLean', step: 'sStep', snap: 'sSnap' };
   function press(el, on) { el.setAttribute('aria-pressed', on ? 'true' : 'false'); }
   function syncUI() {
-    var biped = ch.kind === 'biped', k;
+    var biped = ch.kind === 'biped', civil = !!ch.mount.civil, k;
     [].forEach.call($('chars').children, function (b) { press(b, b.dataset.ch === set.ch); });
     [].forEach.call($('terrain').children, function (b) { press(b, b.dataset.t === set.terrain); b.disabled = set.ladder; });
     [].forEach.call($('presets').children, function (b) { press(b, b.dataset.p === set.preset); });
@@ -755,10 +756,10 @@
     var noTurn = set.ladder || set.down;
     $('turnRound').disabled = noTurn; $('steerL').disabled = noTurn; $('steerR').disabled = noTurn; $('hit').disabled = noTurn;
     press($('ladder'), set.ladder); $('ladder').textContent = set.ladder ? 'Step off the ladder' : 'Climb a ladder';
-    $('holdSeg').hidden = !biped; press($('armedOn'), set.armed); press($('armedOff'), !set.armed);
-    $('kitSeg').hidden = !biped; $('reload').hidden = !biped; $('ammoNote').hidden = !biped;
-    [].forEach.call($('kitSeg').children, function (b) { press(b, b.dataset.kit === set.kit); b.disabled = set.ladder || set.down; });
-    $('fire').disabled = set.ladder || set.down || (biped && !set.armed);
+    $('holdSeg').hidden = !biped || civil; press($('armedOn'), set.armed); press($('armedOff'), !set.armed);
+    $('kitSeg').hidden = !biped; $('reload').hidden = !biped || civil; $('ammoNote').hidden = !biped || civil; $('fire').hidden = civil;
+    [].forEach.call($('kitSeg').children, function (b) { b.hidden = !M.kitFits(ch, b.dataset.kit); press(b, b.dataset.kit === set.kit); b.disabled = set.ladder || set.down; });
+    $('fire').disabled = set.ladder || set.down || (biped && !set.armed) || civil;
     $('reload').disabled = set.ladder || set.down || !set.armed;
     [].forEach.call($('dirSeg').children, function (b) { press(b, +b.dataset.dir === set.dir); b.disabled = set.ladder || set.down || !!F || (S && (S.mode === 'swim' || S.mode === 'fly')); });
     $('ride').hidden = !ch.saddle; $('ride').disabled = set.down || !!F; press($('ride'), !!rider); $('ride').textContent = rider ? 'Take the rider off' : 'Put a rider on';
@@ -775,7 +776,7 @@
     if (swimming) { ['hit', 'knock', 'fire', 'turnRound'].forEach(function (id2) { $(id2).disabled = true; }); }
     if (biped && set.kit === 'sword') $('reload').disabled = true;
     $('fire').textContent = biped && set.kit === 'sword' ? 'Slash' : ch.beast ? 'Bite' : ch.arthro ? (!ch.arthro.claw ? 'Sting' : ch.arthro.both ? 'Strike' : 'Pinch') : ch.octo ? 'Grab' : 'Hold to fire';
-    $('weaponNote').textContent = ch.fly ? (ch.arthro ? 'The abdomen is a chain that hangs behind and curls round from below to sting. In the air the wings beat faster the harder they work, the body banks into turns, and the legs hang and trail. The crouch slider sets the height.'
+    $('weaponNote').textContent = civil ? 'A person in plain clothes is the soldier\u2019s body dressed otherwise. A case hangs from the right hand and swings a little with the arm; a case on wheels is pulled by its handle, its axle on the ground behind wherever the ground is, and is not run with.' : ch.fly ? (ch.arthro ? 'The abdomen is a chain that hangs behind and curls round from below to sting. In the air the wings beat faster the harder they work, the body banks into turns, and the legs hang and trail. The crouch slider sets the height.'
         : 'The head follows the pointer and bites. In the air the dragon cannot hang still: it keeps at least 5 m/s, beats harder when slow or climbing, and glides when fast or coming down. Neck and tail are the same chains as on the ground. The crouch slider sets the height.')
       : ch.arthro && ch.arthro.look === 'mantis' ? 'The forelegs are held folded, drift towards the pointer, and strike together. Standing, it rocks like a leaf.' : ch.octo ? 'On the bottom each arm is planted, lifted and planted again like a leg, and drawn as one curve. Grab lifts the nearest arm and reaches for the pointer. Swimming is by jets, mantle first, with the arms trailing as eight sprung chains. The crouch slider sets the swimming depth.' : ch.arthro ? 'The claws drift towards the pointer, and the nearer one shoots out to pinch. The sting whips the tail over the head onto the pointer, as far as it reaches. The tail is a chain of sprung links with a rest shape that curls forward.' : ch.beast ? 'The head follows the pointer. A bite shoots the neck out and snaps the jaws. A pounce is a leap along the way it faces that lands jaws first. The tail is a chain of sprung links.' : biped ? 'Weapons are separate objects with grip points. Stowed, the rifle goes across the back and pistols into hip holsters. Firing an empty weapon reloads it.'
       : ch.kind === 'hex' ? 'The turret tracks the pointer all the way round. Recoil pushes the gun back and tips the body.'
@@ -987,7 +988,7 @@
         uiCarry = cNow; uiKd = F ? F.fighters[0].stats.knockdowns + F.fighters[1].stats.knockdowns : 0; syncUI();
         if (F) $('hint').textContent = 'Both fighters run on the same motion core. Knockdowns scored: orange ' + F.fighters[0].stats.knockdowns + ', blue ' + F.fighters[1].stats.knockdowns + '.';
       }
-      if (st.ammo && S.kit) {
+      if (st.ammo && S.kit && !M.KITS[S.kit].civil) {
         var cap = M.PROPS[M.KITS[S.kit].props[0]].rounds;
         $('ammoNote').textContent = 'Rounds ' + st.ammo.join(' + ') + ' of ' + cap + (st.ammo.length > 1 ? ' each' : '') + (st.action === 'reload' ? ', reloading' : '');
       }

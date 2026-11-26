@@ -103,6 +103,7 @@ void cm_ground_core(cm_state *S, const cm_character *ch, const cm_input *inp, co
   S->crouch += (fmax(cm_clamp(inp->crouch, 0, 1), S->act_crouch) - S->crouch) * cm_decay(14 / Tn0, dt);
   vT = cm_clamp(inp->speed, 0, ch->vmax * (1 - 0.65 * fmin(S->crouch, 1)));
   if (S->carry) vT = S->act ? 0 : fmin(vT, 0.62 * sqrt(G * L));
+  if (cm_kit_pace(S, ch) > 0) vT = fmin(vT, cm_kit_pace(S, ch) * sqrt(G * L));       /* nor is a case on wheels run with */
   if (inp->has_heading) vT *= cm_clamp(1.5 - fabs(he) / 0.8, 0, 1);       /* brake for a sharp turn, pivot, then go */
   a_max = (vT > S->v ? 0.4 : 0.65) * G;
   if (J->stage == CM_JUMP_LAND && J->pounce) a_max = 1.3 * G;              /* dig in after a pounce */

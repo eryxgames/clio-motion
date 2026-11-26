@@ -8,7 +8,7 @@ function check(ok, what) { if (!ok) { bad++; console.log('FAIL  ' + what); } ret
 var views = [R.projector({ cx: 0, cy: 0, cz: 0, yaw: 0, pit: 0, ppm: 1, ox: 0, oy: 0 }), R.projector({ cx: 0, cy: 0, cz: 0, yaw: 0.7, pit: 0.3, ppm: 1, ox: 0, oy: 0 }), R.projector({ cx: 0, cy: 0, cz: 0, yaw: 2.6, pit: 0, ppm: 1, ox: 0, oy: 0 })];
 Object.keys(M.CHARACTERS).forEach(function (id) {
   var ch = M.CHARACTERS[id];
-  (ch.mount.type === 'held' ? Object.keys(M.KITS) : [null]).forEach(function (kit) {
+  (ch.mount.type === 'held' ? Object.keys(M.KITS).filter(function (k) { return M.kitFits(ch, k); }) : [null]).forEach(function (kit) {
     var k0 = kit === ch.mount.kit ? null : kit, bad0 = bad, clips = B.recordAll(ch, { frames: 6, kit: k0 }), data = B.rigData(ch, { kit: k0 });
     var sum = 0, n = 0, worst = 0, where = '', orderOff = 0, shadeOff = 0, moveOff = 0, orth = 0, frames = 0;
     clips.forEach(function (c) {

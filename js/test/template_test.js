@@ -39,7 +39,7 @@ function reoriented(bytes) {
 var ids = Object.keys(M.CHARACTERS);
 ids.forEach(function (id) {
   var ch = M.CHARACTERS[id];
-  (ch.mount.type === 'held' ? Object.keys(M.KITS) : [null]).forEach(function (kit) {
+  (ch.mount.type === 'held' ? Object.keys(M.KITS).filter(function (k) { return M.kitFits(ch, k); }) : [null]).forEach(function (kit) {
     var bad0 = bad, rig = B.rig(ch, { kit: kit }), by = {}, worst = 0, k0 = rig.kit === ch.mount.kit ? null : rig.kit, pairs = 0;
     rig.joints.forEach(function (j) { by[j.name] = j; });
     check(rig.joints.every(function (j) { return j.parent === null || by[j.parent]; }) && rig.parts.every(function (p) { return by[p.joint]; }), rig.name + ': every parent and every part\'s joint is a joint');
@@ -73,7 +73,7 @@ ids.forEach(function (id) {
   // the drawing template
   var svg = B.svgTemplate(ch), open = (svg.match(/<g[ >]/g) || []).length, selfc = (svg.match(/<g [^>]*\/>/g) || []).length, close = (svg.match(/<\/g>/g) || []).length;
   check(open - selfc === close && svg.indexOf('id="clio-guides-' + id + '"') > 0 && svg.indexOf('id="clio-scale"') > 0, id + ': the drawing template is well formed and has its guide and scale');
-  R.SLOTS[id].forEach(function (sl) {
+  B.rig(ch).slots.map(function (o) { return [o.id, o.label, o.axis]; }).forEach(function (sl) {
     check(svg.indexOf('id="clio-part-' + sl[0] + '"') > 0 && svg.indexOf('id="clio-joint-' + sl[0] + '"') > 0, id + ': the drawing template has a layer and a joint for ' + sl[1]);
     if (sl[2] === 'ball') check(svg.indexOf('id="clio-bone-' + sl[0] + '"') < 0, id + ': an upright part (' + sl[1] + ') has no bone line');
   });
