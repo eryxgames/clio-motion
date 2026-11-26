@@ -3,7 +3,7 @@
 Characters that move by rule, not by keyframe. Give a character's proportions and what it should
 do (go this fast, face that way, aim there, jump, climb, strike) and CLIo Motion works out the
 pose, every step, on any ground: where the feet land, how the hips rise and fall, how the spine,
-arms, tail or wings follow. The same rules drive a soldier, a heavy mech, a hyena, a horse, a
+arms, tail or wings follow. The same rules drive a soldier, a heavy gunner and a jungle commando, a heavy mech, a hyena, a horse, a
 raptor, a scorpion, an octopus, a wasp and a dragon, a soldier riding the horse, the spider
 mech or the dragon, and people who are not soldiers: a man and a woman in plain clothes, a technician, a
 scientist, and one in a hazmat suit - each of whom a wardrobe makes into many.
@@ -22,6 +22,9 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - Ladders, and a ledge grab: hang by the hands, pull up, stand on top.
 - Weapons as data: rifle, two pistols, sword and shield; aiming, recoil, reload, swings, block.
 - Hands: throwing, lifting and carrying a crate, a fighting stance and three punches.
+- Weapons that change hands: a rifle, two pistols, a sword and shield, a chaingun fired from the
+  hip (its barrels come up to speed before the first round) and a pair of them - any of which
+  any of the three bodies that bear arms puts away and takes up.
 - People for a crowd: the soldier's body in plain clothes, an overall and hard hat, a lab coat or
   a hazmat suit, with nothing in the hands, a case in one (a briefcase, a tool box), or a case on
   wheels pulled behind with its axle on the ground wherever the ground is.
@@ -76,14 +79,14 @@ the bottom, each stage checked against the reference before the next one starts.
 | 5d. The C core under another language: a shared library with a flat interface (bodies as plain numbers), loaded by Python as CLIo loads CLIo Picture | | yes | yes |
 | 5e. In an engine: Unity, Godot, Unreal | | | |
 
-Stage 1 agrees with the reference to the last bit or two on 1,447 recorded cases, in both languages
+Stage 1 agrees with the reference to the last bit or two on 1,569 recorded cases, in both languages
 (160 of them are stage 5a's rule for placing a part's picture).
 Stage 2 reproduces 30 recorded runs (1,062 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4 reproduce 102 whole-body runs (4,176 poses of all
-seventeen characters: every number of the pose, the count of each event, what the events carry, and
-the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,392:
+recorded with. Stages 3 and 4 reproduce 108 whole-body runs (4,518 poses of all
+nineteen characters: every number of the pose, the count of each event, what the events carry, and
+the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,506:
 the joints, the parts they carry, the draw order and shading, the moves). Stage 5b, in Python,
-records every clip of every character as the reference's baker does (529 clips, 7,008 poses),
+records every clip of every character as the reference's baker does (625 clips, 8,398 poses),
 and dresses people from the wardrobe as the reference does (45 looks).
 
 So the C and Python versions now do everything the reference does: every character whole on the

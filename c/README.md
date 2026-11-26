@@ -11,7 +11,7 @@ interface.
     make test
 
 Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
-(stage 2), whole bodies on the ground (stage 3) for all seventeen characters, and off the ground
+(stage 2), whole bodies on the ground (stage 3) for all nineteen characters, and off the ground
 (stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; and the skeleton of a
 pose for showing it (stage 5a, below).
 
@@ -110,7 +110,7 @@ stretched to the bone's end as `js/rig.js` does.
 
 `examples/live2d_svg.c` is a complete program: a character walking over rolling ground and
 knocked down, written as an SVG strip. `python/examples/live2d_svg.py` writes the same file,
-byte for byte, for all seventeen characters.
+byte for byte, for all nineteen characters.
 
 The parts carried rigidly by the joints are within a few hundredths of a percent of leg length of
 where the reference's own drawing code puts them, on average. The exceptions are bodies that

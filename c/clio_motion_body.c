@@ -15,7 +15,7 @@
 #define G CM_G
 
 typedef struct { double len, body, grip[2], grip_low[2]; int has_fore; double fore[2], mag_a[2], mag_b[2], kick, rise; int rounds; double reload, seat; } prop_def;
-static const prop_def PROPS[6] = {
+static const prop_def PROPS[8] = {
   { 0.91, 0.57, { 0.24, -0.06 }, { 0.225, -0.115 }, 1, { 0.53, -0.035 }, { 0.35, -0.035 }, { 0.35, -0.15 }, 1.5, 5, 30, 1.7, 0.80 },      /* rifle */
   { 0.20, 0.12, { 0.025, -0.03 }, { 0.0, -0.11 }, 0, { 0, 0 }, { 0.012, -0.045 }, { 0.012, -0.12 }, 1.6, 3, 12, 1.1, 0.60 },              /* pistol */
   { 0.95, 0.15, { 0.07, 0 }, { 0.13, -0.09 }, 0, { 0, 0 }, { 0.13, 0.09 }, { 0.13, -0.09 }, 0, 0, 0, 0, 0 },                              /* sword */
@@ -24,21 +24,30 @@ static const prop_def PROPS[6] = {
      bottom ones. A case on wheels: its rear end is the axle, 'body' where the case ends and the rods begin, the muzzle the grip; the
      magazine's ends are the middle line of the case itself */
   { 0.42, 0.21, { 0.21, 0.035 }, { 0.21, 0 }, 0, { 0, 0 }, { 0, -0.30 }, { 0.42, -0.30 }, 0, 0, 0, 0, 0 },                                /* case */
-  { 0.98, 0.56, { 0.98, 0 }, { 0.90, 0 }, 0, { 0, 0 }, { 0.03, 0.11 }, { 0.56, 0.11 }, 0, 0, 0, 0, 0 }                                    /* trolley */
+  { 0.98, 0.56, { 0.98, 0 }, { 0.90, 0 }, 0, { 0, 0 }, { 0.03, 0.11 }, { 0.56, 0.11 }, 0, 0, 0, 0, 0 },                                   /* trolley */
+  /* a gunner's: a chaingun carried at the hip by its rear grip and the handle on top, its barrels from 'body' to the muzzle and its
+     ammunition in a box under it; and the same gun as one of a pair, one in each hand */
+  { 1.05, 0.50, { 0.10, -0.07 }, { 0.08, -0.16 }, 1, { 0.42, 0.11 }, { 0.30, -0.07 }, { 0.30, -0.24 }, 0.32, 0.5, 200, 3.2, 0.80 },       /* chaingun */
+  { 1.05, 0.50, { 0.10, -0.07 }, { 0.08, -0.16 }, 0, { 0, 0 }, { 0.30, -0.07 }, { 0.30, -0.24 }, 0.32, 0.5, 150, 3.2, 0.80 }              /* sidegun */
 };
 #define TROLLEY_WHEEL 0.035
-/* civil: a kit for people who are not soldiers; in the hand whether or not weapons are asked for. pace: the fastest it is taken along */
-typedef struct { int n, props[2]; double rate; int melee, civil; double pace; } kit_def;
-static const kit_def KITS[7] = {
-  { 0, { 0, 0 }, 0, 0, 0, 0 },
-  { 1, { CM_PROP_RIFLE, 0 }, 9, 0, 0, 0 },
-  { 2, { CM_PROP_PISTOL, CM_PROP_PISTOL }, 7, 0, 0, 0 },
-  { 2, { CM_PROP_SWORD, CM_PROP_SHIELD }, 0, 1, 0, 0 },
-  { 0, { 0, 0 }, 0, 1, 1, 0 },
-  { 1, { CM_PROP_CASE, 0 }, 0, 1, 1, 0 },
-  { 1, { CM_PROP_TROLLEY, 0 }, 0, 1, 1, 1.0 }
+/* civil: a kit for people who are not soldiers; in the hand whether or not weapons are asked for. pace: the fastest it is taken along.
+   spin: seconds a chaingun's barrels take to come up to speed once the trigger is pulled. body_kick: how hard each round pushes
+   the body back, where that is not the body's own */
+typedef struct { int n, props[2]; double rate; int melee, civil; double pace, spin, body_kick; } kit_def;
+static const kit_def KITS[9] = {
+  { 0, { 0, 0 }, 0, 0, 0, 0, 0, 0 },
+  { 1, { CM_PROP_RIFLE, 0 }, 9, 0, 0, 0, 0, 0 },
+  { 2, { CM_PROP_PISTOL, CM_PROP_PISTOL }, 7, 0, 0, 0, 0, 0 },
+  { 2, { CM_PROP_SWORD, CM_PROP_SHIELD }, 0, 1, 0, 0, 0, 0 },
+  { 0, { 0, 0 }, 0, 1, 1, 0, 0, 0 },
+  { 1, { CM_PROP_CASE, 0 }, 0, 1, 1, 0, 0, 0 },
+  { 1, { CM_PROP_TROLLEY, 0 }, 0, 1, 1, 1.0, 0, 0 },
+  { 1, { CM_PROP_CHAINGUN, 0 }, 22, 0, 0, 0.85, 0.35, 0.10 },
+  { 2, { CM_PROP_SIDEGUN, CM_PROP_SIDEGUN }, 30, 0, 0, 0.70, 0.35, 0.10 }
 };
-static int kit_fits(const cm_character *ch, int kit) { return kit >= CM_KIT_RIFLE && kit <= CM_KIT_TROLLEY && !KITS[kit].civil == !ch->mount_civil; }
+/* any body that bears arms carries any weapon; people who are not soldiers carry their own things, and only those */
+static int kit_fits(const cm_character *ch, int kit) { return ch->mount_type == CM_MOUNT_HELD && kit >= CM_KIT_RIFLE && kit <= CM_KIT_CHAINGUNS && !KITS[kit].civil == !ch->mount_civil; }
 /* how fast what is in the hand lets the body go: 0 for as fast as it likes */
 double cm_kit_pace(const cm_state *S, const cm_character *ch) { return ch->mount_type == CM_MOUNT_HELD && S->kit && S->armed.x > 0.5 ? KITS[S->kit].pace : 0; }
 static const double SWING_DUR[4] = { 0, 0.62, 0.70, 0.55 };
@@ -88,7 +97,9 @@ static void prop_at(int kind, const double o[2], double th, double z, cm_prop_po
 static place_t stow_place(int kind, int k, const double root[3], const double u[3], const double f[3], double zc) {
   double down = atan2(-u[1], -u[0]);
   place_t p;
-  if (kind == CM_PROP_RIFLE) { p.o[0] = root[0] + 0.65 * u[0] - 0.22 * f[0]; p.o[1] = root[1] + 0.65 * u[1] - 0.22 * f[1]; p.th = down; p.z = zc - 0.02; }                  /* muzzle down across the back */
+  if (kind == CM_PROP_CHAINGUN) { p.o[0] = root[0] + 0.72 * u[0] - 0.25 * f[0]; p.o[1] = root[1] + 0.72 * u[1] - 0.25 * f[1]; p.th = down; p.z = zc - 0.02; }           /* across the back, and more of it */
+  else if (kind == CM_PROP_SIDEGUN) { p.o[0] = root[0] + 0.72 * u[0] - 0.25 * f[0]; p.o[1] = root[1] + 0.72 * u[1] - 0.25 * f[1]; p.th = down; p.z = zc + (k == 0 ? 0.11 : -0.11); }
+  else if (kind == CM_PROP_RIFLE) { p.o[0] = root[0] + 0.65 * u[0] - 0.22 * f[0]; p.o[1] = root[1] + 0.65 * u[1] - 0.22 * f[1]; p.th = down; p.z = zc - 0.02; }                  /* muzzle down across the back */
   else if (kind == CM_PROP_SWORD) { p.o[0] = root[0] + 0.10 * u[0] + 0.06 * f[0]; p.o[1] = root[1] + 0.10 * u[1] + 0.06 * f[1]; p.th = down - 0.45; p.z = root[2] - 0.17; }  /* in a scabbard on the left hip */
   else if (kind == CM_PROP_SHIELD) { p.o[0] = root[0] + 0.10 * u[0] - 0.20 * f[0]; p.o[1] = root[1] + 0.10 * u[1] - 0.20 * f[1]; p.th = down + PI; p.z = zc; }              /* slung on the back */
   else if (kind == CM_PROP_CASE) { p.o[0] = root[0] - 0.12 * u[0] - 0.21 * f[0]; p.o[1] = root[1] - 0.12 * u[1] - 0.21 * f[1]; p.th = atan2(f[1], f[0]); p.z = root[2] + 0.20; }   /* let go of: against the right thigh */
@@ -98,7 +109,13 @@ static place_t stow_place(int kind, int k, const double root[3], const double u[
 }
 static place_t ready_place(int kind, int k, const double chest[3], const double u[3], const double f[3], double W, double kick) {
   place_t p;
-  if (kind == CM_PROP_RIFLE) {
+  /* a chaingun is fired from the hip: it turns about a point in front of the right hip, and recoil drives it straight back.
+     One of a pair is out at its own side */
+  if (kind == CM_PROP_CHAINGUN) {
+    p.o[0] = chest[0] - 0.36 * u[0] + 0.10 * f[0] + cos(W) * (kick - 0.30); p.o[1] = chest[1] - 0.36 * u[1] + 0.10 * f[1] + sin(W) * (kick - 0.30); p.th = W; p.z = chest[2] + 0.13;
+  } else if (kind == CM_PROP_SIDEGUN) {
+    p.o[0] = chest[0] - 0.34 * u[0] + 0.06 * f[0] + cos(W) * (kick - 0.26); p.o[1] = chest[1] - 0.34 * u[1] + 0.06 * f[1] + sin(W) * (kick - 0.26); p.th = W; p.z = chest[2] + (k == 0 ? 0.25 : -0.25);
+  } else if (kind == CM_PROP_RIFLE) {
     double a = kick - 0.15;                                    /* the butt sits in the shoulder pocket */
     p.o[0] = chest[0] - 0.11 * u[0] + 0.10 * f[0] + cos(W) * a; p.o[1] = chest[1] - 0.11 * u[1] + 0.10 * f[1] + sin(W) * a; p.th = W; p.z = chest[2] + 0.04;
   } else if (kind == CM_PROP_SWORD) { p.o[0] = chest[0] - 0.24 * u[0] + 0.20 * f[0]; p.o[1] = chest[1] - 0.24 * u[1] + 0.20 * f[1]; p.th = 0.95 + 0.3 * W; p.z = chest[2] + 0.21; }
@@ -153,6 +170,7 @@ static void fire_control(cm_state *S, const cm_character *ch, const cm_input *in
   int n = kit ? kit->n : ch->mount_n, i, g = -1;
   if (kit && kit->melee) { S->flash[0] = S->flash[1] = 0; return; }       /* blades are swung, not fired */
   S->cool -= dt;
+  if (kit && kit->spin > 0 && !inp->fire) S->cool = kit->spin;      /* a chaingun's barrels come up to speed before the first round */
   for (i = 0; i < 2; i++) { S->flash[i] = fmax(0, S->flash[i] - dt / 0.06); cm_spring_step(&S->kick[i], 0, ch->mount_omega, 0.6, dt); }
   cm_spring_step(&S->rise, 0, ch->mount_omega * 0.7, 0.7, dt);
   if (!inp->fire || S->cool > 0 || (S->mode != CM_MODE_GROUND && S->mode != CM_MODE_RIDE) || S->act > CM_ACT_RELOAD || ch->mount_type == CM_MOUNT_JAW) return;
@@ -166,7 +184,7 @@ static void fire_control(cm_state *S, const cm_character *ch, const cm_input *in
   S->gun = g;
   S->cool = 1 / (kit ? kit->rate : ch->mount_rate); S->flash[g] = 1;
   S->kick[g].v -= kit ? PROPS[kit->props[g]].kick : ch->mount_kick; S->rise.v += kit ? PROPS[kit->props[g]].rise : ch->mount_rise;
-  S->lean.v -= ch->mount_body_kick != 0 ? ch->mount_body_kick : 0.5;
+  S->lean.v -= kit && kit->body_kick != 0 ? kit->body_kick : ch->mount_body_kick != 0 ? ch->mount_body_kick : 0.5;
   simple_event(S, CM_EV_FIRE, g);
 }
 
@@ -851,6 +869,7 @@ static int body_step(cm_state *S, const cm_character *ch, const cm_input *inp, c
       cm_prop_pose *w = &props[np];
       if (kind == CM_PROP_RIFLE && rel >= 0) Wi -= 0.32 * cm_smooth(0, 0.12, rel) * (1 - cm_smooth(0.84, 1, rel));     /* muzzle dips while the hand is away */
       if (kind == CM_PROP_RIFLE) Wi -= 0.45 * tk;
+      if ((kind == CM_PROP_CHAINGUN || kind == CM_PROP_SIDEGUN) && rel >= 0) Wi -= 0.5 * cm_smooth(0, 0.15, rel) * (1 - cm_smooth(0.8, 1, rel));      /* a new belt: the muzzle goes down while it is fed in */
       place = ready_place(kind, i, chest, u, f, Wi, S->kick[i].x);
       if (kind == CM_PROP_PISTOL && rel >= 0) {
         /* one-handed: the pistol comes down to the belt, the magazine drops into the holder and a fresh one is pushed home */

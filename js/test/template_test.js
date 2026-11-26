@@ -39,7 +39,7 @@ function reoriented(bytes) {
 var ids = Object.keys(M.CHARACTERS);
 ids.forEach(function (id) {
   var ch = M.CHARACTERS[id];
-  (ch.mount.type === 'held' ? Object.keys(M.KITS).filter(function (k) { return M.kitFits(ch, k); }) : [null]).forEach(function (kit) {
+  B.kitsKept(ch).forEach(function (kit) {
     var bad0 = bad, rig = B.rig(ch, { kit: kit }), by = {}, worst = 0, k0 = rig.kit === ch.mount.kit ? null : rig.kit, pairs = 0;
     rig.joints.forEach(function (j) { by[j.name] = j; });
     check(rig.joints.every(function (j) { return j.parent === null || by[j.parent]; }) && rig.parts.every(function (p) { return by[p.joint]; }), rig.name + ': every parent and every part\'s joint is a joint');

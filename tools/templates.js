@@ -38,7 +38,7 @@ function put(rel, data) {
   else { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); }
 }
 Object.keys(M.CHARACTERS).forEach(function (id) {
-  const ch = M.CHARACTERS[id], kits = ch.mount.type === 'held' ? Object.keys(M.KITS).filter(function (k) { return M.kitFits(ch, k); }) : [null];
+  const ch = M.CHARACTERS[id], kits = B.kitsKept(ch);
   kits.forEach(function (kit) {
     const rig = B.rig(ch, { kit: kit });
     put('3d/' + rig.name + '.rig.json', JSON.stringify(rig, null, 1) + '\n');

@@ -671,14 +671,24 @@
     // A case on wheels pulled by its handle: 'o' is the axle, 'body' where the case ends and the handle's rods begin, 'muzzle' the grip;
     // 'magA' to 'magB' is the middle line of the case itself, which lies on the side of the rods away from the ground.
     'case': { len: 0.42, body: 0.21, grip: [0.21, 0.035], gripLow: [0.21, 0], fore: null, magA: [0, -0.30], magB: [0.42, -0.30], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0 },
-    trolley: { len: 0.98, body: 0.56, grip: [0.98, 0], gripLow: [0.90, 0], fore: null, magA: [0.03, 0.11], magB: [0.56, 0.11], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0, wheel: 0.035 }
+    trolley: { len: 0.98, body: 0.56, grip: [0.98, 0], gripLow: [0.90, 0], fore: null, magA: [0.03, 0.11], magB: [0.56, 0.11], kick: 0, rise: 0, rounds: 0, reload: 0, seat: 0, wheel: 0.035 },
+    // a gunner's: a chaingun carried at the hip by its rear grip and the handle on top, its barrels from 'body' to the muzzle and its
+    // ammunition in a box under it ('magA' to 'magB'); and the same gun as one of a pair, one in each hand
+    chaingun: { len: 1.05, body: 0.50, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: [0.42, 0.11], magA: [0.30, -0.07], magB: [0.30, -0.24], kick: 0.32, rise: 0.5, rounds: 200, reload: 3.2, seat: 0.80 },
+    sidegun: { len: 1.05, body: 0.50, grip: [0.10, -0.07], gripLow: [0.08, -0.16], fore: null, magA: [0.30, -0.07], magB: [0.30, -0.24], kick: 0.32, rise: 0.5, rounds: 150, reload: 3.2, seat: 0.80 }
   };
   // civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
   // pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
+  // spin: seconds a chaingun's barrels take to come up to speed once the trigger is pulled - let go of it and they must come up
+  // again. bodyKick: how hard each round pushes the body back, where that is not the body's own (0.5)
   var KITS = { rifle: { props: ['rifle'], rate: 9 }, pistols: { props: ['pistol', 'pistol'], rate: 7 }, sword: { props: ['sword', 'shield'], rate: 0, melee: true },
     hands: { props: [], rate: 0, melee: true, civil: true }, 'case': { props: ['case'], rate: 0, melee: true, civil: true },
-    trolley: { props: ['trolley'], rate: 0, melee: true, civil: true, pace: 1.0 } };
-  function kitFits(ch, name) { return !!KITS[name] && !KITS[name].civil === !ch.mount.civil; }
+    trolley: { props: ['trolley'], rate: 0, melee: true, civil: true, pace: 1.0 },
+    chaingun: { props: ['chaingun'], rate: 22, spin: 0.35, pace: 0.85, bodyKick: 0.10 }, chainguns: { props: ['sidegun', 'sidegun'], rate: 30, spin: 0.35, pace: 0.70, bodyKick: 0.10 } };
+  // Any body that bears arms carries any weapon; people who are not soldiers carry their own things, and only those.
+  function kitFits(ch, name) { return ch.mount.type === 'held' && !!KITS[name] && !KITS[name].civil === !ch.mount.civil; }
+  // the kits a character can carry; none for one that holds nothing in its hands
+  function kitsOf(ch) { return ch.mount.type === 'held' ? Object.keys(KITS).filter(function (k) { return kitFits(ch, k); }) : []; }
   // the three ways to swing a blade: when it lands (as a share of the whole) and how long it takes
   var SWINGS = { slash: { dur: 0.62 }, chop: { dur: 0.70 }, thrust: { dur: 0.55 } };
   function fullAmmo(kitName) { return KITS[kitName].props.map(function (k) { return PROPS[k].rounds; }); }
@@ -694,6 +704,8 @@
   function stowPlace(kind, k, root, u, f, zc) {
     var down = Math.atan2(-u[1], -u[0]);
     if (kind === 'rifle') return { o: [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], th: down, z: zc - 0.02 };       // muzzle down across the back
+    if (kind === 'chaingun') return { o: [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], th: down, z: zc - 0.02 };    // the same, and more of it
+    if (kind === 'sidegun') return { o: [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], th: down, z: zc + (k === 0 ? 0.11 : -0.11) };
     if (kind === 'sword') return { o: [root[0] + 0.10 * u[0] + 0.06 * f[0], root[1] + 0.10 * u[1] + 0.06 * f[1]], th: down - 0.45, z: root[2] - 0.17 };     // in a scabbard on the left hip, point down and back
     if (kind === 'shield') return { o: [root[0] + 0.10 * u[0] - 0.20 * f[0], root[1] + 0.10 * u[1] - 0.20 * f[1]], th: down + Math.PI, z: zc };             // slung on the back, face outwards
     if (kind === 'case') return { o: [root[0] - 0.12 * u[0] - 0.21 * f[0], root[1] - 0.12 * u[1] - 0.21 * f[1]], th: Math.atan2(f[1], f[0]), z: root[2] + 0.20 };    // let go of: against the right thigh
@@ -705,6 +717,10 @@
       var a = kick - 0.15;                                         // the butt sits in the shoulder pocket
       return { o: [chest[0] - 0.11 * u[0] + 0.10 * f[0] + Math.cos(W) * a, chest[1] - 0.11 * u[1] + 0.10 * f[1] + Math.sin(W) * a], th: W, z: chest[2] + 0.04 };
     }
+    // a chaingun is fired from the hip: it turns about a point in front of the right hip, and recoil drives it straight back.
+    // One of a pair is out at its own side
+    if (kind === 'chaingun') return { o: [chest[0] - 0.36 * u[0] + 0.10 * f[0] + Math.cos(W) * (kick - 0.30), chest[1] - 0.36 * u[1] + 0.10 * f[1] + Math.sin(W) * (kick - 0.30)], th: W, z: chest[2] + 0.13 };
+    if (kind === 'sidegun') return { o: [chest[0] - 0.34 * u[0] + 0.06 * f[0] + Math.cos(W) * (kick - 0.26), chest[1] - 0.34 * u[1] + 0.06 * f[1] + Math.sin(W) * (kick - 0.26)], th: W, z: chest[2] + (k === 0 ? 0.25 : -0.25) };
     // sword: held low at the right side, point up and forward. shield: upright on the left forearm, in front of the body
     if (kind === 'sword') return { o: [chest[0] - 0.24 * u[0] + 0.20 * f[0], chest[1] - 0.24 * u[1] + 0.20 * f[1]], th: 0.95 + 0.3 * W, z: chest[2] + 0.21 };
     if (kind === 'shield') return { o: [chest[0] - 0.36 * u[0] + 0.30 * f[0], chest[1] - 0.36 * u[1] + 0.30 * f[1]], th: Math.atan2(u[1], u[0]) - 0.12, z: chest[2] - 0.20 };
@@ -736,6 +752,7 @@
     var m = ch.mount, kit = heldKit(S, ch), n = kit ? kit.props.length : (m.n || 1), i, g = -1;
     if (kit && kit.melee) { for (i = 0; i < 2; i++) S.flash[i] = 0; return; }      // blades are swung, not fired: see inp.swing
     S.cool -= dt;
+    if (kit && kit.spin && !inp.fire) S.cool = kit.spin;      // a chaingun's barrels come up to speed before the first round
     for (i = 0; i < 2; i++) { S.flash[i] = Math.max(0, S.flash[i] - dt / 0.06); spring(S.kick[i], 0, m.omega, 0.6, dt); }
     spring(S.rise, 0, m.omega * 0.7, 0.7, dt);
     if (!inp.fire || S.cool > 0 || (S.mode !== 'ground' && S.mode !== 'ride') || (S.act && S.act.name !== 'reload') || m.type === 'jaw') return;
@@ -749,7 +766,7 @@
     S.gun = g;
     var D = kit ? PROPS[kit.props[g]] : m;
     S.cool = 1 / (kit ? kit.rate : m.rate); S.flash[g] = 1; S.kick[g].v -= D.kick; S.rise.v += D.rise;
-    S.lean.v -= m.bodyKick || 0.5;
+    S.lean.v -= (kit && kit.bodyKick) || m.bodyKick || 0.5;
     S.events.push({ type: 'fire', gun: g });
   }
 
@@ -1066,6 +1083,7 @@
         var kind = kit.props[i], rel = an === 'reload' && act.gun === i ? rs : -1, Wi = W, place, slide = 0;
         if (kind === 'rifle' && rel >= 0) Wi -= 0.32 * smooth(0, 0.12, rel) * (1 - smooth(0.84, 1, rel));          // muzzle dips while the hand is away
         if (kind === 'rifle') Wi -= 0.45 * tk;
+        if ((kind === 'chaingun' || kind === 'sidegun') && rel >= 0) Wi -= 0.5 * smooth(0, 0.15, rel) * (1 - smooth(0.8, 1, rel));          // a new belt: the muzzle goes down while it is fed in
         place = readyPlace(kind, i, chest, u, f, Wi, S.kick[i].x);
         if (kind === 'pistol' && rel >= 0) {
           // one-handed: the pistol comes down to the belt, the magazine drops into the holder and a fresh one is pushed home
@@ -1486,8 +1504,19 @@
   CHARACTERS.technician = civilian('technician', 'Technician', 'case');
   CHARACTERS.scientist = civilian('scientist', 'Scientist', 'hands');
   CHARACTERS.hazmat = civilian('hazmat', 'Scientist in a hazmat suit', 'hands');
+  /* Gunners: the soldier's body, heavily built (the rig builds it), who come with a chaingun at the hip. (Any of the three
+     bodies that bear arms can carry any weapon: a soldier a chaingun, a gunner a rifle.) */
+  function gunner(id, label) {
+    var so = CHARACTERS.soldier, c = {}, k;
+    for (k in so) c[k] = so[k];
+    c.id = id; c.label = label; c.vmax = 5.4;
+    c.mount = { type: 'held', kit: 'chaingun', omega: so.mount.omega, aimOmega: so.mount.aimOmega, min: so.mount.min, max: so.mount.max, yaw: so.mount.yaw };
+    return c;
+  }
   CHARACTERS.woman = civilian('woman', 'Woman', 'hands');
   CHARACTERS.woman.sway = 1.35; CHARACTERS.woman.vmax = 5.0;      // the hips go from side to side a little more
+  CHARACTERS.gunner = gunner('gunner', 'Gunner');
+  CHARACTERS.commando = gunner('commando', 'Jungle commando');
   // an arm on the ground: six links of fixed length from the body to the planted tip, arching up through the bend of its leg
   function armCurve(hip, knee, foot, seg) {
     var c = [2 * knee[0] - 0.5 * (hip[0] + foot[0]), 2 * knee[1] - 0.5 * (hip[1] + foot[1]), 2 * knee[2] - 0.5 * (hip[2] + foot[2])], pts = [], i;
@@ -2212,6 +2241,6 @@
     G: G, CHARACTERS: CHARACTERS, createState: createState, step: step, enterLadder: enterLadder, leaveLadder: leaveLadder, stand: stand, place: place, enterSwim: enterSwim, leaveSwim: leaveSwim, enterFly: enterFly, leaveFly: leaveFly, grabLedge: grabLedge, mountUp: mountUp, dismount: dismount,
     // the numeric kernel on its own, for the ports in other languages to be checked against
     kernel: { clamp: clamp, lerp: lerp, frac: frac, smooth: smooth, decay: decay, spring: spring, ease: ease, idleNoise: idleNoise, idlePeriod: idlePeriod, gaitParams: gaitParams, reachChain: reachChain }, frameOf: frameOf, l2w: l2w, w2l: w2l, wrapPi: wrapPi,
-    blendPose: blendPose, ik2: ik2, PROPS: PROPS, KITS: KITS, kitFits: kitFits, CRATE: CRATE, PUNCH: PUNCH, SWINGS: SWINGS, lob: lob, startReload: startReload, LAD_PH: LAD_PH, LAD_DUTY: LAD_DUTY, idlePeriod: idlePeriod
+    blendPose: blendPose, ik2: ik2, PROPS: PROPS, KITS: KITS, kitFits: kitFits, kitsOf: kitsOf, CRATE: CRATE, PUNCH: PUNCH, SWINGS: SWINGS, lob: lob, startReload: startReload, LAD_PH: LAD_PH, LAD_DUTY: LAD_DUTY, idlePeriod: idlePeriod
   };
 });

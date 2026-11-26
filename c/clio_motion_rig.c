@@ -23,6 +23,7 @@ const cm_rig *cm_rig_for(const cm_character *ch, const cm_pose *pose) {
     kit = ch->mount_civil ? CM_KIT_HANDS : CM_KIT_RIFLE;
     for (i = 0; i < pose->n_props; i++) if (pose->prop[i].kind == CM_PROP_PISTOL && kit != CM_KIT_SWORD) kit = CM_KIT_PISTOLS; else if (pose->prop[i].kind == CM_PROP_SWORD) kit = CM_KIT_SWORD;
       else if (pose->prop[i].kind == CM_PROP_CASE) kit = CM_KIT_CASE; else if (pose->prop[i].kind == CM_PROP_TROLLEY) kit = CM_KIT_TROLLEY;
+    for (i = 0; i < pose->n_props; i++) if (pose->prop[i].kind == CM_PROP_SIDEGUN) kit = CM_KIT_CHAINGUNS; else if (pose->prop[i].kind == CM_PROP_CHAINGUN) kit = CM_KIT_CHAINGUN;
   }
   for (i = 0; i < cm_rig_count(); i++) { const cm_rig *r = cm_rig_at(i); if (!strcmp(r->id, ch->id) && r->kit == kit) return r; }
   return 0;
@@ -73,7 +74,7 @@ static void declare(const cm_character *c, const cm_pose *p, const cm_rig *rig, 
         double sv[3];
         cross3(w->dir, w->up, sv);
         add(D, w->o, w->muzzle, sv);
-        if (w->kind == CM_PROP_RIFLE || w->kind == CM_PROP_PISTOL) add(D, w->mag_a, w->mag_b, sv);
+        if (w->kind == CM_PROP_RIFLE || w->kind == CM_PROP_PISTOL || w->kind == CM_PROP_CHAINGUN || w->kind == CM_PROP_SIDEGUN) add(D, w->mag_a, w->mag_b, sv);
       }
       if (!p->climbing && !p->down) copy3(gp, p->grenade);
       else set3(gp, root[0] + (u[0] * 0.09 + f[0] * 0.07) + rt[0] * 0.185, root[1] + (u[1] * 0.09 + f[1] * 0.07) + rt[1] * 0.185, root[2] + (u[2] * 0.09 + f[2] * 0.07) + rt[2] * 0.185);
@@ -170,7 +171,7 @@ int cm_skeleton_step(const cm_character *ch, const cm_pose *pose, cm_skeleton *s
     const cm_prop_pose *w = &pose->prop[k];
     int st = w->stow > 0.5;
     sk->held[k].on = 1;
-    if (w->kind == CM_PROP_PISTOL) { sk->held[k].layer = k == 0 ? (st ? 2.1 : 3.1) : (st ? -2.1 : -2.9); sk->held[k].shade = k == 0 ? 3 : 1; }
+    if (w->kind == CM_PROP_PISTOL || w->kind == CM_PROP_SIDEGUN) { sk->held[k].layer = k == 0 ? (st ? 2.1 : 3.1) : (st ? -2.1 : -2.9); sk->held[k].shade = k == 0 ? 3 : 1; }
     else if (w->kind == CM_PROP_SWORD) { sk->held[k].layer = st ? -2.3 : 3.1; sk->held[k].shade = 3; }
     else if (w->kind == CM_PROP_SHIELD) { sk->held[k].layer = st ? -0.6 : -2.6; sk->held[k].shade = 1; }
     else if (w->kind == CM_PROP_CASE) { sk->held[k].layer = 2.6; sk->held[k].shade = 3; }

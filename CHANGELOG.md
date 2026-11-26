@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.28.0
+
+Gunners, and weapons that change hands.
+
+- Two weapons: `chaingun` (prop `chaingun`: fired from the hip, the right hand on the grip
+  behind and the left on the handle on top, ammunition in a box under it, 200 rounds) and
+  `chainguns` (two of prop `sidegun`, one in each hand, fired in turn, 150 rounds each). The
+  barrels take 0.35 s to come up to speed once the trigger is pulled, every time it is pulled
+  (`spin`); then 20 rounds a second, or 24 from the pair. A round pushes the body back a
+  fifth as hard as a rifle's (`bodyKick`, now also a kit's). Carried in the hands it is taken
+  at a jog at most, a pair at a walk (`pace`). A new belt takes 3.2 s; the muzzle goes down
+  while it is fed in.
+- Two characters who come with the chaingun: `gunner` (heavy armour, shoulder pads, a drum on
+  the back) and `commando` (bare arms, a headband, a belt of rounds across the chest). They are
+  the soldier's skeleton, built a fifth thicker by the rig (`HEAVY`).
+- Any body that bears arms carries any weapon: `kitFits` no longer ties a kit to one character,
+  only people who are not soldiers to their own things. A soldier takes the chainguns, a
+  commando the sword. `kitsOf(ch)` (`kits_of` in Python) lists what a character can carry.
+  41 rigs now; as files, clips and templates are kept for every weapon with the soldier and for
+  the other two bodies with the one they come with (`kitsKept`) - any other is recorded or
+  made when asked for.
+- Clips: a chaingun's `attack` is a second long, the trigger held through the barrels' coming up.
+- C: `CM_KIT_CHAINGUN`, `CM_KIT_CHAINGUNS`, `CM_PROP_CHAINGUN`, `CM_PROP_SIDEGUN`; the flat
+  interface takes the kits as 7 and 8. An older library passes over a kit it does not know and
+  the body keeps what it had: `native.has_kit(kit)` says whether the one loaded knows it.
+- Gait Bench: the gunner and the commando, and every weapon under "In the hands" for all three.
+- Checked: 6 more recorded runs (108; 4,518 poses; 1,506 skeletons; 625 clips), which C and
+  Python reproduce; everything recorded before is unchanged. `js/test/gunner_test.js`;
+  `python/tests/test_mesh.py` now also checks that a pose's joints are its rig's by name, for
+  every character with every kit it can carry.
+
 ## 0.27.0
 
 A woman, a wardrobe, and anyone at all.

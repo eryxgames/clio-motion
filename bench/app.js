@@ -31,7 +31,7 @@
   var ch, env, S, yOff = 0, pose = null, footprints = [], trail = [], xf = null, held = null, keep = {};
   var cam = { y: 0, z: 0, look: 1, yaw: 0, pit: 0, fx: 0 }, aimScreen = null, firing = false, fireOnce = false, jumpOnce = false, dieOnce = null, hitOnce = null, reloadOnce = false, ladFrame = null, lastK = -1, simTick = 0;
   var rider = null, riderArmed = false;                          // a soldier on the back of the character on stage
-  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {}, person: {}, technician: {}, scientist: {}, hazmat: {}, woman: {} };
+  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {}, person: {}, technician: {}, scientist: {}, hazmat: {}, woman: {}, gunner: {}, commando: {} };
   // Who a person is: what is worn other than the character's own, colours by name other than its own, build and height.
   var gen = { wear: {}, colors: {}, build: 1, height: null };
   if (boot.gen && typeof boot.gen === 'object') { gen.wear = boot.gen.wear || {}; gen.colors = boot.gen.colors || {}; gen.build = +boot.gen.build || 1; gen.height = +boot.gen.height || null; }

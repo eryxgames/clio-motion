@@ -18,6 +18,9 @@
   var PAL = {
     soldier: { suit: '#4d545e', armor: '#e2711d', pack: '#b9581a', dark: '#2a2e35', metal: '#3b4048', glow: '#ffd23f' },
     soldier2: { suit: '#474c57', armor: '#3d7cc0', pack: '#2c5d94', dark: '#23262c', metal: '#3b4048', glow: '#a8ecff' },   // a second team, for telling two apart
+    // gunners: the soldier's colours, and for the one with bare arms and a headband his skin and the band
+    gunner: { suit: '#3c4541', armor: '#5d6a66', pack: '#474d44', dark: '#1f2423', metal: '#4a4f56', glow: '#ff6a3c' },
+    commando: { suit: '#56633c', armor: '#3b4530', pack: '#5c5439', dark: '#1e221b', metal: '#43474d', glow: '#ff6a3c', skin: '#b5855e', band: '#a8281f', hair: '#2a211a' },
     // people: suit is the trousers, top the jacket, coat or overall; box and trim are the colours of what is carried
     person: { suit: '#3b4252', top: '#4c5a73', skin: '#d6a27c', hair: '#3a2a1f', shoe: '#1e1e22', glove: '#d6a27c', dark: '#22252b', metal: '#8d949e', box: '#6b4a2f', trim: '#c9a04a', pack: '#4c5a73' },
     woman: { suit: '#3f4a5c', top: '#8a5a78', skin: '#dcae8e', hair: '#5a3620', shoe: '#2a2226', glove: '#dcae8e', dark: '#22252b', metal: '#8d949e', box: '#7a5a3a', trim: '#c9a04a', pack: '#6a6f7c', hat: '#d8c9a3', band: '#f2c230' },
@@ -39,7 +42,7 @@
   // sprite framing: pixels per metre in a 64-pixel frame, forward offset of the frame centre, depth range for shading, standing height
   var SPRITE = {
     soldier: { ppm: 24.4, cx: 0.25, dz: 0.3, tall: 1.95 }, person: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, technician: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 },
-    scientist: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, woman: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, hazmat: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, mech: { ppm: 8.9, cx: 0.45, dz: 1.3, tall: 5.1 },
+    scientist: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, gunner: { ppm: 24.4, cx: 0.25, dz: 0.3, tall: 1.95 }, commando: { ppm: 24.4, cx: 0.25, dz: 0.3, tall: 1.95 }, woman: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, hazmat: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, mech: { ppm: 8.9, cx: 0.45, dz: 1.3, tall: 5.1 },
     quad: { ppm: 31, cx: 0.12, dz: 0.25, tall: 0.95 }, hyena: { ppm: 26, cx: 0.10, dz: 0.25, tall: 1.1 }, horse: { ppm: 14.5, cx: 0.2, dz: 0.35, tall: 2.05 }, raptor: { ppm: 15.5, cx: -0.15, dz: 0.3, tall: 1.85 }, scorpion: { ppm: 22, cx: 0.15, dz: 0.8, tall: 1.4 }, octopus: { ppm: 24, cx: -0.1, dz: 0.7, tall: 1.0 }, mantis: { ppm: 22, cx: 0.0, dz: 0.5, tall: 1.2 }, wasp: { ppm: 34, cx: 0.0, dz: 0.4, tall: 0.75 }, dragon: { ppm: 6.6, cx: -0.4, dz: 0.5, tall: 3.2 }, spider: { ppm: 13.4, cx: 0.25, dz: 1.5, tall: 2.0 }
   };
   // Image slots. axis says how a part's picture is laid along its bone:
@@ -83,9 +86,14 @@
     }
     return w;
   }
+  /* Gunners: the soldier, built heavily. scale: how much thicker the body's parts are. pack: how thick what is on the back is (a
+     drum of ammunition, or a small pack). pads: armour on the shoulders. bare: no helmet and no sleeves - a headband, bare arms -
+     and a belt of rounds across the chest. */
+  var HEAVY = { gunner: { scale: 1.22, pack: 0.135, pads: true }, commando: { scale: 1.16, pack: 0.075, bare: true } };
   var SLOTS = {
     soldier: [['head', 'Head', 'ball'], ['torso', 'Torso', 'up', 1.5], ['pack', 'Backpack', 'down'], ['upperArm', 'Upper arm', 'down'], ['forearm', 'Forearm and hand', 'down'],
       ['thigh', 'Thigh', 'down'], ['shin', 'Shin', 'down'], ['foot', 'Foot', 'right'], ['weapon', 'Weapon', 'right']],
+    get gunner() { return SLOTS.soldier; }, get commando() { return SLOTS.soldier; },
     person: CIVIL_SLOTS, woman: CIVIL_SLOTS, technician: CIVIL_SLOTS, scientist: CIVIL_SLOTS, hazmat: CIVIL_SLOTS.concat([['pack', 'Air tank', 'down']]),
     mech: [['hull', 'Hull', 'ball'], ['gun', 'Gun', 'right'], ['thigh', 'Thigh', 'down'], ['shin', 'Shin', 'down'], ['foot', 'Foot', 'right']],
     quad: [['body', 'Body', 'right'], ['head', 'Head', 'right'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']],
@@ -201,6 +209,7 @@
     }
     if (p.kind === 'biped') {
       var D = wear;                                // null: a soldier, in armour
+      var H = HEAVY[c.id] || null;                 // a gunner: a soldier heavily built
       for (i = 0; i < p.legs.length; i++) {
         l = p.legs[i]; if (i === 0) G('leg0', 2, 3); else G('leg1', -2, 1);
         J(sideName('UpperLeg', i), 'Hips', l.hip, l.knee);
@@ -235,7 +244,7 @@
       G('torso', 0, 2);
       var pkA = upY(add(p.chest, add(mul(f, -0.21), mul(u, -0.04))), p.pack), pkB = upY(add(mid, mul(f, -0.20)), p.pack);
       J('Hips', null, p.root, p.chest); J('Pack', 'Hips', pkA, pkB);
-      if (!D) cap(pkA, pkB, 0.10, C.pack, { part: 'pack' });
+      if (!D) cap(pkA, pkB, H ? H.pack : 0.10, C.pack, { part: 'pack' });
       else {
         if (W('tank', 'on')) cap(add(pkA, mul(f, 0.03)), add(pkB, mul(f, 0.03)), 0.07, P('pack'), { part: 'pack' });
         if (W('pack', 'on')) cap(add(pkA, mul(u, -0.03)), add(pkB, mul(u, 0.02)), 0.092, P('pack'), { part: 'pack' });
@@ -257,13 +266,26 @@
         J('Spine', 'Hips', mid, p.chest, rtU);
         cap(mid, add(p.chest, mul(u, -0.07)), 0.148, C.armor, { of: 'torso' });
         cap(p.arms[0].shoulder, p.arms[1].shoulder, 0.074, C.armor, { of: 'torso' });
+        if (H && H.pads) { ball(add(p.arms[0].shoulder, mul(u, 0.02)), 0.082, C.armor, { of: 'torso' }); ball(add(p.arms[1].shoulder, mul(u, 0.02)), 0.082, C.armor, { of: 'torso' }); }
+        if (H && H.bare) cap(add(p.arms[1].shoulder, mul(u, -0.02)), add(p.legs[0].hip, mul(u, 0.10)), 0.024, C.metal, { of: 'torso' });       // a belt of rounds from the left shoulder to the right hip
         G('head', 0.1, 2);
         J('Head', 'Spine', p.head, add(p.head, perpU(p.gaze)), rtU);
+        if (H && H.bare) {
+          // no helmet: a head, short hair, a band round the brow with its ends behind, eyes
+          ball(p.head, 0.108, C.skin, { part: 'head' });
+          ball(add(p.head, add(mul(p.gaze, -0.030), mul(gu, 0.034))), 0.090, C.hair, { of: 'head', on: p.head });
+          cap(add(p.head, add(mul(p.gaze, 0.070), mul(gu, 0.046))), add(p.head, add(mul(p.gaze, -0.070), mul(gu, 0.046))), 0.062, C.band, { of: 'head', on: p.head });
+          cap(add(p.head, add(mul(p.gaze, -0.110), mul(gu, 0.040))), add(p.head, add(mul(p.gaze, -0.180), mul(gu, -0.030))), 0.018, C.band, { of: 'head', on: p.head });
+          eye = add(p.head, add(mul(p.gaze, 0.096), mul(gu, 0.002)));
+          ball(asideU(eye, -0.036), 0.014, C.dark, { of: 'head', raw: true, on: p.head });
+          ball(asideU(eye, 0.036), 0.014, C.dark, { of: 'head', raw: true, on: p.head });
+        } else {
         ball(p.head, 0.115, C.armor, { part: 'head' });
         ball(add(p.head, add(mul(p.gaze, 0.055), mul(gu, -0.022))), 0.076, C.dark, { of: 'head', on: p.head });
         eye = add(p.head, add(mul(p.gaze, 0.105), mul(gu, 0.012)));
         ball(asideU(eye, -0.04), 0.024, C.glow, { of: 'head', raw: true, on: p.head });
         ball(asideU(eye, 0.04), 0.024, C.glow, { of: 'head', raw: true, on: p.head });
+        }
       } else {
         // plain clothes: a jacket, coat or overall over the trousers, a bare head or a hat or a hood
         if (W('coat', 'lab')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.30)), 0.128, P('top'), { of: 'torso' });
@@ -318,10 +340,10 @@
       if (p.reins) p.reins.forEach(function (r) { cap(r[0], r[1], 0.007, '#2a211a', { of: 'torso', raw: true }); });
       // props: whatever the character carries, in the hands or stowed. Each has its own joint, and its magazine another.
       (p.props || []).forEach(function (w, k) {
-        var stowed = w.stow > 0.5, pistol = w.kind === 'pistol', civil = w.kind === 'case' || w.kind === 'trolley';
-        var nm = pistol ? sideName('Weapon', k) : w.kind === 'shield' ? 'Shield' : civil ? 'Case' : 'Weapon';
+        var stowed = w.stow > 0.5, pistol = w.kind === 'pistol', civil = w.kind === 'case' || w.kind === 'trolley', chain = w.kind === 'chaingun' || w.kind === 'sidegun', pair = pistol || w.kind === 'sidegun';
+        var nm = pair ? sideName('Weapon', k) : w.kind === 'shield' ? 'Shield' : civil ? 'Case' : 'Weapon';
         var sv = [w.dir[1] * w.up[2] - w.dir[2] * w.up[1], w.dir[2] * w.up[0] - w.dir[0] * w.up[2], w.dir[0] * w.up[1] - w.dir[1] * w.up[0]];
-        if (pistol) G('prop' + k, k === 0 ? (stowed ? 2.1 : 3.1) : (stowed ? -2.1 : -2.9), k === 0 ? 3 : 1);
+        if (pair) G('prop' + k, k === 0 ? (stowed ? 2.1 : 3.1) : (stowed ? -2.1 : -2.9), k === 0 ? 3 : 1);
         else G('prop' + k, stowed ? -0.5 : 0.5, 2);
         J(nm, 'Hips', w.o, w.muzzle, sv);
         if (w.kind === 'case') {
@@ -362,7 +384,18 @@
           ball(add(w.body, mul(w.up, -0.04)), 0.06, C.metal, { of: 'shield' });
           return;
         }
-        if (pistol) {
+        if (chain) {
+          // a chaingun: the body, a cluster of barrels with a ring near the muzzle, a handle on top, the grip behind
+          var hb = add(w.body, mul(w.up, 0.11));
+          cap(w.o, w.body, 0.062, C.metal, { part: 'weapon', end: w.muzzle });
+          cap(add(w.body, mul(w.up, 0.026)), add(w.muzzle, mul(w.up, 0.026)), 0.016, C.dark, { of: 'weapon' });
+          cap(add(w.body, add(mul(w.up, -0.013), mul(sv, 0.023))), add(w.muzzle, add(mul(w.up, -0.013), mul(sv, 0.023))), 0.016, C.dark, { of: 'weapon' });
+          cap(add(w.body, add(mul(w.up, -0.013), mul(sv, -0.023))), add(w.muzzle, add(mul(w.up, -0.013), mul(sv, -0.023))), 0.016, C.dark, { of: 'weapon' });
+          cap(add(w.muzzle, mul(w.dir, -0.10)), add(w.muzzle, mul(w.dir, -0.06)), 0.046, C.metal, { of: 'weapon' });
+          cap(add(hb, mul(w.dir, -0.16)), add(hb, mul(w.dir, 0.0)), 0.015, C.dark, { of: 'weapon' });
+          cap(add(w.body, mul(w.dir, -0.16)), add(hb, mul(w.dir, -0.16)), 0.012, C.dark, { of: 'weapon' });
+          cap(w.grip, w.gripLow, 0.025, C.dark, { of: 'weapon' });
+        } else if (pistol) {
           cap(w.o, w.muzzle, 0.024, C.metal, { part: 'weapon' });
           cap(w.grip, w.gripLow, 0.021, C.dark, { of: 'weapon' });
         } else {
@@ -370,9 +403,10 @@
           cap(w.body, w.muzzle, 0.022, C.metal, { of: 'weapon' });
           cap(w.grip, w.gripLow, 0.024, C.dark, { of: 'weapon' });
         }
-        J(pistol ? sideName('Magazine', k) : 'Magazine', nm, w.magA, w.magB, sv);
-        cap(w.magA, w.magB, pistol ? 0.017 : 0.026, C.dark, { of: 'weapon' });
-        if (!stowed) flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, pistol ? 0.06 : 0.09);
+        J(pair ? sideName('Magazine', k) : 'Magazine', nm, w.magA, w.magB, sv);
+        if (chain) cap(w.magA, w.magB, 0.062, C.pack, { of: 'weapon', sq: true });                  // the box the belt comes out of
+        else cap(w.magA, w.magB, pistol ? 0.017 : 0.026, C.dark, { of: 'weapon' });
+        if (!stowed) flash({ tip: w.muzzle, dir: w.dir, flash: w.flash }, chain ? 0.13 : pistol ? 0.06 : 0.09);
       });
       // a grenade on the belt, or in the throwing hand; and the place where a carried load sits
       var gr = p.grenade || { p: aside(add(p.root, add(mul(u, 0.09), mul(f, 0.07))), 0.185), held: false };
@@ -385,9 +419,9 @@
       for (i = 0; i < 2; i++) {
         s = p.arms[i]; if (i === 0) G('arm0', 3, 3); else G('arm1', -3, 1);
         J(sideName('UpperArm', i), 'Spine', s.shoulder, s.elbow);
-        cap(s.shoulder, s.elbow, D ? 0.048 : 0.052, D ? P('top') : C.suit, { part: 'upperArm' });
+        cap(s.shoulder, s.elbow, D ? 0.048 : 0.052, D ? P('top') : H && H.bare ? C.skin : C.suit, { part: 'upperArm' });
         J(sideName('LowerArm', i), sideName('UpperArm', i), s.elbow, s.hand);
-        if (!D) cap(s.elbow, s.hand, 0.048, C.armor, { part: 'forearm' });
+        if (!D) cap(s.elbow, s.hand, 0.048, H && H.bare ? C.skin : C.armor, { part: 'forearm' });
         else {
           if (W('sleeves', 'long')) cap(s.elbow, s.hand, 0.043, P('top'), { part: 'forearm' });
           if (W('sleeves', 'short')) cap(s.elbow, s.hand, 0.040, P('skin'), { part: 'forearm' });
@@ -653,6 +687,7 @@
         ball(l.knee, 0.13, C.dark, { of: 'upperLeg' });
       }
     }
+    if (p.kind === 'biped' && HEAVY[c.id]) out.forEach(function (q) { if (/^(torso|leg|arm)/.test(q.g)) q.r = q.r * HEAVY[c.id].scale; });      // a gunner is built heavily
     // a heavier or slighter build: the body's parts are that much thicker (the head, and what is carried, are as they were)
     if (wear && !ALL && opt && opt.build && opt.build !== 1) out.forEach(function (q) { if (/^(torso|leg|arm)/.test(q.g)) q.r = q.r * opt.build; });
     out.joints = joints; out.heading = p.heading || 0;
@@ -785,6 +820,6 @@
     return go(o, null);
   }
 
-  return { LOOK: LOOK, partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, WEAR: WEAR, OPTIONS: OPTIONS, COLOURS: COLOURS, wearOf: wearOf, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { LOOK: LOOK, partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, HEAVY: HEAVY, WEAR: WEAR, OPTIONS: OPTIONS, COLOURS: COLOURS, wearOf: wearOf, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });

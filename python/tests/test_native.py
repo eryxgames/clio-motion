@@ -151,6 +151,7 @@ def main():
     print(native.status())
     if os.environ.get("CLIO_MOTION_REQUIRE"):                # a library built from this tree is this version
         check(native.version() == cm.__version__, "the library is %s, the package %s" % (native.version(), cm.__version__))
+        check(all(native.has_kit(k) for k in cm.KITS) and native.has_kit(None) and not native.has_kit("lance"), "the library knows every kit the package does")
     # 1. the inputs as numbers: every line of inputs of every recorded run, to a dictionary and back
     lines = 0
     for path in sorted(glob.glob(os.path.join(HERE, "..", "..", "spec", "body", "*.txt"))):

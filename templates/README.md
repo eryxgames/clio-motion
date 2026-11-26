@@ -9,7 +9,9 @@ model in Blender for 3D. Your art goes onto the character's own skeleton, so it 
     templates/3d/<name>.glb              the same skeleton with a stand-in model, skinned
 
 `<name>` is the character, and for the soldier also the kit: `soldier` (rifle), `soldier_pistols`,
-`soldier_sword`. People who are not soldiers (`person`, `woman`, `technician`, `scientist`, `hazmat`) are
+`soldier_sword`, `soldier_chaingun`, `soldier_chainguns`. The `gunner` and the `commando` are the
+soldier's skeleton with the chaingun they come with; with any other weapon their joints are those
+of the soldier's template for it. People who are not soldiers (`person`, `woman`, `technician`, `scientist`, `hazmat`) are
 the soldier's skeleton in other clothes, each with three kits of their own: nothing in the hands,
 a case in the right hand, a case on wheels (`person`, `person_case`, `person_trolley`; the
 technician starts with the case, so `technician`, `technician_hands`, `technician_trolley`). The

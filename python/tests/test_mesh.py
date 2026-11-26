@@ -95,6 +95,23 @@ def main():
         check(worst < 1e-9, "%s: through walk and die every corner stays on its part (%.3g m outside)" % (name, worst))
         print("%s %-16s %3d parts: %4d corners, %4d faces (%d with 4 sides); in lines %d" % ("ok   " if not bad else "     ", name, len(m["parts"]), len(m["local"]),
                                                                                            len(m["faces"]), len(mesh.build(rig, sides=4, thin=3)["faces"]), len(ln["edges"])))
+    # the joints a pose is given are the rig's own, by name and in its order, for every character and every kit it can carry
+    flat = lambda x, z=0.0: 0.0  # noqa: E731
+    seen = 0
+    for cid, ch in cm.characters().items():
+        kits = [k for k in cm.KITS if cm.kit_fits(ch, k)] if ch["mount"].get("type") == "held" else [None]
+        for kit in kits:
+            S = cm.create_state(ch, flat)
+            pose = None
+            for _ in range(240):
+                pose = cm.step(S, ch, {"speed": 1.2, "kit": kit, "armed": True}, cm.STYLE, flat, 1 / 120)
+            rig = cm.rig.rig_for(ch, pose)
+            want = cid if kit in (None, ch["mount"].get("kit")) else cid + "_" + kit
+            got = [j[0] for j in cm.rig.joints(ch, pose, rig)]
+            check(rig["name"] == want, "%s with %s is the rig %s (got %s)" % (cid, kit, want, rig["name"]))
+            check(got == [j["name"] for j in rig["joints"]], "%s: the pose's joints are the rig's, by name (%s)" % (want, [g for g in got if g not in {j["name"] for j in rig["joints"]}]))
+            seen += 1
+    check(seen == len(cm.rig.rigs()), "every rig is some character's with some kit (%d of %d)" % (seen, len(cm.rig.rigs())))
     print("%d failed" % bad if bad else "mesh: all passed")
     return 1 if bad else 0
 

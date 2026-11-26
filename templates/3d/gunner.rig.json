@@ -1,0 +1,1029 @@
+{
+ "format": "clio-motion-rig",
+ "version": 1,
+ "id": "gunner",
+ "name": "gunner",
+ "kit": "chaingun",
+ "kind": "biped",
+ "units": "metres",
+ "axes": {
+  "up": "+Y",
+  "forward": "+Z",
+  "right": "-X"
+ },
+ "height": 1.7153,
+ "leg": 0.92,
+ "pose": "template",
+ "joints": [
+  {
+   "name": "UpperLeg_R",
+   "parent": "Hips",
+   "head": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "tail": [
+    -0.1,
+    0.456816,
+    0.077147
+   ]
+  },
+  {
+   "name": "LowerLeg_R",
+   "parent": "UpperLeg_R",
+   "head": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "tail": [
+    -0.1,
+    0.08,
+    -0.13
+   ]
+  },
+  {
+   "name": "Foot_R",
+   "parent": "LowerLeg_R",
+   "head": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "tail": [
+    -0.1,
+    0.08,
+    0.07612
+   ]
+  },
+  {
+   "name": "Toe_R",
+   "parent": "Foot_R",
+   "head": [
+    -0.1,
+    0,
+    0.02
+   ],
+   "tail": [
+    -0.1,
+    0,
+    0.1388
+   ]
+  },
+  {
+   "name": "UpperLeg_L",
+   "parent": "Hips",
+   "head": [
+    0.1,
+    0.89,
+    0
+   ],
+   "tail": [
+    0.1,
+    0.456816,
+    0.077147
+   ]
+  },
+  {
+   "name": "LowerLeg_L",
+   "parent": "UpperLeg_L",
+   "head": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "tail": [
+    0.1,
+    0.08,
+    -0.13
+   ]
+  },
+  {
+   "name": "Foot_L",
+   "parent": "LowerLeg_L",
+   "head": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "tail": [
+    0.1,
+    0.08,
+    0.07612
+   ]
+  },
+  {
+   "name": "Toe_L",
+   "parent": "Foot_L",
+   "head": [
+    0.1,
+    0,
+    0.02
+   ],
+   "tail": [
+    0.1,
+    0,
+    0.1388
+   ]
+  },
+  {
+   "name": "Hips",
+   "parent": null,
+   "head": [
+    0,
+    0.89,
+    0
+   ],
+   "tail": [
+    0,
+    1.288661,
+    0.011963
+   ]
+  },
+  {
+   "name": "Pack",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.356092,
+    -0.196108
+   ],
+   "tail": [
+    0,
+    0.981212,
+    -0.189515
+   ],
+   "carried": true
+  },
+  {
+   "name": "Spine",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "tail": [
+    0,
+    1.500285,
+    0.018314
+   ]
+  },
+  {
+   "name": "Head",
+   "parent": "Spine",
+   "head": [
+    0,
+    1.600263,
+    0.017208
+   ],
+   "tail": [
+    0,
+    1.715263,
+    0.017208
+   ]
+  },
+  {
+   "name": "Weapon",
+   "parent": "Hips",
+   "head": [
+    0.02,
+    1.617175,
+    -0.228291
+   ],
+   "tail": [
+    0.02,
+    0.551655,
+    -0.260266
+   ],
+   "carried": true
+  },
+  {
+   "name": "Magazine",
+   "parent": "Weapon",
+   "head": [
+    0.02,
+    1.31941,
+    -0.307258
+   ],
+   "tail": [
+    0.02,
+    1.326369,
+    -0.539154
+   ],
+   "carried": true
+  },
+  {
+   "name": "Grenade",
+   "parent": "Hips",
+   "head": [
+    -0.185,
+    0.97786,
+    0.072668
+   ],
+   "tail": [
+    -0.185,
+    1.029295,
+    0.074212
+   ],
+   "carried": true
+  },
+  {
+   "name": "Carry",
+   "parent": "Hips",
+   "head": [
+    0,
+    1.099703,
+    0.346446
+   ],
+   "tail": [
+    0,
+    1.151137,
+    0.34799
+   ],
+   "carried": true
+  },
+  {
+   "name": "UpperArm_R",
+   "parent": "Spine",
+   "head": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "tail": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ]
+  },
+  {
+   "name": "LowerArm_R",
+   "parent": "UpperArm_R",
+   "head": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "tail": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ]
+  },
+  {
+   "name": "Hand_R",
+   "parent": "LowerArm_R",
+   "head": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "tail": [
+    -0.623305,
+    0.911982,
+    0.00066
+   ]
+  },
+  {
+   "name": "UpperArm_L",
+   "parent": "Spine",
+   "head": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "tail": [
+    0.393951,
+    1.143721,
+    0.007614
+   ]
+  },
+  {
+   "name": "LowerArm_L",
+   "parent": "UpperArm_L",
+   "head": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "tail": [
+    0.583836,
+    0.951861,
+    0.001856
+   ]
+  },
+  {
+   "name": "Hand_L",
+   "parent": "LowerArm_L",
+   "head": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "tail": [
+    0.623305,
+    0.911982,
+    0.00066
+   ]
+  }
+ ],
+ "parts": [
+  {
+   "joint": "UpperLeg_R",
+   "group": "leg0",
+   "slot": "thigh",
+   "a": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "r": 0.09516,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerLeg_R",
+   "group": "leg0",
+   "slot": "shin",
+   "a": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.07076,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerLeg_R",
+   "group": "leg0",
+   "slot": "shin",
+   "a": [
+    -0.1,
+    0.268408,
+    -0.026427
+   ],
+   "b": [
+    -0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.08052000000000001,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "LowerLeg_R",
+   "group": "leg0",
+   "slot": "shin",
+   "a": [
+    -0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": null,
+   "r": 0.08052000000000001,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Foot_R",
+   "group": "leg0",
+   "slot": "foot",
+   "a": [
+    -0.1,
+    0.04,
+    -0.19
+   ],
+   "b": [
+    -0.1,
+    0.04,
+    0.02
+   ],
+   "r": 0.056119999999999996,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Toe_R",
+   "group": "leg0",
+   "slot": "foot",
+   "a": [
+    -0.1,
+    0.035,
+    0.02
+   ],
+   "b": [
+    -0.1,
+    0.035,
+    0.09
+   ],
+   "r": 0.0488,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "UpperLeg_L",
+   "group": "leg1",
+   "slot": "thigh",
+   "a": [
+    0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "r": 0.09516,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerLeg_L",
+   "group": "leg1",
+   "slot": "shin",
+   "a": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.07076,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerLeg_L",
+   "group": "leg1",
+   "slot": "shin",
+   "a": [
+    0.1,
+    0.268408,
+    -0.026427
+   ],
+   "b": [
+    0.1,
+    0.08,
+    -0.13
+   ],
+   "r": 0.08052000000000001,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "LowerLeg_L",
+   "group": "leg1",
+   "slot": "shin",
+   "a": [
+    0.1,
+    0.456816,
+    0.077147
+   ],
+   "b": null,
+   "r": 0.08052000000000001,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Foot_L",
+   "group": "leg1",
+   "slot": "foot",
+   "a": [
+    0.1,
+    0.04,
+    -0.19
+   ],
+   "b": [
+    0.1,
+    0.04,
+    0.02
+   ],
+   "r": 0.056119999999999996,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Toe_L",
+   "group": "leg1",
+   "slot": "foot",
+   "a": [
+    0.1,
+    0.035,
+    0.02
+   ],
+   "b": [
+    0.1,
+    0.035,
+    0.09
+   ],
+   "r": 0.0488,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Pack",
+   "group": "torso",
+   "slot": "pack",
+   "a": [
+    0,
+    1.356092,
+    -0.196108
+   ],
+   "b": [
+    0,
+    1.145887,
+    -0.192411
+   ],
+   "r": 0.1647,
+   "color": "#474d44"
+  },
+  {
+   "joint": "Hips",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    -0.1,
+    0.89,
+    0
+   ],
+   "b": [
+    0.1,
+    0.89,
+    0
+   ],
+   "r": 0.11956,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "Hips",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    0,
+    0.939978,
+    0.0015
+   ],
+   "b": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "r": 0.14884,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    0,
+    1.139888,
+    0.007499
+   ],
+   "b": [
+    0,
+    1.319807,
+    0.012898
+   ],
+   "r": 0.18056,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "r": 0.09028,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    -0.19,
+    1.369784,
+    0.014398
+   ],
+   "b": null,
+   "r": 0.10004,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Spine",
+   "group": "torso",
+   "slot": "torso",
+   "a": [
+    0.19,
+    1.369784,
+    0.014398
+   ],
+   "b": null,
+   "r": 0.10004,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0,
+    1.600263,
+    0.017208
+   ],
+   "b": null,
+   "r": 0.115,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0,
+    1.578263,
+    0.072208
+   ],
+   "b": null,
+   "r": 0.076,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    0.04,
+    1.612263,
+    0.122208
+   ],
+   "b": null,
+   "r": 0.024,
+   "color": "#ff6a3c"
+  },
+  {
+   "joint": "Head",
+   "group": "head",
+   "slot": "head",
+   "a": [
+    -0.04,
+    1.612263,
+    0.122208
+   ],
+   "b": null,
+   "r": 0.024,
+   "color": "#ff6a3c"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.617175,
+    -0.228291
+   ],
+   "b": [
+    0.02,
+    1.1174,
+    -0.243288
+   ],
+   "r": 0.062,
+   "color": "#4a4f56"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.11662,
+    -0.2173
+   ],
+   "b": [
+    0.02,
+    0.566867,
+    -0.233798
+   ],
+   "r": 0.016,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    -0.003,
+    1.11779,
+    -0.256283
+   ],
+   "b": [
+    -0.003,
+    0.568037,
+    -0.27278
+   ],
+   "r": 0.016,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.043,
+    1.11779,
+    -0.256283
+   ],
+   "b": [
+    0.043,
+    0.568037,
+    -0.27278
+   ],
+   "r": 0.016,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    0.667602,
+    -0.256786
+   ],
+   "b": [
+    0.02,
+    0.62762,
+    -0.257986
+   ],
+   "r": 0.046,
+   "color": "#4a4f56"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.274028,
+    -0.128539
+   ],
+   "b": [
+    0.02,
+    1.1141,
+    -0.133338
+   ],
+   "r": 0.015,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.277328,
+    -0.238489
+   ],
+   "b": [
+    0.02,
+    1.274028,
+    -0.128539
+   ],
+   "r": 0.012,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Weapon",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.51932,
+    -0.301259
+   ],
+   "b": [
+    0.02,
+    1.54201,
+    -0.390618
+   ],
+   "r": 0.025,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "Magazine",
+   "group": "prop0",
+   "slot": "weapon",
+   "a": [
+    0.02,
+    1.31941,
+    -0.307258
+   ],
+   "b": [
+    0.02,
+    1.324509,
+    -0.477181
+   ],
+   "r": 0.062,
+   "color": "#474d44"
+  },
+  {
+   "joint": "Grenade",
+   "group": "grenade",
+   "slot": "grenade",
+   "a": [
+    -0.185,
+    0.97786,
+    0.072668
+   ],
+   "b": null,
+   "r": 0.036,
+   "color": "#566238"
+  },
+  {
+   "joint": "UpperArm_R",
+   "group": "arm0",
+   "slot": "upperArm",
+   "a": [
+    -0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "r": 0.06344,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerArm_R",
+   "group": "arm0",
+   "slot": "forearm",
+   "a": [
+    -0.393951,
+    1.143721,
+    0.007614
+   ],
+   "b": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "r": 0.05856,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Hand_R",
+   "group": "arm0",
+   "slot": "forearm",
+   "a": [
+    -0.583836,
+    0.951861,
+    0.001856
+   ],
+   "b": null,
+   "r": 0.056119999999999996,
+   "color": "#1f2423"
+  },
+  {
+   "joint": "UpperArm_L",
+   "group": "arm1",
+   "slot": "upperArm",
+   "a": [
+    0.19,
+    1.349793,
+    0.013798
+   ],
+   "b": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "r": 0.06344,
+   "color": "#3c4541"
+  },
+  {
+   "joint": "LowerArm_L",
+   "group": "arm1",
+   "slot": "forearm",
+   "a": [
+    0.393951,
+    1.143721,
+    0.007614
+   ],
+   "b": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "r": 0.05856,
+   "color": "#5d6a66"
+  },
+  {
+   "joint": "Hand_L",
+   "group": "arm1",
+   "slot": "forearm",
+   "a": [
+    0.583836,
+    0.951861,
+    0.001856
+   ],
+   "b": null,
+   "r": 0.056119999999999996,
+   "color": "#1f2423"
+  }
+ ],
+ "slots": [
+  {
+   "id": "head",
+   "label": "Head",
+   "axis": "ball"
+  },
+  {
+   "id": "torso",
+   "label": "Torso",
+   "axis": "up"
+  },
+  {
+   "id": "pack",
+   "label": "Backpack",
+   "axis": "down"
+  },
+  {
+   "id": "upperArm",
+   "label": "Upper arm",
+   "axis": "down"
+  },
+  {
+   "id": "forearm",
+   "label": "Forearm and hand",
+   "axis": "down"
+  },
+  {
+   "id": "thigh",
+   "label": "Thigh",
+   "axis": "down"
+  },
+  {
+   "id": "shin",
+   "label": "Shin",
+   "axis": "down"
+  },
+  {
+   "id": "foot",
+   "label": "Foot",
+   "axis": "right"
+  },
+  {
+   "id": "weapon",
+   "label": "Weapon",
+   "axis": "right"
+  }
+ ],
+ "clips": [
+  "idle",
+  "walk",
+  "back",
+  "left",
+  "right",
+  "run",
+  "sneak",
+  "jump",
+  "attack",
+  "reload",
+  "chop",
+  "thrust",
+  "block",
+  "throw",
+  "pickup",
+  "carry",
+  "putdown",
+  "guard",
+  "jab",
+  "cross",
+  "hook",
+  "hit",
+  "turn",
+  "climb",
+  "hang",
+  "climbup",
+  "die"
+ ]
+}
