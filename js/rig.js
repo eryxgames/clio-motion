@@ -20,6 +20,7 @@
     soldier2: { suit: '#474c57', armor: '#3d7cc0', pack: '#2c5d94', dark: '#23262c', metal: '#3b4048', glow: '#a8ecff' },   // a second team, for telling two apart
     // people: suit is the trousers, top the jacket, coat or overall; box and trim are the colours of what is carried
     person: { suit: '#3b4252', top: '#4c5a73', skin: '#d6a27c', hair: '#3a2a1f', shoe: '#1e1e22', glove: '#d6a27c', dark: '#22252b', metal: '#8d949e', box: '#6b4a2f', trim: '#c9a04a', pack: '#4c5a73' },
+    woman: { suit: '#3f4a5c', top: '#8a5a78', skin: '#dcae8e', hair: '#5a3620', shoe: '#2a2226', glove: '#dcae8e', dark: '#22252b', metal: '#8d949e', box: '#7a5a3a', trim: '#c9a04a', pack: '#6a6f7c', hat: '#d8c9a3', band: '#f2c230' },
     technician: { suit: '#2f6690', top: '#2f6690', skin: '#c99874', hair: '#2a2420', shoe: '#2c2622', glove: '#c98a2b', dark: '#22252b', metal: '#8d949e', box: '#b3362b', trim: '#3b4048', hat: '#f2c230', band: '#f2c230', pack: '#2f6690' },
     scientist: { suit: '#4a4f58', top: '#eef0f2', skin: '#dcae8b', hair: '#7a7d82', shoe: '#26262a', glove: '#dcae8b', dark: '#22252b', metal: '#8d949e', box: '#b8bec6', trim: '#5c636d', pack: '#eef0f2' },
     hazmat: { suit: '#e3c62f', top: '#e3c62f', skin: '#e3c62f', hair: '#e3c62f', shoe: '#2d5f8f', glove: '#2d5f8f', dark: '#1d2a33', metal: '#8d949e', box: '#d9622b', trim: '#22252b', glass: '#7fb6c9', pack: '#8a9097' },
@@ -38,7 +39,7 @@
   // sprite framing: pixels per metre in a 64-pixel frame, forward offset of the frame centre, depth range for shading, standing height
   var SPRITE = {
     soldier: { ppm: 24.4, cx: 0.25, dz: 0.3, tall: 1.95 }, person: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, technician: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 },
-    scientist: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, hazmat: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, mech: { ppm: 8.9, cx: 0.45, dz: 1.3, tall: 5.1 },
+    scientist: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, woman: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, hazmat: { ppm: 24.4, cx: 0.0, dz: 0.3, tall: 1.95 }, mech: { ppm: 8.9, cx: 0.45, dz: 1.3, tall: 5.1 },
     quad: { ppm: 31, cx: 0.12, dz: 0.25, tall: 0.95 }, hyena: { ppm: 26, cx: 0.10, dz: 0.25, tall: 1.1 }, horse: { ppm: 14.5, cx: 0.2, dz: 0.35, tall: 2.05 }, raptor: { ppm: 15.5, cx: -0.15, dz: 0.3, tall: 1.85 }, scorpion: { ppm: 22, cx: 0.15, dz: 0.8, tall: 1.4 }, octopus: { ppm: 24, cx: -0.1, dz: 0.7, tall: 1.0 }, mantis: { ppm: 22, cx: 0.0, dz: 0.5, tall: 1.2 }, wasp: { ppm: 34, cx: 0.0, dz: 0.4, tall: 0.75 }, dragon: { ppm: 6.6, cx: -0.4, dz: 0.5, tall: 3.2 }, spider: { ppm: 13.4, cx: 0.25, dz: 1.5, tall: 2.0 }
   };
   // Image slots. axis says how a part's picture is laid along its bone:
@@ -50,16 +51,42 @@
      hips (m). hat: a hard hat. hood: the head is inside the suit, behind a visor. tank: an air tank on the back. band: a bright band
      round the chest. box: how many slabs the case in the hand is made of, one under the other, each as thick as it is high (three: a
      briefcase, thin; two: a tool box, thick). */
-  var DRESS = {
-    person: { box: 3 },
-    technician: { boots: true, hat: true, band: true, box: 2 },
-    scientist: { coat: 0.30, box: 3 },
-    hazmat: { boots: true, hood: true, tank: true, box: 2 }
+  /* What people who are not soldiers wear: each option and what it may be (the first is what it is when nothing is said).
+     shape: the body's - m or f. hair: none, short, long (to the shoulders), bun, tail. hat: a hard hat, a peaked cap. hood: the head
+     inside a suit, behind a visor. coat: a lab coat to mid-thigh, a long one to the knee. skirt: short, to the knee, long (a dress is a
+     skirt the colour of the top). sleeves and legs: long, short (bare forearms; bare shins), and for legs bare. band: a bright band
+     round the chest. tank: an air tank on the back. pack: a backpack. boots: the lower shin is the shoe's colour. box: what a case
+     in the hand is - brief (a briefcase, thin) or tool (a tool box, thick). */
+  var OPTIONS = {
+    shape: ['m', 'f'], hair: ['none', 'short', 'long', 'bun', 'tail'], hat: ['none', 'hard', 'cap'], hood: ['none', 'on'],
+    coat: ['none', 'lab', 'long'], skirt: ['none', 'short', 'knee', 'long'], sleeves: ['long', 'short'], legs: ['long', 'short', 'bare'],
+    band: ['none', 'on'], tank: ['none', 'on'], pack: ['none', 'on'], boots: ['none', 'on'], box: ['brief', 'tool']
   };
+  // what each of them wears unless told otherwise (an option not named here is the first of its list, but hair, which is short)
+  var WEAR = {
+    person: { hair: 'short' },
+    woman: { shape: 'f', hair: 'long' },
+    technician: { hair: 'none', boots: 'on', hat: 'hard', band: 'on', box: 'tool' },
+    scientist: { hair: 'short', coat: 'lab' },
+    hazmat: { hair: 'none', boots: 'on', hood: 'on', tank: 'on', box: 'tool' }
+  };
+  // the colours a person has by name, and which of them a part is painted with: PAL[id][name]. 'skirt' is the top's unless given.
+  var COLOURS = ['skin', 'hair', 'top', 'suit', 'skirt', 'shoe', 'glove', 'hat', 'band', 'pack', 'box', 'trim', 'dark', 'metal', 'glass'];
+  // what a person wears: the character's own, with what is asked for over it; anything that is not one of an option's values is dropped
+  function wearOf(id, asked) {
+    var base = WEAR[id], w = {}, k, v;
+    if (!base) return null;
+    for (k in OPTIONS) {
+      v = asked && asked[k] !== undefined && asked[k] !== null ? asked[k] : base[k];
+      if (v === true) v = 'on'; if (v === false) v = 'none';
+      w[k] = OPTIONS[k].indexOf(v) >= 0 ? v : (base[k] || OPTIONS[k][0]);
+    }
+    return w;
+  }
   var SLOTS = {
     soldier: [['head', 'Head', 'ball'], ['torso', 'Torso', 'up', 1.5], ['pack', 'Backpack', 'down'], ['upperArm', 'Upper arm', 'down'], ['forearm', 'Forearm and hand', 'down'],
       ['thigh', 'Thigh', 'down'], ['shin', 'Shin', 'down'], ['foot', 'Foot', 'right'], ['weapon', 'Weapon', 'right']],
-    person: CIVIL_SLOTS, technician: CIVIL_SLOTS, scientist: CIVIL_SLOTS, hazmat: CIVIL_SLOTS.concat([['pack', 'Air tank', 'down']]),
+    person: CIVIL_SLOTS, woman: CIVIL_SLOTS, technician: CIVIL_SLOTS, scientist: CIVIL_SLOTS, hazmat: CIVIL_SLOTS.concat([['pack', 'Air tank', 'down']]),
     mech: [['hull', 'Hull', 'ball'], ['gun', 'Gun', 'right'], ['thigh', 'Thigh', 'down'], ['shin', 'Shin', 'down'], ['foot', 'Foot', 'right']],
     quad: [['body', 'Body', 'right'], ['head', 'Head', 'right'], ['upperLeg', 'Upper leg', 'down'], ['lowerLeg', 'Lower leg', 'down']],
     raptor: [['body', 'Body', 'right'], ['head', 'Head', 'ball'], ['upperLeg', 'Thigh', 'down'], ['lowerLeg', 'Shin', 'down']],
@@ -121,6 +148,15 @@
   // opt.model: only what belongs to the character's own model (no crate in the hands). opt.pal: other colours.
   function buildPrims(p, c, opt) {
     var out = [], C = (opt && opt.pal) || PAL[c.id], grp = 'body', ly = 0, sh = 2, withFlash = !opt || opt.flash !== false;
+    // People who are not soldiers: what they wear (opt.wear over the character's own), their colours by name (opt.colors over the
+    // character's), and how heavily they are built (opt.build: 1 as drawn, less is slighter). opt.all: every part of every option, each
+    // marked with the option it belongs to ('tag': "hair=long") - the wardrobe other languages choose from.
+    var wear = wearOf(c.id, opt && opt.wear), ALL = !!(opt && opt.all) && !!wear, TAG = null, CK = null, ck;
+    if (wear && opt && opt.colors) { var C0 = C; C = {}; for (ck in C0) C[ck] = C0[ck]; for (ck in opt.colors) if (COLOURS.indexOf(ck) >= 0 && /^#[0-9a-fA-F]{6}$/.test(opt.colors[ck])) C[ck] = opt.colors[ck].toLowerCase(); }
+    // is this what is worn? (with opt.all: yes, and what follows is marked with it); W() ends what an option covers
+    function W(key, val) { if (!key) { TAG = null; return false; } if (ALL) { TAG = key + '=' + val; return true; } return wear[key] === val; }
+    // a colour by its name; the part painted next remembers the name
+    function P(key) { CK = key; return C[key] || (key === 'skirt' ? C.top : key === 'hat' || key === 'band' ? '#f2c230' : key === 'glass' ? '#7fb6c9' : C.dark); }
     // a group is one body part: ly is its place in the draw order (low = behind), sh its shade (0 dark .. 4 light)
     function G(name, layer, shadeLevel) { grp = name; ly = layer; sh = shadeLevel; }
     // skeleton: J() declares a joint (its origin, and the point its bone aims at); parts drawn after it are bound to it
@@ -140,7 +176,7 @@
     function perpU(d) { return [rtU[1] * d[2] - rtU[2] * d[1], rtU[2] * d[0] - rtU[0] * d[2], rtU[0] * d[1] - rtU[1] * d[0]]; }
     function asideU(pt, dist) { return add(pt, mul(rtU, dist)); }
     function toward(a, b, dist) { return add(a, mul(unit(sub(b, a)), dist)); }
-    function put(a, b, r, col, o) { var q = { a: a, b: b, r: r, col: col, g: grp, ly: ly, sh: sh, j: curJ }, k; if (o) for (k in o) q[k] = o[k]; out.push(q); }
+    function put(a, b, r, col, o) { var q = { a: a, b: b, r: r, col: col, g: grp, ly: ly, sh: sh, j: curJ }, k; if (o) for (k in o) q[k] = o[k]; if (CK) { q.ck = CK; CK = null; } if (TAG) q.tag = TAG; out.push(q); }
     function cap(a, b, r, col, o) { put(a, b, r, col, o); }
     function ball(a, r, col, o) { put(a, null, r, col, o); }
     function flash(m, r) {
@@ -164,29 +200,57 @@
       });
     }
     if (p.kind === 'biped') {
-      var D = DRESS[c.id] || null;                 // null: a soldier, in armour
+      var D = wear;                                // null: a soldier, in armour
       for (i = 0; i < p.legs.length; i++) {
         l = p.legs[i]; if (i === 0) G('leg0', 2, 3); else G('leg1', -2, 1);
         J(sideName('UpperLeg', i), 'Hips', l.hip, l.knee);
-        cap(l.hip, l.knee, 0.078, C.suit, { part: 'thigh' });
+        if (!D) cap(l.hip, l.knee, 0.078, C.suit, { part: 'thigh' });
+        else {
+          if (W('legs', 'long')) cap(l.hip, l.knee, 0.078, P('suit'), { part: 'thigh' });
+          if (W('legs', 'short')) cap(l.hip, l.knee, 0.078, P('suit'), { part: 'thigh' });
+          if (W('legs', 'bare')) cap(l.hip, l.knee, 0.074, P('skin'), { part: 'thigh' });
+          // a skirt goes with the legs under it, so that a stride does not come through it
+          if (W('skirt', 'short')) cap(l.hip, mix(l.hip, l.knee, 0.45), 0.094, P('skirt'), { of: 'thigh' });
+          if (W('skirt', 'knee')) cap(l.hip, mix(l.hip, l.knee, 0.88), 0.096, P('skirt'), { of: 'thigh' });
+          if (W('skirt', 'long')) cap(l.hip, l.knee, 0.098, P('skirt'), { of: 'thigh' });
+          W();
+        }
         J(sideName('LowerLeg', i), sideName('UpperLeg', i), l.knee, l.ankle);
-        cap(l.knee, l.ankle, 0.058, C.suit, { part: 'shin' });
-        if (!D) { cap(mix(l.knee, l.ankle, 0.5), l.ankle, 0.066, C.armor, { of: 'shin' }); ball(l.knee, 0.066, C.armor, { of: 'shin' }); }
-        else if (D.boots) cap(mix(l.knee, l.ankle, 0.55), l.ankle, 0.064, C.shoe, { of: 'shin' });
+        if (!D) { cap(l.knee, l.ankle, 0.058, C.suit, { part: 'shin' }); cap(mix(l.knee, l.ankle, 0.5), l.ankle, 0.066, C.armor, { of: 'shin' }); ball(l.knee, 0.066, C.armor, { of: 'shin' }); }
+        else {
+          if (W('legs', 'long')) cap(l.knee, l.ankle, 0.058, P('suit'), { part: 'shin' });
+          if (W('legs', 'short')) cap(l.knee, l.ankle, 0.054, P('skin'), { part: 'shin' });
+          if (W('legs', 'bare')) cap(l.knee, l.ankle, 0.054, P('skin'), { part: 'shin' });
+          if (W('skirt', 'long')) cap(l.knee, mix(l.knee, l.ankle, 0.5), 0.086, P('skirt'), { of: 'shin' });
+          if (W('boots', 'on')) cap(mix(l.knee, l.ankle, 0.55), l.ankle, 0.064, P('shoe'), { of: 'shin' });
+          W();
+        }
         var fd = unit(sub(l.ball, l.heel)), fn = perp(fd), td = unit(sub(l.toe, l.ball)), tn = perp(td);
         J(sideName('Foot', i), sideName('LowerLeg', i), l.ankle, add(l.ankle, fd));
-        cap(add(l.heel, mul(fn, 0.04)), add(l.ball, mul(fn, 0.04)), 0.046, D ? C.shoe : C.armor, { part: 'foot', end: add(l.toe, mul(tn, 0.04)) });
+        cap(add(l.heel, mul(fn, 0.04)), add(l.ball, mul(fn, 0.04)), 0.046, D ? P('shoe') : C.armor, { part: 'foot', end: add(l.toe, mul(tn, 0.04)) });
         J(sideName('Toe', i), sideName('Foot', i), l.ball, add(l.ball, td));
-        cap(add(l.ball, mul(tn, 0.035)), add(l.toe, mul(tn, 0.035)), 0.04, D ? C.shoe : C.armor, { of: 'foot' });
+        cap(add(l.ball, mul(tn, 0.035)), add(l.toe, mul(tn, 0.035)), 0.04, D ? P('shoe') : C.armor, { of: 'foot' });
       }
       var mid = mix(p.root, p.chest, 0.5), u = p.u, f = p.f;
       G('torso', 0, 2);
       var pkA = upY(add(p.chest, add(mul(f, -0.21), mul(u, -0.04))), p.pack), pkB = upY(add(mid, mul(f, -0.20)), p.pack);
       J('Hips', null, p.root, p.chest); J('Pack', 'Hips', pkA, pkB);
       if (!D) cap(pkA, pkB, 0.10, C.pack, { part: 'pack' });
-      else if (D.tank) cap(add(pkA, mul(f, 0.03)), add(pkB, mul(f, 0.03)), 0.07, C.pack, { part: 'pack' });
+      else {
+        if (W('tank', 'on')) cap(add(pkA, mul(f, 0.03)), add(pkB, mul(f, 0.03)), 0.07, P('pack'), { part: 'pack' });
+        if (W('pack', 'on')) cap(add(pkA, mul(u, -0.03)), add(pkB, mul(u, 0.02)), 0.092, P('pack'), { part: 'pack' });
+        W();
+      }
       useJ('Hips');
-      cap(p.legs[0].hip, p.legs[1].hip, 0.098, C.suit, { of: 'torso' });
+      if (!D) cap(p.legs[0].hip, p.legs[1].hip, 0.098, C.suit, { of: 'torso' });
+      else {
+        if (W('shape', 'm')) cap(p.legs[0].hip, p.legs[1].hip, 0.098, P('suit'), { of: 'torso' });
+        if (W('shape', 'f')) cap(p.legs[0].hip, p.legs[1].hip, 0.106, P('suit'), { of: 'torso' });
+        if (W('skirt', 'short')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.10)), 0.136, P('skirt'), { of: 'torso' });
+        if (W('skirt', 'knee')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.16)), 0.138, P('skirt'), { of: 'torso' });
+        if (W('skirt', 'long')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.22)), 0.140, P('skirt'), { of: 'torso' });
+        W();
+      }
       var gu = perpU(p.gaze), eye;
       if (!D) {
         cap(add(p.root, mul(u, 0.05)), mid, 0.122, C.suit, { part: 'torso', end: p.chest });
@@ -202,28 +266,53 @@
         ball(asideU(eye, 0.04), 0.024, C.glow, { of: 'head', raw: true, on: p.head });
       } else {
         // plain clothes: a jacket, coat or overall over the trousers, a bare head or a hat or a hood
-        if (D.coat) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -D.coat)), 0.128, C.top, { of: 'torso' });
-        cap(add(p.root, mul(u, 0.05)), mid, 0.120, C.top, { part: 'torso', end: p.chest });
+        if (W('coat', 'lab')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.30)), 0.128, P('top'), { of: 'torso' });
+        if (W('coat', 'long')) cap(add(p.root, mul(u, 0.04)), add(p.root, mul(u, -0.46)), 0.132, P('top'), { of: 'torso' });
+        if (W('shape', 'm')) cap(add(p.root, mul(u, 0.05)), mid, 0.120, P('top'), { part: 'torso', end: p.chest });
+        if (W('shape', 'f')) cap(add(p.root, mul(u, 0.05)), mid, 0.102, P('top'), { part: 'torso', end: p.chest });
+        W();
         J('Spine', 'Hips', mid, p.chest, rtU);
-        cap(mid, add(p.chest, mul(u, -0.07)), 0.134, C.top, { of: 'torso' });
-        if (D.band) cap(add(mid, mul(u, 0.03)), add(mid, mul(u, 0.07)), 0.139, C.band, { of: 'torso' });
-        cap(p.arms[0].shoulder, p.arms[1].shoulder, 0.066, C.top, { of: 'torso' });
+        if (W('shape', 'm')) cap(mid, add(p.chest, mul(u, -0.07)), 0.134, P('top'), { of: 'torso' });
+        if (W('shape', 'f')) cap(add(mid, mul(u, 0.03)), add(p.chest, mul(u, -0.07)), 0.120, P('top'), { of: 'torso' });
+        if (W('band', 'on')) cap(add(mid, mul(u, 0.03)), add(mid, mul(u, 0.07)), 0.139, P('band'), { of: 'torso' });
+        if (W('shape', 'm')) cap(p.arms[0].shoulder, p.arms[1].shoulder, 0.066, P('top'), { of: 'torso' });
+        if (W('shape', 'f')) cap(p.arms[0].shoulder, p.arms[1].shoulder, 0.056, P('top'), { of: 'torso' });
+        W();
         G('head', 0.1, 2);
         J('Head', 'Spine', p.head, add(p.head, perpU(p.gaze)), rtU);
-        if (D.hood) {
-          ball(p.head, 0.128, C.top, { part: 'head' });
-          ball(add(p.head, add(mul(p.gaze, 0.062), mul(gu, -0.012))), 0.082, C.dark, { of: 'head', on: p.head });
-          ball(add(p.head, add(mul(p.gaze, 0.082), mul(gu, -0.012))), 0.064, C.glass, { of: 'head', raw: true, on: p.head });
-        } else {
-          ball(p.head, 0.105, C.skin, { part: 'head' });
-          if (D.hat) {
-            ball(add(p.head, mul(gu, 0.035)), 0.108, C.hat, { of: 'head', on: p.head });
-            cap(add(p.head, mul(gu, 0.045)), add(p.head, add(mul(p.gaze, 0.13), mul(gu, 0.040))), 0.022, C.hat, { of: 'head', on: p.head });
-          } else ball(add(p.head, add(mul(p.gaze, -0.034), mul(gu, 0.030))), 0.090, C.hair, { of: 'head', on: p.head });
-          eye = add(p.head, add(mul(p.gaze, 0.093), mul(gu, 0.008)));
-          ball(asideU(eye, -0.036), 0.014, C.dark, { of: 'head', raw: true, on: p.head });
-          ball(asideU(eye, 0.036), 0.014, C.dark, { of: 'head', raw: true, on: p.head });
+        if (W('hood', 'on')) {
+          ball(p.head, 0.128, P('top'), { part: 'head' });
+          ball(add(p.head, add(mul(p.gaze, 0.062), mul(gu, -0.012))), 0.082, P('dark'), { of: 'head', on: p.head });
+          ball(add(p.head, add(mul(p.gaze, 0.082), mul(gu, -0.012))), 0.064, P('glass'), { of: 'head', raw: true, on: p.head });
         }
+        if (W('hood', 'none')) ball(p.head, 0.105, P('skin'), { part: 'head' });
+        if (W('hat', 'hard')) {
+          ball(add(p.head, mul(gu, 0.035)), 0.108, P('hat'), { of: 'head', on: p.head });
+          cap(add(p.head, mul(gu, 0.045)), add(p.head, add(mul(p.gaze, 0.13), mul(gu, 0.040))), 0.022, P('hat'), { of: 'head', on: p.head });
+        }
+        if (W('hat', 'cap')) {
+          ball(add(p.head, mul(gu, 0.028)), 0.106, P('hat'), { of: 'head', on: p.head });
+          cap(add(p.head, add(mul(p.gaze, 0.06), mul(gu, 0.050))), add(p.head, add(mul(p.gaze, 0.17), mul(gu, 0.036))), 0.015, P('hat'), { of: 'head', on: p.head });
+        }
+        if (W('hair', 'short')) ball(add(p.head, add(mul(p.gaze, -0.034), mul(gu, 0.030))), 0.090, P('hair'), { of: 'head', on: p.head });
+        if (W('hair', 'long')) {
+          ball(add(p.head, add(mul(p.gaze, -0.030), mul(gu, 0.030))), 0.094, P('hair'), { of: 'head', on: p.head });
+          cap(add(p.head, add(mul(p.gaze, -0.062), mul(gu, -0.02))), add(p.head, add(mul(p.gaze, -0.070), mul(gu, -0.15))), 0.052, P('hair'), { of: 'head', on: p.head });
+        }
+        if (W('hair', 'bun')) {
+          ball(add(p.head, add(mul(p.gaze, -0.030), mul(gu, 0.030))), 0.092, P('hair'), { of: 'head', on: p.head });
+          ball(add(p.head, add(mul(p.gaze, -0.105), mul(gu, 0.075))), 0.044, P('hair'), { of: 'head', on: p.head });
+        }
+        if (W('hair', 'tail')) {
+          ball(add(p.head, add(mul(p.gaze, -0.030), mul(gu, 0.030))), 0.092, P('hair'), { of: 'head', on: p.head });
+          cap(add(p.head, add(mul(p.gaze, -0.110), mul(gu, 0.040))), add(p.head, add(mul(p.gaze, -0.165), mul(gu, -0.13))), 0.028, P('hair'), { of: 'head', on: p.head });
+        }
+        if (W('hood', 'none')) {
+          eye = add(p.head, add(mul(p.gaze, 0.093), mul(gu, 0.008)));
+          ball(asideU(eye, -0.036), 0.014, P('dark'), { of: 'head', raw: true, on: p.head });
+          ball(asideU(eye, 0.036), 0.014, P('dark'), { of: 'head', raw: true, on: p.head });
+        }
+        W();
       }
       // a rider's reins, from the hands to the mount's mouth or neck
       if (p.reins) p.reins.forEach(function (r) { cap(r[0], r[1], 0.007, '#2a211a', { of: 'torso', raw: true }); });
@@ -237,21 +326,25 @@
         J(nm, 'Hips', w.o, w.muzzle, sv);
         if (w.kind === 'case') {
           // a case seen from the side: slabs one under the other from its top edge down, and the handle above
-          var bx = (D && D.box) || 3, bh = 0.30 / bx, zb;
+          var bx, bh, zb;
           G('prop' + k, 2.6, 3);
-          for (zb = 0; zb < bx; zb++) cap(add(w.o, mul(w.up, -bh * (zb + 0.5))), add(w.muzzle, mul(w.up, -bh * (zb + 0.5))), bh / 2, C.box, zb ? { of: 'case', sq: true } : { part: 'case', sq: true });
-          cap(add(w.grip, mul(w.dir, -0.05)), add(w.grip, mul(w.dir, 0.05)), 0.012, C.trim, { of: 'case' });
-          cap(add(w.body, mul(w.up, -0.02)), add(w.body, mul(w.up, -0.07)), 0.018, C.trim, { of: 'case' });
+          for (bx = 3; bx >= 2; bx--) if (W('box', bx === 3 ? 'brief' : 'tool')) {
+            bh = 0.30 / bx;
+            for (zb = 0; zb < bx; zb++) cap(add(w.o, mul(w.up, -bh * (zb + 0.5))), add(w.muzzle, mul(w.up, -bh * (zb + 0.5))), bh / 2, P('box'), zb ? { of: 'case', sq: true } : { part: 'case', sq: true });
+          }
+          W();
+          cap(add(w.grip, mul(w.dir, -0.05)), add(w.grip, mul(w.dir, 0.05)), 0.012, P('trim'), { of: 'case' });
+          cap(add(w.body, mul(w.up, -0.02)), add(w.body, mul(w.up, -0.07)), 0.018, P('trim'), { of: 'case' });
           return;
         }
         if (w.kind === 'trolley') {
           // a case on wheels: two slabs side by side lying on its handle's rods, the rods and the grip, and a wheel at each end of the axle
           G('prop' + k, -2.4, 1);
-          for (zb = -1; zb <= 1; zb += 2) cap(add(w.magA, mul(sv, 0.09 * zb)), add(w.magB, mul(sv, 0.09 * zb)), 0.10, C.box, zb < 0 ? { part: 'case', sq: true } : { of: 'case', sq: true });
-          cap(w.body, w.muzzle, 0.011, C.metal, { of: 'case' });
-          cap(add(w.muzzle, mul(sv, -0.06)), add(w.muzzle, mul(sv, 0.06)), 0.014, C.trim, { of: 'case' });
-          ball(add(w.o, mul(sv, -0.13)), 0.035, C.dark, { of: 'case' });
-          ball(add(w.o, mul(sv, 0.13)), 0.035, C.dark, { of: 'case' });
+          for (zb = -1; zb <= 1; zb += 2) cap(add(w.magA, mul(sv, 0.09 * zb)), add(w.magB, mul(sv, 0.09 * zb)), 0.10, P('box'), zb < 0 ? { part: 'case', sq: true } : { of: 'case', sq: true });
+          cap(w.body, w.muzzle, 0.011, P('metal'), { of: 'case' });
+          cap(add(w.muzzle, mul(sv, -0.06)), add(w.muzzle, mul(sv, 0.06)), 0.014, P('trim'), { of: 'case' });
+          ball(add(w.o, mul(sv, -0.13)), 0.035, P('dark'), { of: 'case' });
+          ball(add(w.o, mul(sv, 0.13)), 0.035, P('dark'), { of: 'case' });
           return;
         }
         if (w.kind === 'sword') {
@@ -292,11 +385,16 @@
       for (i = 0; i < 2; i++) {
         s = p.arms[i]; if (i === 0) G('arm0', 3, 3); else G('arm1', -3, 1);
         J(sideName('UpperArm', i), 'Spine', s.shoulder, s.elbow);
-        cap(s.shoulder, s.elbow, D ? 0.048 : 0.052, D ? C.top : C.suit, { part: 'upperArm' });
+        cap(s.shoulder, s.elbow, D ? 0.048 : 0.052, D ? P('top') : C.suit, { part: 'upperArm' });
         J(sideName('LowerArm', i), sideName('UpperArm', i), s.elbow, s.hand);
-        cap(s.elbow, s.hand, D ? 0.043 : 0.048, D ? C.top : C.armor, { part: 'forearm' });
+        if (!D) cap(s.elbow, s.hand, 0.048, C.armor, { part: 'forearm' });
+        else {
+          if (W('sleeves', 'long')) cap(s.elbow, s.hand, 0.043, P('top'), { part: 'forearm' });
+          if (W('sleeves', 'short')) cap(s.elbow, s.hand, 0.040, P('skin'), { part: 'forearm' });
+          W();
+        }
         J(sideName('Hand', i), sideName('LowerArm', i), s.hand, add(s.hand, sub(s.hand, s.elbow)));
-        ball(s.hand, D ? 0.042 : 0.046, D ? C.glove : C.dark, { of: 'forearm' });
+        ball(s.hand, D ? 0.042 : 0.046, D ? P('glove') : C.dark, { of: 'forearm' });
       }
     } else if (p.kind === 'mech') {
       for (i = 0; i < p.legs.length; i++) {
@@ -555,6 +653,8 @@
         ball(l.knee, 0.13, C.dark, { of: 'upperLeg' });
       }
     }
+    // a heavier or slighter build: the body's parts are that much thicker (the head, and what is carried, are as they were)
+    if (wear && !ALL && opt && opt.build && opt.build !== 1) out.forEach(function (q) { if (/^(torso|leg|arm)/.test(q.g)) q.r = q.r * opt.build; });
     out.joints = joints; out.heading = p.heading || 0;
     return out;
   }
@@ -685,6 +785,6 @@
     return go(o, null);
   }
 
-  return { LOOK: LOOK, partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
+  return { LOOK: LOOK, partPlace: partPlace, partFrame: partFrame, sprites: sprites, drawSprites: drawSprites, PAL: PAL, SPRITE: SPRITE, SLOTS: SLOTS, WEAR: WEAR, OPTIONS: OPTIONS, COLOURS: COLOURS, wearOf: wearOf, shade: shade, shadeCache: shadeCache, projector: projector, buildPrims: buildPrims,
     ladderPrims: ladderPrims, cratePrims: cratePrims, order: order, level: level, shiftPose: shiftPose, pair: pair };
 });

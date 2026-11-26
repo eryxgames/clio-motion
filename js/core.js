@@ -1486,6 +1486,8 @@
   CHARACTERS.technician = civilian('technician', 'Technician', 'case');
   CHARACTERS.scientist = civilian('scientist', 'Scientist', 'hands');
   CHARACTERS.hazmat = civilian('hazmat', 'Scientist in a hazmat suit', 'hands');
+  CHARACTERS.woman = civilian('woman', 'Woman', 'hands');
+  CHARACTERS.woman.sway = 1.35; CHARACTERS.woman.vmax = 5.0;      // the hips go from side to side a little more
   // an arm on the ground: six links of fixed length from the body to the planted tip, arching up through the bend of its leg
   function armCurve(hip, knee, foot, seg) {
     var c = [2 * knee[0] - 0.5 * (hip[0] + foot[0]), 2 * knee[1] - 0.5 * (hip[1] + foot[1]), 2 * knee[2] - 0.5 * (hip[2] + foot[2])], pts = [], i;

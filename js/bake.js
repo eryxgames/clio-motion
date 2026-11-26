@@ -759,6 +759,47 @@
       rigs[key] = data;
       return data;
     }
+    // The wardrobe of a person who is not a soldier, for other languages: every part of every option (R.OPTIONS), placed as rigData
+    // places a rig's parts, each with the option it belongs to ('tag': "hair=long", or null for what is always worn) and the name of
+    // its colour ('ck'). 'body' is the person's own parts, by the name of the joint that carries each; 'props' what each kit adds;
+    // 'at' is where in 'body' they come in the draw order. 'wear' is what the character wears as it comes, 'palette' its colours by
+    // name (skirt: null - the top's, unless one is given).
+    function wardrobe(ch) {
+      var base = R.wearOf(ch.id), out = { wear: base, palette: {}, body: null, at: 0, props: {} };
+      if (!base) return null;
+      R.COLOURS.forEach(function (k) { var c = R.PAL[ch.id][k]; out.palette[k] = c || (k === 'skirt' ? null : k === 'hat' || k === 'band' ? '#f2c230' : k === 'glass' ? '#7fb6c9' : R.PAL[ch.id].dark); });
+      Object.keys(M.KITS).filter(function (k) { return M.kitFits(ch, k); }).forEach(function (kitName) {
+        var kit = kitName === ch.mount.kit ? null : kitName, d = rigData(ch, { kit: kit }), sk = d.sk;
+        var tp = R.buildPrims(templatePose(ch, { kit: kit }), ch, { flash: false, model: true, all: true });
+        var std = R.buildPrims(record(ch, 'idle', { frames: 8, kit: kit }).frames[0], ch, { flash: false, model: true }), F0 = sk.frames(std, null), Fr = sk.frames(tp, F0);
+        function local(F, pt) { var c = conv(pt), dd = [c[0] - F.o[0], c[1] - F.o[1], c[2] - F.o[2]]; return r6([dot3(F.B[0], dd), dot3(F.B[1], dd), dot3(F.B[2], dd)]); }
+        var parts = tp.map(function (q) {
+          var F = Fr[sk.jIdx[q.j]];
+          return { joint: q.j, a: local(F, q.a), b: q.b ? local(F, q.b) : null, end: q.end ? local(F, q.end) : null, on: q.on ? local(F, q.on) : null, r: q.r, color: q.col, ck: q.ck || null, tag: q.tag || null,
+            group: q.g, layer: q.ly, shade: q.sh, part: q.part || null, of: q.of || null, raw: !!q.raw, sq: !!q.sq };
+        });
+        var body = parts.filter(function (q) { return !/^prop/.test(q.group); }), first = parts.findIndex(function (q) { return /^prop/.test(q.group); });
+        if (!out.body) { out.body = body; out.at = body.length; }
+        if (first >= 0) out.at = first;
+        out.props[kitName] = parts.filter(function (q) { return /^prop/.test(q.group); });
+      });
+      return out;
+    }
+    // What a person so dressed is made of, as rigData's 'parts' are: the wardrobe's parts that go with what is worn, in their
+    // colours, as thick as the build makes them. (What other languages must arrive at from the wardrobe.)
+    function dressedParts(ch, o) {
+      o = o || {};
+      var kit = ch.mount.type === 'held' && o.kit && o.kit !== ch.mount.kit ? o.kit : null, d = rigData(ch, { kit: kit }), sk = d.sk;
+      var look = { flash: false, model: true, wear: o.wear, colors: o.colors, build: o.build };
+      var tp = R.buildPrims(templatePose(ch, { kit: kit }), ch, look);
+      var std = R.buildPrims(record(ch, 'idle', { frames: 8, kit: kit }).frames[0], ch, { flash: false, model: true }), F0 = sk.frames(std, null), Fr = sk.frames(tp, F0);
+      function local(F, pt) { var c = conv(pt), dd = [c[0] - F.o[0], c[1] - F.o[1], c[2] - F.o[2]]; return r6([dot3(F.B[0], dd), dot3(F.B[1], dd), dot3(F.B[2], dd)]); }
+      return tp.map(function (q) {
+        var k = sk.jIdx[q.j], F = Fr[k];
+        return { joint: k, a: local(F, q.a), b: q.b ? local(F, q.b) : null, end: q.end ? local(F, q.end) : null, on: q.on ? local(F, q.on) : null, r: q.r, color: q.col, group: q.g, layer: q.ly, shade: q.sh,
+          part: q.part || null, of: q.of || null, raw: !!q.raw, sq: !!q.sq };
+      });
+    }
     // Things in the hands change their place in the draw order with what the hands are doing: a weapon in the hand is
     // in front of the body, put away it is behind or at the hip; a grenade in the hand is in front of the arm.
     // By group name: [layer, shade].
@@ -1132,6 +1173,6 @@
     return { record: record, recordAll: recordAll, clipNames: clipNames, walkSpeed: walkSpeed, runSpeed: runSpeed, newPalette: newPalette, rasterize: rasterize,
       framePrims: framePrims, spriteView: spriteView, sheet: sheet, clio: clio, glb: glb, glbSkinned: glbSkinned,
       templatePose: templatePose, rig: rig, glbTemplate: glbTemplate, svgTemplate: svgTemplate, cutout: cutout,
-      rigData: rigData, liveSkeleton: liveSkeleton, liveParts: liveParts, jointMove: jointMove, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
+      rigData: rigData, wardrobe: wardrobe, dressedParts: dressedParts, liveSkeleton: liveSkeleton, liveParts: liveParts, jointMove: jointMove, glbCheck: glbCheck, glbFit: glbFit, glbFollows: glbFollows, parseGlb: parseGlb, pngScanlines: pngScanlines, zlibStored: zlibStored, png: png, zip: zip, crc32: crc32 };
   };
 });

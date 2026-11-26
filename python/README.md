@@ -3,7 +3,7 @@
 Pure Python, standard library only, so CLIo can carry it without a compiler.
 
 Everything the JavaScript reference does is here: the numeric kernel (stage 1), the ground step
-(stage 2), whole bodies on the ground (stage 3) for all sixteen characters, and off the ground
+(stage 2), whole bodies on the ground (stage 3) for all seventeen characters, and off the ground
 (stage 4): swimming, flight, the ladder, the ledge, the ragdoll and riding; the skeleton of a
 pose for showing it (stage 5a); and, for a game that does not run the core every frame, clips
 recorded from it and a stand-in model in triangles (stage 5b, both below). CLIo uses exactly
@@ -30,7 +30,7 @@ Inputs (all optional). Legs: `speed` (m/s), `crouch` (0..1), `steer` (-1..1) or 
 (radians), `dir` (the way to go, measured from the facing), `jump`, `hit: {"impulse": [x, y, z]}`,
 `move: [vx, vz]` (drift while standing), `pounce` (animals). Soldier: `aim: [x, y, z]`, `fire`,
 `armed`, `kit` ("rifle", "pistols", "sword" for a soldier; "hands", "case", "trolley" for a person,
-a technician, a scientist and one in a hazmat suit, who have it in the hand whatever `armed` says), `reload`, `throw: {"target": [x, y, z]}`,
+a woman, a technician, a scientist and one in a hazmat suit, who have it in the hand whatever `armed` says), `reload`, `throw: {"target": [x, y, z]}`,
 `pickup: {"at": [x, y, z], "heading": a, "size": {"d": .., "h": .., "w": ..}}`, `putdown`,
 `guard`, `block`, `punch: {"kind": "jab" | "cross" | "hook", "target": [x, y, z]}`, `track`,
 `swing: {"kind": "slash" | "chop" | "thrust"}`. Animals: `bite`, `pinch`, `sting`, `grab` (each
@@ -92,7 +92,7 @@ the box `dx`, `dy`, `dw`, `dh`.
 
 `examples/live2d_svg.py` is a complete program: `python python/examples/live2d_svg.py horse`
 writes a strip of a horse walking over rolling ground and knocked down. It writes the same file
-as `c/examples/live2d_svg.c`, byte for byte, for all sixteen characters.
+as `c/examples/live2d_svg.c`, byte for byte, for all seventeen characters.
 
 ## Clips, and a model in triangles
 

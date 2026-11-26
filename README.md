@@ -5,8 +5,8 @@ do (go this fast, face that way, aim there, jump, climb, strike) and CLIo Motion
 pose, every step, on any ground: where the feet land, how the hips rise and fall, how the spine,
 arms, tail or wings follow. The same rules drive a soldier, a heavy mech, a hyena, a horse, a
 raptor, a scorpion, an octopus, a wasp and a dragon, a soldier riding the horse, the spider
-mech or the dragon, and people who are not soldiers: a person in plain clothes, a technician, a
-scientist, and one in a hazmat suit.
+mech or the dragon, and people who are not soldiers: a man and a woman in plain clothes, a technician, a
+scientist, and one in a hazmat suit - each of whom a wardrobe makes into many.
 
 It runs live inside a game loop, in 2D or 3D, or bakes to sprite sheets and glTF files that Unity,
 Godot, Unreal and CLIo load as ordinary animation.
@@ -25,6 +25,11 @@ Pages serving `/docs` it is at https://eryxgames.github.io/clio-motion/).
 - People for a crowd: the soldier's body in plain clothes, an overall and hard hat, a lab coat or
   a hazmat suit, with nothing in the hands, a case in one (a briefcase, a tool box), or a case on
   wheels pulled behind with its axle on the ground wherever the ground is.
+- A wardrobe for them: a man's body or a woman's, hair, a hat, a hood, a coat, a skirt, short
+  sleeves, bare legs, a backpack, boots - and their colours by name, a build and a height. The
+  bench has a panel for it ("Who it is": a woman in red, a tourist, anyone at all) that writes
+  what CLIo's `models.json` takes; `spec/wardrobe.json` is the same wardrobe as data, and
+  `clio_motion.rig.dressed()` dresses a rig from it in Python.
 - Tails, tentacles and stings as chains with follow-through; bites, pinches and grabs that reach
   a target.
 - Swimming (octopus) and flight (wasp, dragon).
@@ -71,14 +76,15 @@ the bottom, each stage checked against the reference before the next one starts.
 | 5d. The C core under another language: a shared library with a flat interface (bodies as plain numbers), loaded by Python as CLIo loads CLIo Picture | | yes | yes |
 | 5e. In an engine: Unity, Godot, Unreal | | | |
 
-Stage 1 agrees with the reference to the last bit or two on 1,386 recorded cases, in both languages
+Stage 1 agrees with the reference to the last bit or two on 1,447 recorded cases, in both languages
 (160 of them are stage 5a's rule for placing a part's picture).
-Stage 2 reproduces 29 recorded runs (1,020 sampled poses of every character) to the ten digits they are
-recorded with. Stages 3 and 4 reproduce 100 whole-body runs (4,086 poses of all
-sixteen characters: every number of the pose, the count of each event, what the events carry, and
-the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,362:
+Stage 2 reproduces 30 recorded runs (1,062 sampled poses of every character) to the ten digits they are
+recorded with. Stages 3 and 4 reproduce 102 whole-body runs (4,176 poses of all
+seventeen characters: every number of the pose, the count of each event, what the events carry, and
+the mode the body is in). Stage 5a reproduces the skeleton of every third of those poses (1,392:
 the joints, the parts they carry, the draw order and shading, the moves). Stage 5b, in Python,
-records every clip of every character as the reference's baker does (466 clips, 6,190 poses).
+records every clip of every character as the reference's baker does (529 clips, 7,008 poses),
+and dresses people from the wardrobe as the reference does (45 looks).
 
 So the C and Python versions now do everything the reference does: every character whole on the
 ground, with its weapons and every action; in the water, in the air, on a ladder and on a ledge;

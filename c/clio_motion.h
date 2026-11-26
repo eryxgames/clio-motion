@@ -394,7 +394,7 @@ __asm__(".symver exp,exp@GLIBC_2.17"); __asm__(".symver pow,pow@GLIBC_2.17"); __
 __asm__(".symver log,log@GLIBC_2.17");
 #  endif
 #endif
-#define CM_VERSION "0.26.0"
+#define CM_VERSION "0.27.0"
 #define CM_NIN 82                                  /* how many numbers the inputs are */
 #define CM_NEV 22                                  /* how many kinds of event there are (CM_EV_... run from 1) */
 

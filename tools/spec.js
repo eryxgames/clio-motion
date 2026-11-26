@@ -98,6 +98,36 @@ fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'characters.json'
   fs.writeFileSync(path.join(dir, 'rigs.json'), text);
   fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'rigs.json'), text);
   process.stdout.write('spec/rigs.json ' + names.length + ' rigs, ' + Math.round(text.length / 1024) + ' KB | ');
+
+  // The wardrobe of the people who are not soldiers: every part of every option, for other languages to dress them from
+  // (python/clio_motion/rig.py: dressed). And looks.json: people dressed this way and that, and the parts the reference
+  // makes each of - what dressing from the wardrobe must arrive at.
+  const people = {};
+  Object.keys(M.CHARACTERS).forEach(function (id) { const w = B.wardrobe(M.CHARACTERS[id]); if (w) people[id] = w; });
+  const wtext = JSON.stringify({ about: 'What people who are not soldiers can wear: tools/spec.js writes this from js/rig.js. options: each option and its values. colours: the names of their colours. people: by character - wear (as it comes), palette, body (its parts, by joint name; tag: the option a part belongs to, ck: its colour by name), at (where a kit\'s parts come in the draw order), props (by kit).',
+    options: R.OPTIONS, colours: R.COLOURS, people: people }) + '\n';
+  fs.writeFileSync(path.join(dir, 'wardrobe.json'), wtext);
+  fs.writeFileSync(path.join(dir, '..', 'python', 'clio_motion', 'wardrobe.json'), wtext);
+  let seed = 20261;
+  function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+  function one(a) { return a[Math.floor(rnd() * a.length)]; }
+  const HEX = ['#b3202e', '#d8793a', '#3f7a4d', '#2f6690', '#eef0f2', '#22252b', '#C9A24A'], looks = [];
+  Object.keys(people).forEach(function (id) {
+    const ch = M.CHARACTERS[id], kits = Object.keys(people[id].props);
+    for (let n = 0; n < 9; n++) {
+      const look = { character: id, kit: one(kits), wear: {}, colors: {}, build: n % 3 === 0 ? 1 : Math.round((0.8 + 0.5 * rnd()) * 100) / 100 };
+      if (n === 0) { delete look.wear; delete look.colors; }                      // as the character comes
+      else {
+        Object.keys(R.OPTIONS).forEach(function (k) { if (rnd() < 0.45) look.wear[k] = one(R.OPTIONS[k]); });
+        R.COLOURS.forEach(function (k) { if (rnd() < 0.3) look.colors[k] = one(HEX); });
+        if (n === 4) { look.wear.hat = true; look.wear.band = true; look.wear.hair = 'green'; look.colors.top = 'red'; look.colors.torso = '#ffffff'; }      // what is not understood is passed over
+      }
+      look.parts = B.dressedParts(ch, look);
+      looks.push(look);
+    }
+  });
+  fs.writeFileSync(path.join(dir, 'looks.json'), JSON.stringify({ about: 'People dressed this way and that (character, kit, wear, colors, build) and the parts the reference makes of each, as a rig\'s parts are given. tools/spec.js writes this.', looks: looks }) + '\n');
+  process.stdout.write('spec/wardrobe.json ' + Object.keys(people).length + ' people, ' + Math.round(wtext.length / 1024) + ' KB | spec/looks.json ' + looks.length + ' looks | ');
 })();
 
 let seed = 12345;

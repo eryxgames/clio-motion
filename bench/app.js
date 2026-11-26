@@ -23,7 +23,7 @@
   if (!M.CHARACTERS[set.ch]) set.ch = 'soldier';
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () {
-      return { ch: set.ch, speed: set.speed, crouch: set.crouch, terrain: set.terrain, armed: set.armed, kit: set.kit, view: set.view, fps: set.fps, overlays: set.overlays, preset: set.preset, style: set.style };
+      return { ch: set.ch, speed: set.speed, crouch: set.crouch, terrain: set.terrain, armed: set.armed, kit: set.kit, view: set.view, fps: set.fps, overlays: set.overlays, preset: set.preset, style: set.style, gen: gen };
     });
   }
 
@@ -31,7 +31,18 @@
   var ch, env, S, yOff = 0, pose = null, footprints = [], trail = [], xf = null, held = null, keep = {};
   var cam = { y: 0, z: 0, look: 1, yaw: 0, pit: 0, fx: 0 }, aimScreen = null, firing = false, fireOnce = false, jumpOnce = false, dieOnce = null, hitOnce = null, reloadOnce = false, ladFrame = null, lastK = -1, simTick = 0;
   var rider = null, riderArmed = false;                          // a soldier on the back of the character on stage
-  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {}, person: {}, technician: {}, scientist: {}, hazmat: {} };      // image parts per character and slot
+  var IMG = { soldier: {}, mech: {}, quad: {}, hyena: {}, horse: {}, raptor: {}, scorpion: {}, octopus: {}, mantis: {}, wasp: {}, dragon: {}, spider: {}, person: {}, technician: {}, scientist: {}, hazmat: {}, woman: {} };
+  // Who a person is: what is worn other than the character's own, colours by name other than its own, build and height.
+  var gen = { wear: {}, colors: {}, build: 1, height: null };
+  if (boot.gen && typeof boot.gen === 'object') { gen.wear = boot.gen.wear || {}; gen.colors = boot.gen.colors || {}; gen.build = +boot.gen.build || 1; gen.height = +boot.gen.height || null; }
+  var MAN = 1.70, HEIGHT = { woman: 1.61 };                        // metres to the top of the head: the body is one size; a height is a scale
+  function civilNow() { return !!(ch && ch.mount && ch.mount.civil); }
+  function heightNow() { return civilNow() ? (gen.height || HEIGHT[ch.id] || MAN) : MAN; }
+  function look(more) {                                             // what the rig is asked for, for the person on stage
+    if (!civilNow()) return more;
+    var o = { wear: gen.wear, colors: gen.colors, build: gen.build }, k; if (more) for (k in more) o[k] = more[k];
+    return o;
+  }      // image parts per character and slot
   // things in the world that the actions deal with, and the two-character fight
   var wall = null, baseTerrain = null, climbOnce = false, dropOnce = false, swingOnce = null, blockHeld = false, camView = 2, pounceOnce = null, stingOnce = null, inkOnce = false, swimDown = false, inks = [], grenades = [], sparks = [], crateObj = null, cratePending = null, wantPick = false, wantPut = false, throwOnce = null, guardOn = false, punchOnce = null;
   var FT = typeof GaitFight !== 'undefined' ? GaitFight : null, F = null, say = { text: '', t: 9 }, lastAim = null;
@@ -304,7 +315,7 @@
   var stage = $('stage'), ctx = stage.getContext('2d'), W = 800, H = 400, dpr = 1;
   function projParams() {
     var vh = ch.viewH * (S.mode === 'fly' ? ch.fly.view : 1); camView += (vh - camView) * 0.06; if (Math.abs(camView - vh) > 3 * ch.viewH) camView = vh;
-    var ppm = Math.min(H * 0.70 / camView, W / (camView * 1.75));
+    var ppm = Math.min(H * 0.70 / camView, W / (camView * 1.75)) * heightNow() / MAN;      // a shorter person: the same body, seen smaller
     return { cx: F ? cam.fx : S.px + cam.look * (W * 0.09) / ppm, cy: cam.y, cz: cam.z, ppm: ppm, yaw: cam.yaw, pit: cam.pit, ox: W * 0.5, oy: H * 0.80 };
   }
 
@@ -383,11 +394,12 @@
     var stepM = [1, 2, 5, 10, 20].filter(function (s) { return s * P.ppm >= 64; })[0] || 50;
     ctx.font = '10.5px ' + TOK.mono; ctx.fillStyle = TOK.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.globalAlpha = 0.75; ctx.lineWidth = 1;
-    for (var m = Math.ceil(x0); m <= x1; m++) {
-      var gy = env.terrain(m), a = proj([m, gy, zc + zH]), major = m % stepM === 0;
+    var kH = heightNow() / MAN;                    // the tape is in real metres: a shorter person's world is that much smaller
+    for (var mm = Math.ceil(x0 * kH); mm <= x1 * kH; mm++) {
+      var m = mm / kH, gy = env.terrain(m), a = proj([m, gy, zc + zH]), major = mm % stepM === 0;
       if (Math.abs(P.yaw) > 0.01) { var b = proj([m, gy, zc - zH]); ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.globalAlpha = 0.75; }
       if (P.ppm >= 14 || major) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(a[0], a[1] + (major ? 9 : 5)); ctx.stroke(); }
-      if (major) ctx.fillText(m + ' m', a[0], a[1] + 12);
+      if (major) ctx.fillText(mm + ' m', a[0], a[1] + 12);
     }
     ctx.globalAlpha = 1;
   }
@@ -444,7 +456,7 @@
     // who is on stage: one character, or the two fighters (the one further from the camera is drawn first)
     var actors = F ? F.fighters.map(function (f, k) { var t2 = f.xf ? f.xf.t : 1; return { pose: f.xf ? M.blendPose(f.xf.from, f.S.pose, t2 * t2 * (3 - 2 * t2)) : f.S.pose, team: k, f: f }; }) : [{ pose: shown, team: 0 }];
     var lists = actors.map(function (a) {
-      var pr = R.buildPrims(a.pose, ch, TEAM[a.team].pal ? { pal: TEAM[a.team].pal } : undefined);
+      var pr = R.buildPrims(a.pose, ch, TEAM[a.team].pal ? { pal: TEAM[a.team].pal } : look());
       if (!F && rider && rider.S.pose) { var dpt = proj(a.pose.root)[2]; pr = R.pair(pr, R.buildPrims(rider.S.pose, rider.ch)); pr.depth = dpt; return pr; }
       pr.depth = proj(a.pose.root)[2]; return pr;
     });
@@ -543,7 +555,7 @@
     if (!pose) return;
     var sp = R.SPRITE[ch.id], ref = S.mode === 'ladder' ? S.y - ch.rootHeight - 0.1 : S.gRef.x;
     var P = { cx: S.px + sp.cx * Math.cos(S.h), cy: ref, cz: S.pz, ppm: sp.ppm, yaw: 0, pit: 0, ox: 32, oy: 53 };
-    var prims = R.buildPrims(pose, ch);
+    var prims = R.buildPrims(pose, ch, look());
     if (env.ladder) addLadder(prims, S.y - 4, S.y + 4);
     var img = new ImageData(framePixels(pose, prims, P, 64, 56), 64, 56);
     sctx.putImageData(img, (k % 4) * 64, (k >> 2) * 56); spr.putImageData(img, 0, 0);
@@ -585,7 +597,7 @@
   // Stand-in pictures, drawn here so the feature can be tried without any files:
   // a small armour plate per part, sized from the rig's own proportions.
   function sampleParts() {
-    var id = ch.id, prims = R.buildPrims(pose, ch, { flash: false }), seen = {};
+    var id = ch.id, prims = R.buildPrims(pose, ch, look({ flash: false })), seen = {};
     R.SLOTS[id].forEach(function (sl) {
       var q = prims.filter(function (p) { return p.part === sl[0]; })[0];
       if (!q || seen[sl[0]]) return; seen[sl[0]] = 1;
@@ -756,6 +768,7 @@
     var noTurn = set.ladder || set.down;
     $('turnRound').disabled = noTurn; $('steerL').disabled = noTurn; $('steerR').disabled = noTurn; $('hit').disabled = noTurn;
     press($('ladder'), set.ladder); $('ladder').textContent = set.ladder ? 'Step off the ladder' : 'Climb a ladder';
+    syncGen();
     $('holdSeg').hidden = !biped || civil; press($('armedOn'), set.armed); press($('armedOff'), !set.armed);
     $('kitSeg').hidden = !biped; $('reload').hidden = !biped || civil; $('ammoNote').hidden = !biped || civil; $('fire').hidden = civil;
     [].forEach.call($('kitSeg').children, function (b) { b.hidden = !M.kitFits(ch, b.dataset.kit); press(b, b.dataset.kit === set.kit); b.disabled = set.ladder || set.down; });
@@ -813,7 +826,73 @@
   }
   function setSpeed(v) { set.speed = clamp(v, 0, S.mode === 'swim' ? ch.octo.vswim : S.mode === 'fly' ? ch.fly.vmax : ch.vmax); syncUI(); }
 
-  $('chars').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; set.ch = b.dataset.ch; reset(false); });
+  $('chars').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; set.ch = b.dataset.ch; gen = { wear: {}, colors: {}, build: 1, height: null }; reset(false); });
+
+  // ------------------------------------------------------------- who a person is
+  var GEN_LABEL = { shape: 'Body', hair: 'Hair', hat: 'Hat', hood: 'Hood', coat: 'Coat', skirt: 'Skirt', sleeves: 'Sleeves', legs: 'Legs', band: 'Bright band', tank: 'Air tank', pack: 'Backpack', boots: 'Boots', box: 'Case' };
+  var GEN_VALUE = { m: 'a man\u2019s', f: 'a woman\u2019s', none: 'none', on: 'yes', 'short': 'short', 'long': 'long', bun: 'a bun', tail: 'a tail', hard: 'hard hat', cap: 'peaked cap', lab: 'lab coat', knee: 'to the knee', bare: 'bare', brief: 'briefcase', tool: 'tool box' };
+  var GEN_COLS = [['skin', 'Skin'], ['hair', 'Hair'], ['top', 'Top'], ['suit', 'Trousers'], ['skirt', 'Skirt'], ['shoe', 'Shoes'], ['hat', 'Hat'], ['pack', 'Pack'], ['box', 'Case']];
+  var GEN_PRESET = {
+    person: ['person', {}, {}, 1, null], woman: ['woman', {}, {}, 1, null],
+    red: ['woman', { skirt: 'knee', legs: 'bare', sleeves: 'short' }, { top: '#b3202e', shoe: '#8f1a26', hair: '#2a1a14' }, 0.94, 1.64],
+    tourist: ['person', { hat: 'cap', sleeves: 'short', legs: 'short', pack: 'on' }, { top: '#d8793a', suit: '#b9a57e', hat: '#2f6690', pack: '#3f7a4d', shoe: '#8a8f96' }, 1.08, 1.74],
+    worker: ['person', { hat: 'hard', band: 'on', boots: 'on', hair: 'none', box: 'tool' }, { top: '#d9702a', suit: '#39414f', shoe: '#2c2622', box: '#3b6ea8' }, 1.12, 1.76],
+    doctor: ['woman', { coat: 'lab', hair: 'bun' }, { top: '#f1f3f4', suit: '#3f6f8f', hair: '#7a4a2a' }, 0.96, 1.63]
+  };
+  var SKINS = ['#f1c9a5', '#dcae8e', '#c68e68', '#a56b46', '#7a4a2e', '#4f2f1f'], HAIRS = ['#17120f', '#3a2a1f', '#5a3620', '#8a5a2e', '#c9a24a', '#8d8f93', '#a23a1e'];
+  var CLOTH = ['#b3202e', '#d8793a', '#e3c62f', '#3f7a4d', '#2f6690', '#4c5a73', '#3b4252', '#6a4a7c', '#8a5a78', '#eef0f2', '#22252b', '#b9a57e', '#6b4a2f'];
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function anyone() {
+    var f = Math.random() < 0.5, w = { shape: f ? 'f' : 'm', hair: pick(f ? ['long', 'long', 'bun', 'tail', 'short'] : ['short', 'short', 'short', 'none', 'tail']) }, c = { skin: pick(SKINS), hair: pick(HAIRS), top: pick(CLOTH), suit: pick(CLOTH), shoe: pick(['#1e1e22', '#2c2622', '#8a8f96', '#6b4a2f', '#eef0f2']) };
+    c.glove = c.skin;
+    if (Math.random() < 0.2) { w.hat = 'cap'; c.hat = pick(CLOTH); }
+    if (Math.random() < 0.3) w.sleeves = 'short';
+    if (f && Math.random() < 0.45) { w.skirt = pick(['short', 'knee', 'knee', 'long']); w.legs = 'bare'; if (Math.random() < 0.5) c.skirt = pick(CLOTH); }
+    else if (Math.random() < 0.2) w.legs = 'short';
+    if (Math.random() < 0.15) w.coat = 'long';
+    if (Math.random() < 0.2) { w.pack = 'on'; c.pack = pick(CLOTH); }
+    return [f ? 'woman' : 'person', w, c, Math.round((0.85 + 0.4 * Math.random()) * 100) / 100, Math.round(((f ? 1.52 : 1.62) + 0.22 * Math.random()) * 100) / 100];
+  }
+  function genSpec() {                                              // what CLIo's models.json takes
+    var m = { character: ch.id }, o = {}, k, n = 0, base = R.wearOf(ch.id), wear = {}, cols = {};
+    if (set.kit && set.kit !== ch.mount.kit) m.kit = set.kit;
+    for (k in gen.wear) if (R.OPTIONS[k] && R.OPTIONS[k].indexOf(gen.wear[k]) >= 0 && gen.wear[k] !== base[k]) { wear[k] = gen.wear[k]; n++; }
+    if (n) m.wear = wear;
+    if (gen.build && Math.abs(gen.build - 1) > 0.004) m.build = gen.build;
+    if (Math.abs(heightNow() - MAN) > 0.004) m.height = heightNow();
+    n = 0; for (k in gen.colors) if (gen.colors[k] && gen.colors[k] !== R.PAL[ch.id][k]) { cols[k] = gen.colors[k]; n++; }
+    o.motion = Object.keys(m).length === 1 ? ch.id : m;
+    if (n) o.colors = cols;
+    return o;
+  }
+  function genBuildUI() {
+    var k, h = '';
+    for (k in R.OPTIONS) h += '<label>' + GEN_LABEL[k] + '<select data-o="' + k + '">' + R.OPTIONS[k].map(function (v) { return '<option value="' + v + '">' + (GEN_VALUE[v] || v) + '</option>'; }).join('') + '</select></label>';
+    $('genOpts').innerHTML = h;
+    $('genCols').innerHTML = GEN_COLS.map(function (c) { return '<label>' + c[1] + '<input type="color" data-c="' + c[0] + '"></label>'; }).join('');
+  }
+  function syncGen() {
+    var on = civilNow(); $('genGroup').hidden = !on; if (!on) return;
+    var w = R.wearOf(ch.id, gen.wear), pal = R.PAL[ch.id];
+    [].forEach.call($('genOpts').querySelectorAll('select'), function (s) { s.value = w[s.dataset.o]; });
+    [].forEach.call($('genCols').querySelectorAll('input'), function (i) { var k = i.dataset.c; i.value = gen.colors[k] || pal[k] || (k === 'skirt' ? (gen.colors.top || pal.top) : k === 'hat' ? '#f2c230' : '#22252b'); });
+    $('genBuild').value = gen.build; $('genBuildOut').textContent = (+gen.build).toFixed(2);
+    $('genHeight').value = heightNow(); $('genHeightOut').textContent = heightNow().toFixed(2) + ' m';
+    $('genOut').value = '"someone": ' + JSON.stringify(genSpec());
+  }
+  genBuildUI();
+  $('genOpts').addEventListener('change', function (e) { var s = e.target; if (!s.dataset.o) return; gen.wear[s.dataset.o] = s.value; syncUI(); });
+  $('genCols').addEventListener('input', function (e) { var i = e.target; if (!i.dataset.c) return; gen.colors[i.dataset.c] = i.value; if (i.dataset.c === 'skin' && R.PAL[ch.id].glove === R.PAL[ch.id].skin) gen.colors.glove = i.value; $('genOut').value = '"someone": ' + JSON.stringify(genSpec()); });
+  $('genBuild').addEventListener('input', function () { gen.build = +this.value; syncGen(); });
+  $('genHeight').addEventListener('input', function () { gen.height = +this.value; syncGen(); });
+  $('genReset').addEventListener('click', function () { gen = { wear: {}, colors: {}, build: 1, height: null }; syncUI(); });
+  $('genCopy').addEventListener('click', function () { var t = $('genOut'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (err) { try { document.execCommand('copy'); } catch (e2) { /* the text is selected: Ctrl+C */ } } });
+  $('genPresets').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var g = b.dataset.g === 'random' ? anyone() : GEN_PRESET[b.dataset.g], was = set.ch;
+    gen = { wear: JSON.parse(JSON.stringify(g[1])), colors: JSON.parse(JSON.stringify(g[2])), build: g[3], height: g[4] };
+    set.ch = g[0]; if (was !== set.ch) reset(false); else syncUI();
+  });
   $('terrain').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b || b.disabled) return; set.terrain = b.dataset.t; reset(true); });
   $('presets').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;

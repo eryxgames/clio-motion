@@ -22,13 +22,14 @@ jobs:
           python python/tests/test_body.py
           python python/tests/test_clips.py
           python python/tests/test_mesh.py
+          python python/tests/test_wardrobe.py
       - name: The C library under Python, against the reference
         run: |
           make -C c shared
           CLIO_MOTION_LIB=$PWD/c/build/libclio_motion.so CLIO_MOTION_REQUIRE=1 python python/tests/test_native.py
       - name: The C and Python examples draw the same picture
         run: |
-          for n in soldier horse scorpion octopus person hazmat; do
+          for n in soldier horse scorpion octopus person hazmat woman; do
             c/examples/live2d_svg $n /tmp/$n.c.svg
             python python/examples/live2d_svg.py $n /tmp/$n.py.svg
             cmp /tmp/$n.c.svg /tmp/$n.py.svg

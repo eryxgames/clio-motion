@@ -6,7 +6,7 @@ let fails = 0;
 function ok(c, msg) { if (!c) { fails++; console.log('FAIL ' + msg); } }
 function fin(o) { if (typeof o === 'number') return isFinite(o); if (o && typeof o === 'object') { for (const k in o) if (!fin(o[k])) return false; } return true; }
 const rough = x => 0.92 * (0.10 * Math.sin(x / 1.75) + 0.05 * Math.sin(x / 0.67 + 1.3));
-const PEOPLE = ['person', 'technician', 'scientist', 'hazmat'], CIVIL = ['hands', 'case', 'trolley'];
+const PEOPLE = ['person', 'technician', 'scientist', 'hazmat', 'woman'], CIVIL = ['hands', 'case', 'trolley'];
 function walk(id, inp, secs, each, terr) {
   const ch = M.CHARACTERS[id], env = { terrain: terr || rough }, S = M.createState(ch, env);
   for (let i = 0; i < secs * 120; i++) { const p = M.step(S, ch, typeof inp === 'function' ? inp(i / 120) : inp, st, env, 1 / 120); if (each) each(p, S, i / 120, env, ch); }
@@ -58,7 +58,7 @@ for (const id of PEOPLE) for (const kit of ['case', 'trolley']) {
   ok(S.mode === 'ragdoll' && p.props.length === 1 && p.props[0].kind === 'trolley', 'a fallen body\'s case lies with it');
   ok(Math.abs(p.props[0].o[1]) < 0.25 && Math.abs(p.props[0].muzzle[1]) < 0.45, 'and has come to rest on the ground (' + p.props[0].o[1].toFixed(2) + ', ' + p.props[0].muzzle[1].toFixed(2) + ')'); }
 // clothes and joints
-const want = { person: { hair: 1 }, technician: { hat: 1, band: 1, boots: 1 }, scientist: { coat: 1, hair: 1 }, hazmat: { hood: 1, tank: 1, boots: 1 } };
+const want = { person: { hair: 1 }, technician: { hat: 1, band: 1, boots: 1 }, scientist: { coat: 1, hair: 1 }, hazmat: { hood: 1, tank: 1, boots: 1 }, woman: { hair: 1 } };
 for (const id of PEOPLE) for (const kit of CIVIL) {
   const ch = M.CHARACTERS[id], S = walk(id, { speed: 1.4, kit: kit }, 3), pr = R.buildPrims(S.local, ch, { flash: false }), C = R.PAL[id];
   const names = pr.joints.map(j => j.name), cols = pr.map(q => q.col), parts = pr.map(q => q.part).filter(Boolean);
@@ -71,11 +71,55 @@ for (const id of PEOPLE) for (const kit of CIVIL) {
   ok(pr.some(q => q.j === 'Head' && q.col === C.hair && q.col !== C.skin) === !!w.hair, id + ': hair'); ok(pr.some(q => q.of === 'shin' && q.col === C.shoe) === !!w.boots, id + ': boots');
   ok((parts.indexOf('pack') >= 0) === !!w.tank, id + ': tank'); ok((cols.indexOf(C.glass) >= 0 && !!C.glass) === !!w.hood, id + ': visor');
   ok(pr.length === R.buildPrims(S.local, ch, { flash: false, model: true }).length, id + ' ' + kit + ': the same parts as a model');
+  ok(pr.every(q => q.tag === undefined), id + ' ' + kit + ': no part is marked with an option unless all are asked for');
   const d = B.rigData(ch, { kit: kit === ch.mount.kit ? null : kit }); ok(d.joints.length === names.length && d.name === (kit === ch.mount.kit ? id : id + '_' + kit), id + ' ' + kit + ': its rig is ' + d.name);
 }
 { const S = walk('scientist', { speed: 0 }, 1), pr = R.buildPrims(S.local, M.CHARACTERS.scientist, {}), top = R.PAL.scientist.top;
   const low = Math.min.apply(null, pr.filter(q => q.col === top && q.j === 'Hips').map(q => Math.min(q.a[1], q.b ? q.b[1] : q.a[1]) - q.r));
   ok(low < S.local.root[1] - 0.35 && low > S.local.root[1] - 0.6, 'the lab coat hangs below the hips (' + (S.local.root[1] - low).toFixed(2) + ' m)'); }
+// The wardrobe: what each of them can wear instead
+{ const ch = M.CHARACTERS.woman, S = walk('woman', { speed: 1.4, kit: 'case' }, 3), p = S.local, O = R.OPTIONS;
+  const plain = R.buildPrims(p, ch, { flash: false }), all = R.buildPrims(p, ch, { flash: false, all: true });
+  ok(JSON.stringify(R.wearOf('woman')) === JSON.stringify({ shape: 'f', hair: 'long', hat: 'none', hood: 'none', coat: 'none', skirt: 'none', sleeves: 'long', legs: 'long', band: 'none', tank: 'none', pack: 'none', boots: 'none', box: 'brief' }), 'what a woman wears as she comes');
+  ok(R.wearOf('soldier') === null && R.wearOf('hyena', { hat: 'cap' }) === null, 'only people have a wardrobe');
+  const w2 = R.wearOf('person', { hat: true, band: true, hair: 'green', skirt: 'knee', coat: null, nothing: 1 });
+  ok(w2.hat === 'none' && w2.band === 'on' && w2.hair === 'short' && w2.skirt === 'knee' && w2.coat === 'none' && !('nothing' in w2), 'what is not understood is passed over');
+  // every value of every option changes what she is made of, and is in the wardrobe under its name
+  for (const k in O) for (const v of O[k]) {
+    const pr = R.buildPrims(p, ch, { flash: false, wear: { [k]: v } }), base = R.wearOf('woman')[k];
+    const sig = a => JSON.stringify(a.map(q => [q.r, q.col, q.part || q.of]));
+    ok((sig(pr) === sig(plain)) === (v === base), 'woman, ' + k + ' ' + v + (v === base ? ' is what she has' : ' is something else'));
+    ok(v === 'none' || all.some(q => q.tag === k + '=' + v), 'the wardrobe has ' + k + '=' + v);
+    ok(pr.joints.length === plain.joints.length && pr.every(q => /^#[0-9a-f]{6}$/.test(q.col) && q.r > 0), k + ' ' + v + ': the same skeleton, whole parts');
+    // what is worn is what the wardrobe's marks say
+    const w = R.wearOf('woman', { [k]: v }), from = all.filter(q => !q.tag || w[q.tag.split('=')[0]] === q.tag.split('=')[1]);
+    ok(sig(from) === sig(pr), k + ' ' + v + ': chosen from the wardrobe it is the same');
+  }
+  ok(all.length > 2 * plain.length && all.every(q => q.tag === undefined || /^[a-z]+=[a-z]+$/.test(q.tag)), 'the wardrobe is everything (' + all.length + ' parts)');
+  ok(all.filter(q => q.g !== 'prop0' || true).every(q => typeof q.ck === 'string' && R.COLOURS.indexOf(q.ck) >= 0), 'every part of a person has a colour by name');
+  // colours by name; a dress is a skirt the colour of the top
+  const red = R.buildPrims(p, ch, { flash: false, wear: { skirt: 'knee', legs: 'bare' }, colors: { top: '#B3202E', hair: 'black', torso: '#ffffff' } });
+  ok(red.filter(q => q.col === '#b3202e').length >= 9 && !red.some(q => q.col === R.PAL.woman.top || q.col === '#ffffff') && red.some(q => q.col === R.PAL.woman.hair), 'a red dress: the top and the skirt, and nothing by a name that is not a colour\'s');
+  ok(red.filter(q => q.ck === 'skin').length === 5, 'bare legs and a face');
+  const two = R.buildPrims(p, ch, { flash: false, wear: { skirt: 'long' }, colors: { top: '#b3202e', skirt: '#22252b' } });
+  ok(two.filter(q => q.ck === 'skirt').every(q => q.col === '#22252b') && two.filter(q => q.ck === 'skirt').length === 5, 'a skirt of its own colour, to the shins');
+  ok(R.PAL.woman.top === '#8a5a78' && plain.some(q => q.col === '#8a5a78'), 'the character\'s own colours are not changed by it');
+  // build: the body's parts are thicker, the head and the case are not
+  const heavy = R.buildPrims(p, ch, { flash: false, build: 1.25 });
+  ok(heavy.every((q, i) => Math.abs(q.r - plain[i].r * (/^(torso|leg|arm)/.test(q.g) ? 1.25 : 1)) < 1e-12), 'build');
+  // a woman's body is slighter than a man's at the waist and the shoulders, and wider at the hips
+  const man = R.buildPrims(walk('person', { speed: 0 }, 1).local, M.CHARACTERS.person, {}), wom = R.buildPrims(walk('woman', { speed: 0 }, 1).local, ch, {});
+  const tor = a => a.filter(q => q.g === 'torso').map(q => q.r);
+  ok(tor(wom)[0] > tor(man)[0] && tor(wom)[1] < tor(man)[1] && tor(wom)[3] < tor(man)[3], 'a woman\'s shape (' + tor(wom) + ' against ' + tor(man) + ')');
+  ok(M.CHARACTERS.woman.sway > M.CHARACTERS.person.sway, 'and her hips sway more');
+  // dressed for other languages: the wardrobe's table, and a look made from it
+  const wd = B.wardrobe(ch);
+  ok(wd.body.length === all.filter(q => !/^prop/.test(q.g)).length && wd.at > 20 && wd.at < wd.body.length && wd.props.hands.length === 0 && wd.props['case'].length === 7 && wd.props.trolley.length === 6, 'the wardrobe as data');
+  ok(wd.palette.skirt === null && wd.palette.top === '#8a5a78' && Object.keys(wd.palette).length === R.COLOURS.length, 'its palette');
+  ok(B.wardrobe(M.CHARACTERS.soldier) === null, 'a soldier has none');
+  for (const id of PEOPLE) for (const kit of CIVIL) { const c2 = M.CHARACTERS[id];
+    ok(JSON.stringify(B.dressedParts(c2, { kit: kit })) === JSON.stringify(B.rigData(c2, { kit: kit === c2.mount.kit ? null : kit }).parts), id + ' ' + kit + ': dressed as it comes is its rig'); }
+}
 // a soldier is as it was
 { const S = walk('soldier', { speed: 1.4, armed: true }, 2), pr = R.buildPrims(S.local, M.CHARACTERS.soldier, { flash: false });
   ok(pr.length === 32 && pr.joints.length === 22 && pr.some(q => q.part === 'grenade') && pr.some(q => q.part === 'pack'), 'a soldier has its armour, pack and grenade'); }

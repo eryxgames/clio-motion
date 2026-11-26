@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.27.0
+
+A woman, a wardrobe, and anyone at all.
+
+- `woman`: a fifth person who is not a soldier - the same skeleton (so the same clips, kits and
+  templates' joints), a body narrower at the waist and shoulders and wider at the hips, long
+  hair, and hips that sway a little more.
+- A wardrobe for the five people (`js/rig.js`: `OPTIONS`, `WEAR`, `wearOf`): `shape` (m, f),
+  `hair` (none, short, long, bun, tail), `hat` (hard, cap), `hood`, `coat` (lab, long), `skirt`
+  (short, knee, long - a dress is a skirt the colour of the top), `sleeves` and `legs` (long,
+  short; legs also bare), `band`, `tank`, `pack`, `boots`, `box` (brief, tool). `buildPrims`
+  takes `wear` (over the character's own), `colors` by name (skin, hair, top, suit, skirt,
+  shoe, glove, hat, band, pack, box, trim) and `build` (how thick the body's parts are). What a
+  character wears as it comes is as it was: the four earlier people, their rigs, skeletons and
+  templates are unchanged to the byte.
+- Gait Bench: "Who it is" - ready-made people (a man, a woman, a woman in red, a tourist, a
+  worker, a doctor), "Anyone" for one made up, every option and colour, build and height, and
+  the line for CLIo's `models.json` to copy. A height shows as it is in an engine: the same body
+  seen smaller, against a tape in real metres.
+- For other languages: `spec/wardrobe.json` (every part of every option, marked with the option
+  it belongs to and the name of its colour) and, in Python, `clio_motion.rig.dressed(rig, wear,
+  colors, build)`, `wear_of` and `wardrobe`. `spec/looks.json` has 45 people dressed this way
+  and that with the parts the reference makes of each; `python/tests/test_wardrobe.py`
+  reproduces them. The C core moves bodies and knows nothing of clothes: C draws a person as
+  it comes.
+- A height is not the core's: the body is one size (1.70 m to the top of the head) and a
+  shorter or taller person is that body scaled by whoever draws it.
+- Checked: 2 more recorded runs for the woman (102; 4,176 poses; 1,392 skeletons; 529 clips);
+  everything recorded before is unchanged.
+
 ## 0.26.0
 
 People for a crowd.
